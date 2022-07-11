@@ -1,0 +1,39 @@
+<!-- DTI initialization file -->
+<!-- do not remove the above comment line -->
+
+
+<!--Optimizer to be used for DWI to b=0 registration-->
+<!--MultiStart: for large search space. Only suggested when data from different scans with large rigid differences are combined into a single data. REALLY slow -->
+<!--GradDescent:   for mid-level search space. Fastest option. -->
+<!--DIFFPREPOptimizer:   for small search space with very fine detail level.  Optimal choice for most cases. Default..-->
+<DWIoptimizer>DIFFPREPOptimizer</DWIoptimizer>
+
+<!-- number of bins to be used in mutual information histograms-->
+<nbins>100</nbins>
+
+
+<!--DIFFPREP OPTIMIZER SETTINGS BELOW-->
+
+<!--optimization epsilon  0.0001 -->
+<epsilon>0.0001</epsilon>
+
+<!--bracketing optimization epsilon  -->
+<brk_eps>0.0005</brk_eps>
+
+<!--determines which parameters to optimize. (24 params)-->
+<!--First 3: Translation in x,y,z. (mm)-->
+<!--4-6: Rotation along x,y,z axes. Euler angles in radians-->
+<!--7-9: Scaling along x,y,z.  Non phase encoding coefficients cause shear...-->
+<!--10-12: xy, xz, yz terms. Quadratic eddy currents-->
+<!--13-14: (x^2-y^2) and (2z^2- x^2 -y^2) terms. Quadratic eddy currents-->
+<!--15-21:  Cubic eddy currents-->
+<!--22-24:  Isocenter coordinates-->
+<optimization_flags>1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1</opt_par>
+
+
+<!--number of times by which to divide gradient step by two -->
+<num_grd_halve>5</num_grd_halve>
+
+
+
+

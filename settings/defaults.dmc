@@ -1,0 +1,162 @@
+<!--****************************GENERAL TORTOISE RUN SETTINGS***********************************************-->
+
+<!-- step: The start step for the processing (string). Can be (increasing order): 
+<!--       Import Denoising Gibbs MotionEddy EPI StructuralAlignment Drift FinalData  -->  
+<!--       If not provided, will start from the beginning which is import-->
+<step>import</step>
+
+<!-- do_QC: Perform quality control/assessment and generate reports (boolean)-->
+<do_QC>1</do_QC>
+
+<!-- remove_temp: After processing is completed, should we remove the temporary processing folder? (boolean)-->
+<remove_temp>0</remove_temp>
+
+
+
+
+
+
+<!--****************************DENOISING SETTINGS***********************************************-->
+<!-- Denoising DWI images based on J. Veraart, E. Fieremans, and D.S. Novikov Diffusion MRI noise mapping using random matrix theory. Magn. Res. Med.,  (2016), doi: 10.1002/mrm.26059
+<!-- How to perform the denoising algorithm (string)-->
+<!-- off: Still performs the denoising but only uses the output noise image for noise computations-->
+<!-- for_reg: Uses the denoised DWIs for registration but uses the original noisy images to generate the output-->
+<!-- for_final: Uses the denoised DWIs for both registrtaion and as the final corrected images-->
+<denoising>for_reg</denoising>
+
+
+<!-- Denoising kernel diameter (int)-->
+<!-- If 0 or not provided, the kernel diameter is automatically estimated from the data based on its size.-->
+<denoising_kernel_size>0</denoising_kernel_size>
+
+
+
+
+
+
+<!--****************************GIBBS RINGING SETTINGS***********************************************-->
+<!-- Gibbs ringing correction for the original unprocessed DWIs (boolean) -->
+<!-- Kellner, Dhital, Kiselev and Resiert, MRM 2016, 76:1574-1581      (if full k-space)  -->
+<!-- Lee, Novikov and Fieremans, ISMRM 2021       (if partial k-space)  -->
+<!-- 0: Do not perform Gibbs ringing correction-->
+<!-- 1:: Perform Gibbs ringing correction-->
+<gibbs>1</gibbs>
+
+<!--  gibbs_kspace_coverage (float).  To overwrite what is read from the JSON file, in case something is wrong. Possible values: 1 , 0.875 , 0.75-->
+<gibbs_kspace_coverage>1</gibbs_kspace_coverage>
+
+<!-- Parameters to the algorithm (int) -->
+<gibbs_nsh>25</gibbs_nsh>
+<gibbs_minW>1</gibbs_minW>
+<gibbs_maxW>3</gibbs_maxW>
+
+
+
+
+
+
+<!--****************************MOTION & EDDY CURRENTS DISTORTION CORRECTION SETTINGS***********************************************-->
+
+<!-- Among possibly many b=0 s/mm2 images, the index of the b=0 image (in terms of volume id starting from 0) to be used as template  (int)-->
+<!-- b0_id=-1  will automatically select the best b=0 image.-->
+<!-- b0_id=0  will use the first volume in the data-->
+<!-- b0_id=43  will use the 43th volume. It is the user's responsability to make sure the 43th volume is a b=0 image.-->
+<b0_id>-1</b0_id>
+
+<!-- Is it a human brain? (boolean). Default:1 -->
+<!-- Specialized processing is performed if human brain. -->
+<!-- Syntax: 0 (for no) or 1 (for yes)-->
+<is_human_brain>1</is_human_brain>
+
+<!-- Rotation and eddy-currents center (string)-->
+<!-- rot_eddy_center= center_voxel :  the very center voxel of the image will be the isocenter      -->
+<!-- rot_eddy_center= isocenter :  the zero coordinate from the NIFTI header (ideally the magnet isocenter)      -->
+<rot_eddy_center>isocenter</rot_eddy_center>
+
+ <!--***************************************************************************-->
+ <!--Place the center of mass of the image to the center pixel in the working FoV (boolean)? Affects only processing not the final data.-->
+ <center_of_mass>1</center_of_mass>
+
+<!-- Motion & eddy-currents distortions correction mode. Specifies which undesirable effects will be corrected-->
+<!-- Predefined motion & eddy distortion correction optimization settings. Each setting points to a file in the softwares settings/mecc_settings folder-->
+<!-- off: no motion or eddy currents distortion correction-->
+<!-- motion:  Corrects only motion with a rigid transformation-->
+<!-- eddy_only: Corrects only eddy-currents distortions and no motion. Ideal for phantoms.-->
+<!-- quadratic: Motion&eddy. Eddy currents are modeled with quadratic functions. Quadratic model is sufficient 99% of the time-->
+<!-- cubic: Motion&eddy.  Eddy currents are modeled with cubic functions..-->
+<!-- You can also create a custom settings file in software/settings/mecc_settings folder and put use its filename (without the extension) for this parameter.-->
+<correction_mode>quadratic</correction_mode>
+
+
+
+<!-- Slice to volume or in other-words slice-by-slice correction (boolean)-->
+<!-- Significantly increases processing time but no other penalties in data quality.-->
+<s2v>0</s2v>
+
+<!-- Outlier detection and replacement (boolean)-->
+<!-- Replaces the automatically detected outlier slices with estimates from the MAPMRI model.-->
+<!-- Significantly increases processing time but no other penalties in data quality.-->
+<repol>0</repol>
+
+<!-- Outlier percentage threshold to label a volume too artifactual. (float)-->
+<!-- Outlier fraction ratio. If percentace of outlier slices is larger than this threshold, the entire volume is considered troublesome and all the values replaced with the predicted one. Default:0.5-->
+<outlier_frac>0.5</outlier_frac>
+
+
+<!-- Number of iterations for high_bvalue / s2v / repol correction. Has no effect for -->
+<!-- dti regime data with s2v and repol disabled.-->
+<niter>4</niter>
+
+<!-- DTI bval (int) -->
+<!-- In case non in-vivo human brain data, or to overwrite the default value of 1000 s/mm2, what is the bval for DTI regime?-->
+<dti_bval>1000</dti_bval>
+
+<!-- HARDI bval (int) -->
+<!-- In case non in-vivo human brain data, or to overwrite the default value of 2000 s/mm2, what is the lower range bval for HARDI regime?-->
+<hardi_bval>2000</hardi_bval>
+
+
+
+<!--****************************DRIFT SETTINGS***********************************************-->
+<drift>off</drift>
+
+
+
+<!--****************************EPI DISTORTION CORRECTION, DRBUDDI SETTINGS***********************************************-->
+
+<!-- EPI Distortion correction method-->
+<!-- Options:  off, T2W_reg,  DRBUDDI-->
+<epi>DRBUDDI</epi>
+
+
+<!-- DRBUDDI performs an initial registration between the up and down data-->
+<!-- This registration starts with rigid, followed by a quick diffeomorphic and finalized by another rigid.-->
+<!-- This parameter, when set to 1 disables all these registrations.-->
+<!-- Default: 0-->
+<DRBUDDI_disable_initial_rigid>0</DRBUDDI_disable_initial_rigid>
+
+<!-- DRBUDDI performs an initial registration between the up and down data-->
+<!-- This registration starts with rigid, followed by a quick diffeomorphic and finalized by another rigid.-->
+<!-- This parameter, when set to 1 disables the very initial rigid registration and starts with the quick diffemorphic-->
+<!-- This is helpful with VERY DISTORTED data, for which the initial rigid registration is problematic.-->
+<!-- Default: 0-->
+<DRBUDDI_start_with_diffeomorphic_for_rigid_reg>0</DRBUDDI_start_with_diffeomorphic_for_rigid_reg>
+
+<!-- Similarity Metric to be used in rigid registration.->
+<!-- Options: MI or CC-->
+<!-- Default: MI-->
+<DRBUDDI_rigid_metric_type>MI</DRBUDDI_rigid_metric_type>
+
+<!-- Rigid metric learning rate.->
+<!-- Default: 0.25-->
+<DRBUDDI_rigid_metric_learning_rate>0.25</DRBUDDI_rigid_metric_learning_rate>
+
+<!-- up to which b-value should be used for DRBUDDI's tensor fitting->
+<!-- Default: 0 , meaning use all b-values-->
+<DRBUDDI_DWI_bval_tensor_fitting>0</DRBUDDI_DWI_bval_tensor_fitting>
+
+
+<!--****************************OUTPUT SETTINGS***********************************************-->
+<output_orientation>LPS</output_orientation>
+
+

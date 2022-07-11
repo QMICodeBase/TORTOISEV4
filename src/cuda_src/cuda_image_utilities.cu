@@ -1,0 +1,968 @@
+#ifndef _CUDAIMAGEUTILITIES_CU
+#define _CUDAIMAGEUTILITIES_CU
+
+#include <stdio.h>
+#include <iostream>
+
+#include "cuda_utils.h"
+
+
+
+#define BLOCKSIZE 32
+#define PER_SLICE 1
+
+static const int bSize = 1024;
+static const int gSize = 24;
+
+extern __constant__ float d_dir[9];
+extern __constant__ int d_sz[3];
+extern __constant__ float d_orig[3];
+extern __constant__ float d_spc[3];
+
+
+
+
+
+__global__ void
+FieldFindMaxLocalNorm(const float *gArr, int arraySize, const float3 spc, float *gOut)
+{
+    int thIdx = threadIdx.x;
+    int gthIdx = thIdx + blockIdx.x*bSize;
+    const int gridSize = bSize*gridDim.x;
+    float mx = -1;
+
+    for (int i = gthIdx; i < arraySize; i += gridSize)
+    {
+        float sm = (gArr[3*i  ]/spc.x)*(gArr[3*i  ]/spc.x) +
+                   (gArr[3*i+1]/spc.y)*(gArr[3*i+1]/spc.y) +
+                   (gArr[3*i+2]/spc.z)*(gArr[3*i+2]/spc.z) ;
+        sm=sqrt(sm);
+        if(sm>mx)
+            mx=sm;
+    }
+
+
+    __shared__ float shArr[bSize];
+    shArr[thIdx] = mx;
+    __syncthreads();
+    for (int size = bSize/2; size>0; size/=2)
+    { //uniform
+        if (thIdx<size)
+        {
+            if(shArr[thIdx+size]> shArr[thIdx])
+                shArr[thIdx] = shArr[thIdx+size];
+        }
+        __syncthreads();
+    }
+    if (thIdx == 0)
+        gOut[blockIdx.x] = shArr[0];
+}
+
+
+
+__global__ void
+FieldFindSumLocalNorm(const float *gArr, int arraySize, const float3 spc, float *gOut)
+{
+    int thIdx = threadIdx.x;
+    int gthIdx = thIdx + blockIdx.x*bSize;
+    const int gridSize = bSize*gridDim.x;
+    float sum = 0;
+
+    for (int i = gthIdx; i < arraySize; i += gridSize)
+    {
+        float nrm= (gArr[3*i  ]/spc.x)*(gArr[3*i  ]/spc.x) +
+                   (gArr[3*i+1]/spc.y)*(gArr[3*i+1]/spc.y) +
+                   (gArr[3*i+2]/spc.z)*(gArr[3*i+2]/spc.z) ;
+        nrm=sqrt(nrm);
+        sum+=nrm;
+    }
+
+    __shared__ float shArr[bSize];
+    shArr[thIdx] = sum;
+    __syncthreads();
+
+    for (int size = bSize/2; size>0; size/=2)
+    { //uniform
+        if (thIdx<size)
+        {
+
+                shArr[thIdx] += shArr[thIdx+size];
+        }
+        __syncthreads();
+    }
+    if (thIdx == 0)
+        gOut[blockIdx.x] = shArr[0];
+}
+
+
+
+__global__ void
+ScalarFindMax(const float *gArr, int arraySize,  float *gOut)
+{
+    int thIdx = threadIdx.x;
+    int gthIdx = thIdx + blockIdx.x*bSize;
+    const int gridSize = bSize*gridDim.x;
+    float mx = -1;
+
+    for (int i = gthIdx; i < arraySize; i += gridSize)
+    {
+        float sm = gArr[i ];
+        if(sm>mx)
+            mx=sm;
+    }
+
+    __shared__ float shArr[bSize];
+    shArr[thIdx] = mx;
+    __syncthreads();
+
+    for (int size = bSize/2; size>0; size/=2)
+    { //uniform
+        if (thIdx<size)
+        {
+            if(shArr[thIdx+size]> shArr[thIdx])
+                shArr[thIdx] = shArr[thIdx+size];
+        }
+        __syncthreads();
+    }
+    if (thIdx == 0)
+        gOut[blockIdx.x] = shArr[0];
+}
+
+
+
+__global__ void
+ScalarFindMin(const float *gArr, int arraySize,  float *gOut)
+{
+    int thIdx = threadIdx.x;
+    int gthIdx = thIdx + blockIdx.x*bSize;
+    const int gridSize = bSize*gridDim.x;
+    float mn = 1E100;
+
+    for (int i = gthIdx; i < arraySize; i += gridSize)
+    {
+        float sm = gArr[i ];
+        if(sm<mn)
+            mn=sm;
+    }
+
+    __shared__ float shArr[bSize];
+    shArr[thIdx] = mn;
+    __syncthreads();
+
+    for (int size = bSize/2; size>0; size/=2)
+    { //uniform
+        if (thIdx<size)
+        {
+            if(shArr[thIdx+size]< shArr[thIdx])
+                shArr[thIdx] = shArr[thIdx+size];
+        }
+        __syncthreads();
+    }
+    if (thIdx == 0)
+        gOut[blockIdx.x] = shArr[0];
+}
+
+
+
+
+
+__global__ void
+ScalarFindSum(const float *gArr, int arraySize,  float *gOut)
+{
+    int thIdx = threadIdx.x;
+    int gthIdx = thIdx + blockIdx.x*bSize;
+    const int gridSize = bSize*gridDim.x;
+    float sum = 0;
+
+    for (int i = gthIdx; i < arraySize; i += gridSize)
+    {
+        sum+= gArr[i ];
+    }
+
+    __shared__ float shArr[bSize];
+    shArr[thIdx] = sum;
+    __syncthreads();
+
+    for (int size = bSize/2; size>0; size/=2)
+    { //uniform
+        if (thIdx<size)
+        {
+                shArr[thIdx] += shArr[thIdx+size];
+        }
+        __syncthreads();
+    }
+    if (thIdx == 0)
+        gOut[blockIdx.x] = shArr[0];
+}
+
+
+
+__global__ void
+ScalarFindSumSq(const float *gArr, int arraySize,  float *gOut)
+{
+    int thIdx = threadIdx.x;
+    int gthIdx = thIdx + blockIdx.x*bSize;
+    const int gridSize = bSize*gridDim.x;
+    float sum = 0;
+
+    for (int i = gthIdx; i < arraySize; i += gridSize)
+    {
+        sum+= gArr[i ]*gArr[i];
+    }
+
+    __shared__ float shArr[bSize];
+    shArr[thIdx] = sum;
+    __syncthreads();
+
+    for (int size = bSize/2; size>0; size/=2)
+    { //uniform
+        if (thIdx<size)
+        {
+                shArr[thIdx] += shArr[thIdx+size];
+        }
+        __syncthreads();
+    }
+    if (thIdx == 0)
+        gOut[blockIdx.x] = shArr[0];
+}
+
+
+
+
+
+
+__global__ void
+AddToUpdateField_kernel(cudaPitchedPtr total_data, cudaPitchedPtr to_add_data , float weight, int3 d_sz, int Ncomponents)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+        if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+        {
+            size_t opitch= total_data.pitch;
+            size_t oslicePitch= opitch*d_sz.y*k;
+            size_t ocolPitch= j*opitch;
+
+            char *o_ptr= (char *)(total_data.ptr);
+            char * slice_o= o_ptr+  oslicePitch;
+            float * row_out= (float *)(slice_o+ ocolPitch);
+
+
+            char *a_ptr= (char *)(to_add_data.ptr);
+            char * slice_a= a_ptr+  oslicePitch;
+            float * row_add= (float *)(slice_a+ ocolPitch);                     
+
+            for(int mm=0;mm<Ncomponents;mm++)
+                row_out[Ncomponents*i + mm]=   row_out[Ncomponents*i + mm] + row_add[Ncomponents*i + mm]*weight;
+        }
+    }
+
+}
+
+
+void AddToUpdateField_cuda(cudaPitchedPtr total_data, cudaPitchedPtr to_add_data,float weight, const int3 data_sz,int Ncomponents  )
+{
+
+    float magnitude;
+
+    {
+
+        float* dev_out;
+        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+        ScalarFindSumSq<<<gSize, bSize>>>((float *)to_add_data.ptr, to_add_data.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+        ScalarFindSum<<<1, bSize>>>(dev_out, gSize, dev_out);
+        cudaDeviceSynchronize();
+
+        cudaMemcpy(&magnitude, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+        cudaFree(dev_out);
+        magnitude=sqrt(magnitude);
+
+    }
+
+    if(magnitude!=0)
+    {
+        const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+        const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+
+        AddToUpdateField_kernel<<< blockSize,gridSize>>>(  total_data,to_add_data,weight/magnitude,data_sz,Ncomponents );
+    }
+
+
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+}
+
+
+
+
+__global__ void
+ScaleUpdateField_kernel(cudaPitchedPtr field, const int3 d_sz, float scale)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+            {
+                size_t opitch= field.pitch;
+                size_t oslicePitch= opitch*d_sz.y*k;
+                size_t ocolPitch= j*opitch;
+
+                char *o_ptr= (char *)(field.ptr);
+                char * slice_o= o_ptr+  oslicePitch;
+                float * row_data= (float *)(slice_o+ ocolPitch);
+
+                row_data[3*i]= row_data[3*i]*scale;
+                row_data[3*i+1]= row_data[3*i+1]*scale;
+                row_data[3*i+2]= row_data[3*i+2]*scale;
+            }
+    }
+}
+
+
+
+void ScaleUpdateField_cuda(cudaPitchedPtr field, const int3 data_sz,float3 spc, float scale_factor )
+{
+    float magnitude=0;
+
+    {               
+        float* dev_out;
+        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+        FieldFindMaxLocalNorm<<<gSize, bSize>>>((float *)field.ptr, field.pitch/sizeof(float)/3*data_sz.y*data_sz.z,spc,dev_out);
+        ScalarFindMax<<<1, bSize>>>(dev_out, gSize, dev_out);
+        cudaDeviceSynchronize();
+
+
+        cudaMemcpy(&magnitude, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+        cudaFree(dev_out);                
+    }
+
+    {
+        const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+        const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );        
+
+        if(magnitude>1E-20)
+        {
+            ScaleUpdateField_kernel<<< blockSize,gridSize>>>(  field, data_sz, scale_factor/magnitude );
+            gpuErrchk(cudaPeekAtLastError());
+            gpuErrchk(cudaDeviceSynchronize());
+        }
+    }
+
+
+}
+
+
+
+__global__ void
+RestrictPhase_kernel(cudaPitchedPtr field, const int3 d_sz, float3 phase)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+            {
+                size_t opitch= field.pitch;
+                size_t oslicePitch= opitch*d_sz.y*k;
+                size_t ocolPitch= j*opitch;
+
+                char *o_ptr= (char *)(field.ptr);
+                char * slice_o= o_ptr+  oslicePitch;
+                float * row_data= (float *)(slice_o+ ocolPitch);
+                
+                float nrm = row_data[3*i]*row_data[3*i] +row_data[3*i+1]*row_data[3*i+1] + row_data[3*i+2]*row_data[3*i+2] ; 
+                nrm=sqrt(nrm);
+                if(nrm!=0)
+                {
+                    float vec_x = row_data[3*i]/nrm;
+                    float vec_y = row_data[3*i+1]/nrm;
+                    float vec_z = row_data[3*i+2]/nrm;                                        
+                    
+                    float dot = vec_x*phase.x + vec_y*phase.y + vec_z*phase.z ;
+                    row_data[3*i] =  phase.x*nrm*dot;
+                    row_data[3*i+1] = phase.y*nrm*dot;
+                    row_data[3*i+2] = phase.z*nrm*dot;
+                }
+
+          }          
+    }
+}
+
+
+
+void RestrictPhase_cuda(cudaPitchedPtr field, const int3 data_sz,float3 phase )
+{
+        const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+        const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+
+        RestrictPhase_kernel<<< blockSize,gridSize>>>(  field, data_sz, phase );
+
+
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+}
+
+
+__global__ void
+ContrainDefFields_kernel(cudaPitchedPtr ufield, cudaPitchedPtr dfield, const int3 d_sz)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+            {
+                size_t opitch= ufield.pitch;
+                size_t oslicePitch= opitch*d_sz.y*k;
+                size_t ocolPitch= j*opitch;
+
+                char *u_ptr= (char *)(ufield.ptr);
+                char * slice_u= u_ptr+  oslicePitch;
+                float * row_data_u= (float *)(slice_u+ ocolPitch);
+                
+                char *d_ptr= (char *)(dfield.ptr);
+                char * slice_d= d_ptr+  oslicePitch;
+                float * row_data_d= (float *)(slice_d+ ocolPitch);
+                
+                for(int v=0;v<3;v++)
+                {
+                    float val=(row_data_u[3*i+v] - row_data_d[3*i+v])*0.5;
+                    row_data_u[3*i+v]=val;
+                    row_data_d[3*i+v]=-val;                
+                }                             
+           }          
+    }
+}
+
+
+
+void ContrainDefFields_cuda(cudaPitchedPtr ufield, cudaPitchedPtr dfield, const int3 data_sz)
+{
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+
+    ContrainDefFields_kernel<<< blockSize,gridSize>>>(  ufield, dfield, data_sz );
+
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+}
+
+
+__global__ void
+ComposeFields_kernel(cudaPitchedPtr main_field,cudaPitchedPtr update_field,  cudaPitchedPtr output )
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2])
+            {
+                size_t mpitch= main_field.pitch;
+                size_t mslicePitch= mpitch*d_sz[1]*k;
+                size_t mcolPitch= j*mpitch;
+
+                char *m_ptr= (char *)(main_field.ptr);
+                char * slice_m= m_ptr+  mslicePitch;
+                float * row_m= (float *)(slice_m+ mcolPitch);
+
+                char *o_ptr= (char *)(output.ptr);
+                char * slice_o= o_ptr+  mslicePitch;
+                float * row_o= (float *)(slice_o+ mcolPitch);
+
+                float x[3];
+                x[0]= (d_dir[0]*i  + d_dir[1]*j + d_dir[2]*k)* d_spc[0] ;
+                x[1]= (d_dir[3]*i  + d_dir[4]*j + d_dir[5]*k)* d_spc[1] ;
+                x[2]= (d_dir[6]*i  + d_dir[7]*j + d_dir[8]*k)* d_spc[2] ;
+
+
+                float xp[3];
+                xp[0]= x[0] + row_m[3*i];
+                xp[1]= x[1] + row_m[3*i+1];
+                xp[2]= x[2] + row_m[3*i+2];
+
+                float iw = (d_dir[0]*xp[0]  + d_dir[3]*xp[1]  + d_dir[6]*xp[2])/ d_spc[0] ;
+                float jw = (d_dir[1]*xp[0]  + d_dir[4]*xp[1]  + d_dir[7]*xp[2])/ d_spc[1] ;
+                float kw = (d_dir[2]*xp[0]  + d_dir[5]*xp[1]  + d_dir[8]*xp[2])/ d_spc[2] ;
+
+
+                if(iw<0 || iw> d_sz[0]-1 || jw<0 || jw> d_sz[1]-1 || kw<0 || kw> d_sz[2]-1)
+                {
+                    for(int mm=0;mm<3;mm++)
+                       row_o[3*i +mm]=row_m[3*i +mm];
+                }
+                else
+                {
+                    int floor_x = __float2int_rd(iw);
+                    int floor_y = __float2int_rd(jw);
+                    int floor_z = __float2int_rd(kw);
+
+                    int ceil_x = __float2int_ru(iw);
+                    int ceil_y = __float2int_ru(jw);
+                    int ceil_z = __float2int_ru(kw);
+
+                    float xd= iw - floor_x;
+                    float yd= jw - floor_y;
+                    float zd= kw - floor_z;
+
+                    float ia1[3],ib1[3],ia2[3],ib2[3], ja1[3],jb1[3],ja2[3],jb2[3];
+
+
+                    size_t dpitch= update_field.pitch;
+                    char *d_ptr= (char *)(update_field.ptr);
+                    {
+                        size_t dslicePitch= dpitch*d_sz[1]*floor_z;
+                        char * slice_d= d_ptr+  dslicePitch;
+                        {
+                            size_t dcolPitch= floor_y*dpitch;
+                            float * row_data= (float *)(slice_d+ dcolPitch);
+                            for(int mm=0;mm<3;mm++)
+                            {
+                                ia1[mm] = row_data[3*floor_x +mm];
+                                ja1[mm] = row_data[3*ceil_x +mm];
+                            }
+
+                        }
+                        {
+                            size_t dcolPitch= ceil_y*dpitch;
+                            float * row_data= (float *)(slice_d+ dcolPitch);
+                            for(int mm=0;mm<3;mm++)
+                            {
+                                ia2[mm] = row_data[3*floor_x +mm];
+                                ja2[mm] = row_data[3*ceil_x +mm];
+                            }
+                        }
+                    }
+                    {
+                        size_t dslicePitch= dpitch*d_sz[1]*ceil_z;
+                        char * slice_d= d_ptr+  dslicePitch;
+                        {
+                            size_t dcolPitch= floor_y*dpitch;
+                            float * row_data= (float *)(slice_d+ dcolPitch);
+                            for(int mm=0;mm<3;mm++)
+                            {
+                                ib1[mm] = row_data[3*floor_x +mm];
+                                jb1[mm] = row_data[3*ceil_x +mm];
+                            }
+                        }
+                        {
+                            size_t dcolPitch= ceil_y*dpitch;
+                            float * row_data= (float *)(slice_d+ dcolPitch);
+                            for(int mm=0;mm<3;mm++)
+                            {
+                                ib2[mm] = row_data[3*floor_x +mm];
+                                jb2[mm] = row_data[3*ceil_x +mm];
+                            }
+                        }
+                    }
+
+                    for(int mm=0;mm<3;mm++)
+                    {
+                        float i1= ia1[mm]*(1-zd) + ib1[mm]*zd;
+                        float i2= ia2[mm]*(1-zd) + ib2[mm]*zd;
+                        float j1= ja1[mm]*(1-zd) + jb1[mm]*zd;
+                        float j2= ja2[mm]*(1-zd) + jb2[mm]*zd;
+
+                        float w1= i1*(1-yd) + i2*yd;
+                        float w2= j1*(1-yd) + j2*yd;
+
+                        float update= w1*(1-xd) + w2*xd;
+                        row_o[3*i+mm]= xp[mm] +update -  x[mm];
+
+                    }
+                }
+            }
+    }
+
+}
+
+
+
+
+void ComposeFields_cuda(cudaPitchedPtr main_field,cudaPitchedPtr update_field,
+             int3 data_sz,float3 data_spc,
+             float data_d00,  float data_d01,float data_d02,float data_d10,float data_d11,float data_d12,float data_d20,float data_d21,float data_d22,
+             float3 data_orig,
+             cudaPitchedPtr output )
+{
+
+
+    float h_d_dir[]= {data_d00,data_d01,data_d02,data_d10,data_d11,data_d12,data_d20,data_d21,data_d22};
+    gpuErrchk(cudaMemcpyToSymbol(d_dir, &h_d_dir, 9 * sizeof(float)));
+
+    float h_d_orig[]= {data_orig.x,data_orig.y,data_orig.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_orig, &h_d_orig, 3 * sizeof(float)));
+
+    float h_d_spc[]= {data_spc.x,data_spc.y,data_spc.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_spc, &h_d_spc, 3 * sizeof(float)));
+
+    int h_d_sz[]= {data_sz.x,data_sz.y,data_sz.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
+
+
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+
+    ComposeFields_kernel<<< blockSize,gridSize>>>( main_field,update_field,output );
+
+
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+
+
+}
+
+
+
+
+__global__ void
+NegateImage_kernel(cudaPitchedPtr image,  const int3 d_sz, const int Ncomponents)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+            {
+                size_t opitch= image.pitch;
+                size_t oslicePitch= opitch*d_sz.y*k;
+                size_t ocolPitch= j*opitch;
+
+                char *u_ptr= (char *)(image.ptr);
+                char * slice_u= u_ptr+  oslicePitch;
+                float * row_data= (float *)(slice_u+ ocolPitch);
+
+
+                for(int m=0;m<Ncomponents;m++)
+                    row_data[Ncomponents*i+m]=-row_data[Ncomponents*i+m];
+           }
+    }
+}
+
+__global__ void
+ComputeFieldLocalNormImage(cudaPitchedPtr field,const int3 d_sz,const float3 data_spc,cudaPitchedPtr scale_image)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+            {
+                size_t opitch= scale_image.pitch;
+                size_t oslicePitch= opitch*d_sz.y*k;
+                size_t ocolPitch= j*opitch;
+
+                char *u_ptr= (char *)(scale_image.ptr);
+                char * slice_u= u_ptr+  oslicePitch;
+                float * row_out= (float *)(slice_u+ ocolPitch);
+
+
+                size_t fpitch= field.pitch;
+                size_t fslicePitch= fpitch*d_sz.y*k;
+                size_t fcolPitch= j*fpitch;
+
+                char *f_ptr= (char *)(field.ptr);
+                char * slice_f= f_ptr+  fslicePitch;
+                float * row_data= (float *)(slice_f+ fcolPitch);
+
+                float nrm = row_data[3*i]*row_data[3*i]/data_spc.x/data_spc.x +
+                            row_data[3*i+1]*row_data[3*i+1]/data_spc.y/data_spc.y +
+                            row_data[3*i+2]*row_data[3*i+2]/data_spc.z/data_spc.z ;
+                nrm=sqrt(nrm);
+
+                row_out[i]=nrm;
+           }
+    }
+
+}
+
+__global__ void
+UpdateInvertField_kernel( cudaPitchedPtr composed_field, cudaPitchedPtr scale_image, cudaPitchedPtr output, int3 d_sz, float3 data_spc , float m_Epsilon, float m_MaxErrorNorm)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+            {
+                size_t cpitch= composed_field.pitch;
+                size_t cslicePitch= cpitch*d_sz.y*k;
+                size_t ccolPitch= j*cpitch;
+                char *c_ptr= (char *)(composed_field.ptr);
+                char * slice_c= c_ptr+  cslicePitch;
+                float * row_composed_field= (float *)(slice_c+ ccolPitch);
+
+
+                size_t spitch= scale_image.pitch;
+                size_t sslicePitch= spitch*d_sz.y*k;
+                size_t scolPitch= j*spitch;
+                char *s_ptr= (char *)(scale_image.ptr);
+                char * slice_s= s_ptr+  sslicePitch;
+                float * row_scale_image= (float *)(slice_s+ scolPitch);
+
+                size_t opitch= output.pitch;
+                size_t oslicePitch= opitch*d_sz.y*k;
+                size_t ocolPitch= j*opitch;
+                char *o_ptr= (char *)(output.ptr);
+                char * slice_o= o_ptr+  oslicePitch;
+                float * row_output= (float *)(slice_o+ ocolPitch);
+
+                float3 update;
+                update.x = row_composed_field[3*i];
+                update.y = row_composed_field[3*i+1];
+                update.z = row_composed_field[3*i+2];
+
+
+                float scaledNorm= row_scale_image[i];
+                if (scaledNorm > m_Epsilon * m_MaxErrorNorm)
+                {
+                       update.x = update.x * (m_Epsilon * m_MaxErrorNorm / scaledNorm);
+                       update.y = update.y * (m_Epsilon * m_MaxErrorNorm / scaledNorm);
+                       update.z = update.z * (m_Epsilon * m_MaxErrorNorm / scaledNorm);
+                }
+
+                update.x = row_output[3*i]  +  update.x *m_Epsilon;
+                update.y = row_output[3*i+1]  + update.y *m_Epsilon;
+                update.z = row_output[3*i+2]  + update.z *m_Epsilon;
+
+
+                row_output[3*i]=update.x;
+                row_output[3*i+1]=update.y;
+                row_output[3*i+2]=update.z;
+
+
+                if(i==0 || i==d_sz.x-1 || j==0 || j==d_sz.y-1 || k==0 || k==d_sz.z-1 )
+                {
+                    row_output[3*i]=0;
+                    row_output[3*i+1]=0;
+                    row_output[3*i+2]=0;
+                }
+            }
+    }
+}
+
+
+void InvertField_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 data_spc,
+                      float data_d00,  float data_d01,float data_d02,float data_d10,float data_d11,float data_d12,float data_d20,float data_d21,float data_d22,
+                      float3 data_orig,
+                      cudaPitchedPtr output)
+{
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+
+
+    cudaPitchedPtr scale_image={0};
+    cudaExtent extent =  make_cudaExtent(1*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
+    cudaMalloc3D(&scale_image, extent);
+    cudaMemset3D(scale_image,0,extent);
+
+    cudaPitchedPtr composed_field={0};
+    cudaExtent extent2 =  make_cudaExtent(3*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
+    cudaMalloc3D(&composed_field, extent2);
+    cudaMemset3D(composed_field,0,extent2);
+
+
+
+    int numberOfPixelsInRegion= data_sz.x  * data_sz.y * data_sz.z;
+
+
+    //const float m_MaxErrorToleranceThreshold=0.08;
+    //const float m_MeanErrorToleranceThreshold=0.0008;
+    //const int Niter=20;
+
+    const float m_MaxErrorToleranceThreshold=0.1;
+    const float m_MeanErrorToleranceThreshold=0.001;
+    const int Niter=20;
+
+//    const float m_MaxErrorToleranceThreshold=0.03;
+//    const float m_MeanErrorToleranceThreshold=0.0003;
+//    const int Niter=200;
+
+    float m_MaxErrorNorm = 1E10;
+    float m_MeanErrorNorm = 1E10;
+
+    int iteration=0;
+
+    while (iteration++ < Niter && m_MaxErrorNorm > m_MaxErrorToleranceThreshold &&m_MeanErrorNorm > m_MeanErrorToleranceThreshold)
+    {
+
+        ComposeFields_cuda(output,field,
+                     data_sz, data_spc,
+                     data_d00,  data_d01, data_d02, data_d10, data_d11, data_d12, data_d20, data_d21, data_d22,
+                     data_orig,
+                     composed_field );
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+        ComputeFieldLocalNormImage<<< blockSize,gridSize>>>(composed_field,data_sz,data_spc,scale_image);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+        NegateImage_kernel<<< blockSize,gridSize>>>(composed_field,data_sz,3);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+
+        {
+            float* dev_out;
+            float out;
+            cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+            ScalarFindMax<<<gSize, bSize>>>((float *)scale_image.ptr, scale_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+            cudaDeviceSynchronize();
+            ScalarFindMax<<<1, bSize>>>(dev_out, gSize, dev_out);
+            cudaDeviceSynchronize();
+
+            cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+            cudaFree(dev_out);
+            m_MaxErrorNorm=out;
+        }
+
+        {
+            float* dev_out;
+            float out;
+            cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+            ScalarFindSum<<<gSize, bSize>>>((float *)scale_image.ptr, scale_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+            cudaDeviceSynchronize();
+            ScalarFindSum<<<1, bSize>>>(dev_out, gSize, dev_out);
+            cudaDeviceSynchronize();
+
+            cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+            cudaFree(dev_out);
+            m_MeanErrorNorm=out/numberOfPixelsInRegion;
+        }
+
+
+        float m_Epsilon = 0.5;
+        if (iteration == 1)
+        {
+          m_Epsilon = 0.75;
+        }
+
+        UpdateInvertField_kernel<<< blockSize,gridSize>>>(  composed_field, scale_image, output, data_sz, data_spc , m_Epsilon,m_MaxErrorNorm);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+
+    }
+    cudaFree(scale_image.ptr);
+    cudaFree(composed_field.ptr);
+
+}
+
+
+
+__global__ void
+PreprocessImage_kernel(cudaPitchedPtr img,  const int3 d_sz,
+                       float img_min, float img_max,
+                       float low_val, float up_val,
+                       cudaPitchedPtr output)
+
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+            {
+                size_t pitch= img.pitch;
+                size_t slicePitch= pitch*d_sz.y*k;
+                size_t colPitch= j*pitch;
+
+                char *img_ptr= (char *)(img.ptr);
+                char * slice_img= img_ptr+  slicePitch;
+                float * row_data= (float *)(slice_img+ colPitch);
+
+                char *output_ptr= (char *)(output.ptr);
+                char * slice_o= output_ptr+  slicePitch;
+                float * row_output= (float *)(slice_o+ colPitch);
+
+                row_output[i]= (up_val-low_val)/(img_max-img_min)*row_data[i]
+                                - img_min*(up_val-low_val)/(img_max-img_min)
+                               +low_val;
+
+           }
+    }
+}
+
+
+void PreprocessImage_cuda(cudaPitchedPtr img,
+                      int3 data_sz,
+                      float low_val, float up_val,
+                      cudaPitchedPtr output)
+{
+
+    float max, min;
+    {
+        float* dev_out;
+        float out;
+        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+        ScalarFindMax<<<gSize, bSize>>>((float *)img.ptr, img.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+        cudaDeviceSynchronize();
+        ScalarFindMax<<<1, bSize>>>(dev_out, gSize, dev_out);
+        cudaDeviceSynchronize();
+
+        cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+        cudaFree(dev_out);
+        max=out;
+    }
+    {
+        float* dev_out;
+        float out;
+        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+        ScalarFindMin<<<gSize, bSize>>>((float *)img.ptr, img.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+        cudaDeviceSynchronize();
+        ScalarFindMin<<<1, bSize>>>(dev_out, gSize, dev_out);
+        cudaDeviceSynchronize();
+
+        cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+        cudaFree(dev_out);
+        min=out;
+    }
+
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+
+    PreprocessImage_kernel<<< blockSize,gridSize>>>( img,data_sz,min,max , low_val,up_val,output );
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+
+}
+
+
+
+
+
+
+
+
+
+
+#endif

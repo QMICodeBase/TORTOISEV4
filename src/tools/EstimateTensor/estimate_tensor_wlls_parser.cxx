@@ -1,0 +1,184 @@
+#include "estimate_tensor_wlls_parser.h"
+#include <algorithm>
+#include <ctype.h>
+
+
+
+
+
+
+EstimateTensorWLLS_PARSER::EstimateTensorWLLS_PARSER( int argc , char * argv[] )
+{
+    CreateParserandFillText(argc,argv);    
+    this->Parse(argc,argv);
+    
+           
+    if( argc == 1 )
+    {
+        this->PrintMenu( std::cout, 5, false );
+        exit(EXIT_FAILURE);
+    }
+    
+    if(checkIfAllRequiredParamsAreEntered()==0)
+    {
+        std::cout<<"Not all the required Parameters are entered! Exiting!"<<std::endl;
+        exit(EXIT_FAILURE);
+    }   
+} 
+
+
+
+
+
+EstimateTensorWLLS_PARSER::~EstimateTensorWLLS_PARSER()
+{       
+}
+
+
+
+
+void EstimateTensorWLLS_PARSER::CreateParserandFillText(int argc, char* argv[])
+{  
+    this->SetCommand( argv[0] );
+ 
+    std::string commandDescription = std::string( "This program estiamtes the diffusion tensor with Weighted-Linear-Least-Squares regression.. " );
+    
+    this->SetCommandDescription( commandDescription );    
+    this->InitializeCommandLineOptions();        
+}
+
+
+void EstimateTensorWLLS_PARSER::InitializeCommandLineOptions()
+{
+    typedef itk::ants::CommandLineParser::OptionType OptionType;
+   
+    {
+        std::string description = std::string( "Full path to the input NIFTI DWIs" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetShortName( 'i');
+        option->SetLongName( "input");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+
+    {
+        std::string description = std::string( "Full path to the mask NIFTI image" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetShortName( 'm');
+        option->SetLongName( "mask");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+
+    {
+        std::string description = std::string( "Maximum b-value volumes to use for tensor fitting. (Default: use all volumes)" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetShortName( 'b');
+        option->SetLongName( "bval_cutoff");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+
+
+    {
+        std::string description = std::string( "Use noise image if present for weigthing and correction of interpolation artifacts. (Default:1)" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetShortName( 'n');
+        option->SetLongName( "use_noise");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+
+
+    {
+        std::string description = std::string( "Use voxelwise Bmatrices for gradient non-linearity correction if present (Default:1)" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetShortName( 'v');
+        option->SetLongName( "use_voxelwise_bmat");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+    {
+        std::string description = std::string( "4D Voxelwise inclusion mask image filename" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "inclusion");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+}
+
+
+std::string EstimateTensorWLLS_PARSER::getInclusionImg()
+{
+    OptionType::Pointer option = this->GetOption( "inclusion");
+    if(option->GetNumberOfFunctions())
+        return option->GetFunction(0)->GetName();
+    else
+       return std::string("");
+
+}
+
+
+std::string EstimateTensorWLLS_PARSER::getInputImageName()
+{
+    OptionType::Pointer option = this->GetOption( "input");
+    if(option->GetNumberOfFunctions())
+        return option->GetFunction(0)->GetName();
+    else
+       return std::string("");
+}
+
+
+std::string EstimateTensorWLLS_PARSER::getMaskImageName()
+{
+    OptionType::Pointer option = this->GetOption( "mask");
+    if(option->GetNumberOfFunctions())
+        return option->GetFunction(0)->GetName();
+    else
+       return std::string("");
+}
+
+double EstimateTensorWLLS_PARSER::getBValCutoff()
+{
+    OptionType::Pointer option = this->GetOption( "bval_cutoff");
+    if(option->GetNumberOfFunctions())
+        return atof(option->GetFunction(0)->GetName().c_str());
+    else
+       return 1E10;
+}
+
+
+bool EstimateTensorWLLS_PARSER::getUseNoise()
+{
+    OptionType::Pointer option = this->GetOption( "use_noise");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+       return 1;
+}
+
+bool EstimateTensorWLLS_PARSER::getUseVoxelwiseBmat()
+{
+    OptionType::Pointer option = this->GetOption( "use_voxelwise_bmat");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+       return 1;
+}
+
+
+bool EstimateTensorWLLS_PARSER::checkIfAllRequiredParamsAreEntered()
+{
+    
+    if(this->getInputImageName()==std::string(""))
+    {
+        std::cout<<"Input image name not entered...Exiting..."<<std::endl;
+        return 0;
+    }
+
+    return 1;
+}
+
+
+
+
