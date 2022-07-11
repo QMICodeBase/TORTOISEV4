@@ -1,9 +1,13 @@
-# TORTOISEV4
+# TORTOISEV4 
 Official TORTOISE Diffusion MRI Processing Pipeline V4 Source Code and Documentation
+<img src="https://tortoise.nibib.nih.gov/sites/default/files/inline-images/image1.jpeg" alt="drawing" width="400" />
+
+
+
 
 # What is TORTOISE?
 
-TORTOISE (Tolerably Obsessive registration and Tensor Optimization Indolent Software Ensemble)  (https://tortoise.nibib.nih.gov)  is a suite of programs for for pre-processing, post-processing and analyzing diffusion MRI data. It contains C, C++, Cuda, Python programs as well as shell scripts. Begninning with V4 TORTOISE is now open-source and available to all researchers.
+TORTOISE (Tolerably Obsessive registration and Tensor Optimization Indolent Software Ensemble)  is a suite of programs for for pre-processing, post-processing and analyzing diffusion MRI data. It contains C, C++, Cuda, Python programs as well as shell scripts. Begninning with V4 TORTOISE is now open-source and available to all researchers.
 
 
 ## Diffusion MRI Preprocessing Steps:
