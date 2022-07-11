@@ -26,7 +26,7 @@ TORTOISE (Tolerably Obsessive registration and Tensor Optimization Indolent Soft
     * Effects on Bmatrices as:
       * HCP style gradient deviation tensors
       * Voxelwise Bmatrices
-  * DWI output aligned to an anatomical image, with customizable resolution, field of view, # voxels,  data save orientation. 
+  * DWI output aligned to an anatomical image, with customizable resolution, field of view, # voxels,  data save orientation with correct overall or voxelwise Bmatrix reorientation
   * Auatomatic quality control and reporting tools.
 
 ## Diffusion Modelling:
