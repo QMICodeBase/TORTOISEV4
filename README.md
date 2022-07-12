@@ -90,7 +90,7 @@ sudo apt-get update -y
 sudo apt-get install -y fftw3
 ```
 
-#### 3)Eigen installation 
+#### 3) Eigen installation 
 ```
 sudo apt-get update -y
 sudo apt install libeigen3-dev
@@ -104,6 +104,7 @@ tar -xvf boost_1_76_0.tar.gz
 cd boost_1_76_0
 /bootstrap.sh --with-libraries=iostreams,filesystem,system,regex --prefix=/usr/local/boost176
 sudo ./b2 install
+cd ..
 ```
 
 
@@ -116,8 +117,22 @@ mkdir InsightToolkit-5.0.1_build
 cd InsightToolkit-5.0.1_build
 cmake ../InsightToolkit-5.0.1
 make -j 16
+cd ..
+```
+
+#### 5) VTK installation (Optional. only for the ComputeGlyphMaps executable)
+
+```
+wget https://gitlab.kitware.com/vtk/vtk/-/archive/v8.0.1/vtk-v8.0.1.zip
+unzip  vtk-v8.0.1.zip
+mkdir VTK-8.0.1_build
+cd VTK-8.0.1_build
+cmake ../vtk-v8.0.1
+make -j 16
+cd ..
 ```
 
 
+### TORTOISEV4 Compilation
 
 
