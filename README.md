@@ -79,7 +79,7 @@ cd libraries
 ```
 
 
-#### 1) CUDA installation (OPTIONAL. If you have an NIVIDA GPU and want to kae TORTOISE faster)
+#### 1) CUDA installation (OPTIONAL. If you have an NIVIDA GPU and want to make TORTOISE faster)
 
 Follow the instructions at:  https://developer.nvidia.com/cuda-11.3.0-download-archive
 Install CUDA to default location at /usr/local/cuda
