@@ -135,4 +135,9 @@ cd ..
 
 ### TORTOISEV4 Compilation
 
+```
+cd ..
+git clone https://github.com/eurotomania/TORTOISEV4.git
+cd TORTOISEV4/TORTOISEV4
 
+```
