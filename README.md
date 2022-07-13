@@ -139,5 +139,25 @@ cd ..
 cd ..
 git clone https://github.com/eurotomania/TORTOISEV4.git
 cd TORTOISEV4/TORTOISEV4
+```
+For nonCUDA version:
+```
+cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.0.1_build 
+```
 
+For CUDA version:
+```
+cmake . -D USECUDA=1 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.0.1_build 
+```
+
+For ComputeGlyphMaps executable version:
+```
+cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightToolkit-5.0.1_build -D VTK_DIR=../../libraries/VTK-8.0.1_build
+```
+
+Then,
+```
+make -j 16
+cd ..
+export PATH=${PATH}:$(pwd)/bin
 ```
