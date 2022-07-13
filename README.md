@@ -178,51 +178,35 @@ TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file
 
 #### Turn on denoising:
 
-```
-TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file --denoising for_final
-```
+```TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file --denoising for_final```
 
 
 #### Align the DWIs to an anatomical image (and perform b=0 -> T2W susceptibility distortion correction)
 
-```
-TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final 
-```
+```TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final ```
 
 #### Bring in Reverse Phase-encoded (blip-down) data for Susceptibility Distortion Correction
 
-```
-TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final 
-```
+```TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final ```
 
 
 #### Intra-Volume Motion correction and Outlier Replacement
 
-```
-TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final --s2v 1 --repol 1
-```
+```TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final --s2v 1 --repol 1```
 
 #### Correct for center frequency signal drift with a linear model
 
-```
-TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final --s2v 1 --repol 1 --drift linear
-```
+```TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final --s2v 1 --repol 1 --drift linear```
 
 #### Give an output name, change the Output resolution, FOV , orientation
 
-```
-TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final --s2v 1 --repol 1 --drift linear --output  path_to_output_NIFTI_file --output_res 1 1 1 --output_voxels 220 220 200 --output_orientation LPS 
-```
+```TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final --s2v 1 --repol 1 --drift linear --output  path_to_output_NIFTI_file --output_res 1 1 1 --output_voxels 220 220 200 --output_orientation LPS ```
 
 #### Input gradient nonlinearity information and output HCP-style grad_dev tensors
 
-```
-TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final --s2v 1 --repol 1 --drift linear --output  path_to_output_NIFTI_file --output_res 1 1 1 --output_voxels 220 220 200 --output_orientation LPS  --grad_nonlin nonlinearity_coefficients_file_OR_nonlinearity_field --output_gradnonlin_Bmtxt_type grad_dev
-```
+```TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final --s2v 1 --repol 1 --drift linear --output  path_to_output_NIFTI_file --output_res 1 1 1 --output_voxels 220 220 200 --output_orientation LPS  --grad_nonlin nonlinearity_coefficients_file_OR_nonlinearity_field --output_gradnonlin_Bmtxt_type grad_dev```
 
 #### Dont'do ANY correction. Just Reorient DWIs to an anatomical image (with Bmatrix rotation)
 
-```
-TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising off --gibbs off -c off --epi off --s2v 0 --repol 0 
-```
+```TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising off --gibbs off -c off --epi off --s2v 0 --repol 0 ```
 
