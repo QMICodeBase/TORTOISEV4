@@ -208,5 +208,5 @@ TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file
 
 #### Dont'do ANY correction. Just Reorient DWIs to an anatomical image (with Bmatrix rotation)
 
-```TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising off --gibbs off -c off --epi off --s2v 0 --repol 0 ```
+```TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising off --gibbs 0 -c off --epi off --s2v 0 --repol 0 ```
 
