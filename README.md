@@ -183,13 +183,13 @@ TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file --denoising for_final
 ```
 
 
-#### Align the DWIs to an anatomical image (and perform b=0 -> T2W susceptibiltiy distortion correction)
+#### Align the DWIs to an anatomical image (and perform b=0 -> T2W susceptibility distortion correction)
 
 ```
 TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final 
 ```
 
-#### Bring in Reverse Phase-encoded (blip-down) data for Susceptibiltiy Distortion Correction
+#### Bring in Reverse Phase-encoded (blip-down) data for Susceptibility Distortion Correction
 
 ```
 TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final 
