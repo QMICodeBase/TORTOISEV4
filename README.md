@@ -166,7 +166,7 @@ export PATH=${PATH}:$(pwd)/bin
 
 # TORTOISEV4 Usage examples
 
-Assuming you imported your data with dcm2niix and you already have a NIFTI file for DWIs, a bvecs and bvals file:
+Assuming you imported your data with dcm2niix and you already have a NIFTI file for DWIs, and the corresponding json, bvecs and bvals files:
 
 #### Simplest Usage:
 
