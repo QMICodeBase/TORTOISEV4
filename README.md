@@ -9,6 +9,8 @@ Official TORTOISE Diffusion MRI Processing Pipeline V4 Source Code and Documenta
 
 TORTOISE (Tolerably Obsessive registration and Tensor Optimization Indolent Software Ensemble)  is a suite of programs for for pre-processing, post-processing and analyzing diffusion MRI data. It contains C, C++, Cuda, Python programs as well as shell scripts. Begninning with V4 TORTOISE is now open-source and available to all researchers.
 
+DISCLAIMER: TORTOISEV4 IS INCOMPATIBLE WITH PREVIOUS VERSIONS.
+
 
 ## Diffusion MRI Preprocessing Steps:
   * Data Import
@@ -161,3 +163,66 @@ make -j 16
 cd ..
 export PATH=${PATH}:$(pwd)/bin
 ```
+
+# TORTOISEV4 Usage examples
+
+Assuming you imported your data with dcm2niix and you already have a NIFTI file for DWIs, a bvecs and bvals file:
+
+#### Simplest Usage:
+
+This will only do (by default)  Gibbs ringing correction,  inter-volume motion and eddy-currents distortion correction.
+
+```
+TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file
+```
+
+#### Turn on denoising:
+
+```
+TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file --denoising for_final
+```
+
+
+#### Align the DWIs to an anatomical image
+
+```
+TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final 
+```
+
+#### Bring in Reverse Phase-encoded (blip-down) data for Susceptibiltiy Distortion Correction
+
+```
+TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final 
+```
+
+
+#### Intra-Volume Motion correction and Outlier Replacement
+
+```
+TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final --s2v 1 --repol 1
+```
+
+#### Correct for center frequency signal drift with a linear model
+
+```
+TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final --s2v 1 --repol 1 --drift linear
+```
+
+#### Give an output name, change the Output resolution, FOV , orientation
+
+```
+TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final --s2v 1 --repol 1 --drift linear --output  path_to_output_NIFTI_file --output_res 1 1 1 --output_voxels 220 220 200 --output_orientation LPS 
+```
+
+#### Input gradient nonlinearity information and output HCP-style grad_dev tensors
+
+```
+TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file  --down_data  path_to_your_down_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final --s2v 1 --repol 1 --drift linear --output  path_to_output_NIFTI_file --output_res 1 1 1 --output_voxels 220 220 200 --output_orientation LPS  --grad_nonlin nonlinearity_coefficients_file_OR_nonlinearity_field --output_gradnonlin_Bmtxt_type grad_dev
+```
+
+#### Dont'do ANY correction. Just Reorient DWIs to an anatomical image (with Bmatrix rotation)
+
+```
+TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising off --gibbs off -c off --epi off --s2v 0 --repol 0 
+```
+
