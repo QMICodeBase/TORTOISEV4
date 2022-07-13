@@ -2,10 +2,15 @@ cmake_minimum_required(VERSION 3.20)
 
 PROJECT(TORTOISEV4  )
 
-SET(USE_VTK 0)
 SET(ISDEBUG 0)
 SET(USEOPENMP 1)
-SET(USECUDA 1)
+
+if ( NOT DEFINED USECUDA)
+    SET(USECUDA 0)
+endif()
+if ( NOT DEFINED USE_VTK)
+    SET(USE_VTK 0)
+endif()
 
 
 SET(CMAKE_C_COMPILER /usr/bin/gcc-9)
@@ -72,7 +77,9 @@ ENDIF(USECUDA)
 
 
 IF(ISDEBUG)
-    SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-5.0.1-debug)
+     if ( NOT DEFINED ITK_DIR)
+        SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-5.0.1-debug)
+    endif()
     FIND_PACKAGE(ITK) 
     IF(ITK_FOUND) 
         INCLUDE(${ITK_USE_FILE})
@@ -82,7 +89,9 @@ IF(ISDEBUG)
     ENDIF(ITK_FOUND)
     SET(CMAKE_BUILD_TYPE Debug)
 ELSE(ISDEBUG)    
-    SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-5.0.1-release)
+    if ( NOT DEFINED ITK_DIR)
+        SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-5.0.1-release)
+    endif()
     FIND_PACKAGE(ITK) 
     IF(ITK_FOUND) 
        INCLUDE(${ITK_USE_FILE})
@@ -186,7 +195,10 @@ target_link_libraries(IsDirectionPositiveDet ${ITK_LIBRARIES} ${Boost_LIBRARIES}
 
 IF(USE_VTK)
     add_definitions(-DUSE_VTK)
-    SET(VTK_DIR /qmi_home/irfanogo/Desktop/codes/other_codes/ANTs_09_05_2013/Release/VTK_801_Linux_static)
+    if ( NOT DEFINED VTK_DIR)
+        SET(VTK_DIR /qmi_home/irfanogo/Desktop/codes/other_codes/ANTs_09_05_2013/Release/VTK_801_Linux_static)
+    endif()
+
     FIND_PACKAGE(VTK)
     IF(VTK_FOUND)
         INCLUDE(${VTK_USE_FILE})
