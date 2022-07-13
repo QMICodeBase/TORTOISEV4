@@ -183,7 +183,7 @@ TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file --denoising for_final
 ```
 
 
-#### Align the DWIs to an anatomical image
+#### Align the DWIs to an anatomical image (and perform b=0 -> T2W susceptibiltiy distortion correction)
 
 ```
 TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising for_final 
