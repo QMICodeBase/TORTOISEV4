@@ -123,7 +123,7 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
     }
 
     {
-        std::string description = std::string( "Gradient Nonlinearity information file. Can be in ITK displacement field format, DRBUDDI coefficients .gc format, GE coefficients gw_coils format or Siemens coefficients .coeffs format. If it is GE, it should be specified in brackets. If 1D or 2D gradwarp is desired, it should be specified. Default:3D   " );
+        std::string description = std::string( "Gradient Nonlinearity information file. Can be in ITK displacement field format, TORTOISE coefficients .gc format, GE coefficients gw_coils format or Siemens coefficients .coeffs format. If it is GE, it should be specified in brackets. If 1D or 2D gradwarp is desired, it should be specified. Default:3D   " );
 
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "grad_nonlin");

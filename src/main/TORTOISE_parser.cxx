@@ -218,7 +218,7 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
         OptionType::Pointer option = OptionType::New();        
         option->SetLongName( "denoising");
         option->SetUsageOption(0, "off: DWI denoising not performed. However, noise variance still be estimated with this method." );
-        option->SetUsageOption(1, "for_reg: Denoised DWIs are used for registration but the final outputs are the transformed versions of the original data." );
+        option->SetUsageOption(1, "for_reg: DEFAULT. Denoised DWIs are used for registration but the final outputs are the transformed versions of the original data." );
         option->SetUsageOption(2, "for_final: Final output is also based on denoised DWIs." );
         option->SetDescription( description );
         option->SetModule(2);
