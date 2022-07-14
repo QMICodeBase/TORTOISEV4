@@ -14,7 +14,7 @@ int main(int argc, char* argv[])
     if(argc==1)
     {
         std::cout<<"Usage: TORTOISEBmatrixToFSLBVecs full_path_to_bmatrix_file"<<std::endl;
-        exit(0);
+        exit(EXIT_FAILURE);
     }
 
     vnl_matrix<double> Bmatrix = read_bmatrix_file(std::string(argv[1]));

@@ -265,11 +265,18 @@ MattesMutualInformationImageToImageMetricv4Okan<TFixedImage, TMovingImage, TVirt
       for( unsigned int movingIndex = 0; movingIndex < this->m_NumberOfHistogramBins; ++movingIndex, jointPDFPtr++ )
       {
           const PDFValueType jointPDFValue = *( jointPDFPtr );
+
+          std::cout<<jointPDFValue<< " ";
+
+
           if(  (jointPDFValue > closeToZero ) )
           {
               sumjh+= jointPDFValue *std::log(jointPDFValue);
+
           }
+
       }
+      std::cout<<std::endl;
   }
 
   double sum= (sumf+summ)/sumjh;

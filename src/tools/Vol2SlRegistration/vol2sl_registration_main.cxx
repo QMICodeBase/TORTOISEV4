@@ -1,5 +1,8 @@
 #include "defines.h"
 #include "register_dwi_to_slice.h"
+#ifdef USECUDA
+    #include "../cuda_src/register_dwi_to_slice_cuda.h"
+#endif
 #include "itkOkanQuadraticTransform.h"
 
 #include <iostream>
@@ -9,9 +12,11 @@ using OkanQuadraticTransformType=itk::OkanQuadraticTransform<double,3,3>;
 
 std::vector<float> choose_range(ImageType3D::Pointer b0_img,ImageType3D::Pointer curr_vol, ImageType3D::Pointer b0_mask_img)
 {
-
      std::vector<float> fixed_signal;
      std::vector<float> moving_signal;
+
+     float moving_max=-1E10;
+     float moving_min = 1E10;
 
      itk::ImageRegionIteratorWithIndex<ImageType3D> it(b0_mask_img,b0_mask_img->GetLargestPossibleRegion());
      it.GoToBegin();
@@ -23,6 +28,11 @@ std::vector<float> choose_range(ImageType3D::Pointer b0_img,ImageType3D::Pointer
               fixed_signal.push_back(b0_img->GetPixel(index));
               moving_signal.push_back(curr_vol->GetPixel(index));
           }
+          if(curr_vol->GetPixel(index)> moving_max)
+              moving_max=curr_vol->GetPixel(index);
+          if(curr_vol->GetPixel(index)< moving_min)
+              moving_min=curr_vol->GetPixel(index);
+
          ++it;
      }
 
@@ -38,8 +48,10 @@ std::vector<float> choose_range(ImageType3D::Pointer b0_img,ImageType3D::Pointer
      lim_arr.resize(4);
      lim_arr[0]=0.1;
      lim_arr[1]= fixed_signal[ind];
-     lim_arr[2]=0.1;
-     lim_arr[3]= moving_signal[ind];
+     //lim_arr[2]=0.1;
+    // lim_arr[3]= moving_signal[ind];
+     lim_arr[2]=moving_min;
+     lim_arr[3]= moving_max;
 
      return lim_arr;
 }
@@ -112,11 +124,14 @@ int main(int argc, char*argv[])
     int MB=slspec.columns();
     
     std::vector<float> signal_ranges = choose_range(target, native_synth_img,b0_mask_img);
-    signal_ranges[2]=signal_ranges[3]=0;
     
     std::vector<OkanQuadraticTransformType::Pointer> s2v_transformations;
-    
-    VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations,do_q,PE_string);
+
+//    #ifdef USECUDA
+  //         VolumeToSliceRegistration_cuda(target, native_synth_img,slspec,signal_ranges,s2v_transformations,do_q,PE_string);
+  //  #else
+           VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations,do_q,PE_string);
+   // #endif
     
         
     ImageType3D::Pointer native_native_synth_dwis = ImageType3D::New();

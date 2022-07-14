@@ -25,17 +25,6 @@ void VolumeToSliceRegistration_cuda(ImageType3D::Pointer slice_img, ImageType3D:
     s2v_transformations.resize(sz[2]);
 
 
-    typedef itk::MattesMutualInformationImageToImageMetricv4Okan<ImageType3D,ImageType3D> MetricType;
-    MetricType::Pointer         metric        = MetricType::New();
-    metric->SetNumberOfHistogramBins(40);
-    metric->SetUseMovingImageGradientFilter(false);
-    metric->SetUseFixedImageGradientFilter(false);
-    metric->SetFixedMin(lim_arr[0]);
-    metric->SetFixedMax(lim_arr[1]);
-    metric->SetMovingMin(lim_arr[2]);
-    metric->SetMovingMax(lim_arr[3]);
-
-
     OkanQuadraticTransformType::ParametersType flags, grd_scales;
     grd_scales.SetSize(NQUADPARAMS);
     flags.SetSize(NQUADPARAMS);
@@ -83,7 +72,7 @@ void VolumeToSliceRegistration_cuda(ImageType3D::Pointer slice_img, ImageType3D:
 
 
     for(int e=0;e<Nexc;e++)
-    {
+    {                
         ImageType3D::Pointer  temp_slice_img_itk=ImageType3D::New();
 
         sz[2]=MB;
@@ -105,6 +94,7 @@ void VolumeToSliceRegistration_cuda(ImageType3D::Pointer slice_img, ImageType3D:
         orig_ind[0]=0;
         orig_ind[1]=0;
         orig_ind[2]=slspec(e,0);
+
 
         ImageType3D::PointType orig;
         slice_img->TransformIndexToPhysicalPoint(orig_ind,orig);
@@ -129,6 +119,18 @@ void VolumeToSliceRegistration_cuda(ImageType3D::Pointer slice_img, ImageType3D:
             }
         }
 
+
+        typedef itk::MattesMutualInformationImageToImageMetricv4Okan<ImageType3D,ImageType3D> MetricType;
+        MetricType::Pointer         metric        = MetricType::New();
+        metric->SetNumberOfHistogramBins(64);
+        metric->SetUseMovingImageGradientFilter(false);
+        metric->SetUseFixedImageGradientFilter(false);
+        metric->SetFixedMin(lim_arr[0]);
+        metric->SetFixedMax(lim_arr[1]);
+        metric->SetMovingMin(lim_arr[2]);
+        metric->SetMovingMax(lim_arr[3]);
+
+
         CUDAIMAGE::Pointer temp_slice_img_itk_cuda= CUDAIMAGE::New();
         temp_slice_img_itk_cuda->SetImageFromITK(temp_slice_img_itk);
 
@@ -146,7 +148,7 @@ void VolumeToSliceRegistration_cuda(ImageType3D::Pointer slice_img, ImageType3D:
         optimizer->SetGradScales(grd_scales);
         optimizer->SetNumberHalves(5);
         optimizer->SetBrkEps(0.0005);
-        optimizer->SetNBins(40);
+        optimizer->SetNBins(64);
         optimizer->SetLimits(lim_arr);
         optimizer->SetFixedCudaImage(temp_slice_img_itk_cuda);
         optimizer->SetMovingCudaImage(dwi_img_cuda);

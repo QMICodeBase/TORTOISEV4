@@ -1712,7 +1712,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
             ImageType3D::Pointer final_mask;
             {
-                std::vector<ImageType4D::Pointer> dummyv;
+                std::vector<std::vector<ImageType3D::Pointer> > dummyv;
                 std::vector<int> dummy;
                 DTIModel dti_estimator;
                 dti_estimator.SetBmatrix(rot_Bmat);

@@ -110,7 +110,7 @@ message(${EIGEN3_INCLUDE_DIR})
 endif()
 
 
-set(SOURCES ../src/main/defines.cxx  ../src/main/TORTOISE_global.cxx ../src/main/antsCommandLineParser.cxx ../src/main/antsCommandLineOption.cxx  ../src/utilities/TORTOISE_Utilities.cxx ../src/utilities/extract_3Dvolume_from_4D.cxx ../src/utilities/itkNiftiImageIOHeader.cxx ../src/utilities/itkNiftiImageIOHeaderFactory.cxx ../src/utilities/read_3Dvolume_from_4D.cxx ../src/utilities/read_bmatrix_file.cxx ../src/utilities/math_utilities.cxx)
+set(SOURCES ../src/main/defines.cxx  ../src/main/TORTOISE_global.cxx ../src/main/antsCommandLineParser.cxx ../src/main/antsCommandLineOption.cxx  ../src/utilities/TORTOISE_Utilities.cxx ../src/utilities/extract_3Dvolume_from_4D.cxx ../src/utilities/itkNiftiImageIOHeader.cxx ../src/utilities/itkNiftiImageIOHeaderFactory.cxx ../src/utilities/read_3Dvolume_from_4D.cxx ../src/utilities/read_bmatrix_file.cxx ../src/utilities/math_utilities.cxx ../src/external_src/cmpfit-1.3a/mpfit.c)
 include_directories(../src/main)
 
 IF(USECUDA)
@@ -119,9 +119,9 @@ IF(USECUDA)
      target_include_directories(TORTOISEProcess_cuda   PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
      target_link_libraries(TORTOISEProcess_cuda  Eigen3::Eigen ${ITK_LIBRARIES} ${Boost_LIBRARIES}   fftw3 ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a  -llapack -lblas  -static-libgcc -static-libstdc++)
 
-     add_executable(Vol2SlRegistration   ../src/tools/Vol2SlRegistration/vol2sl_registration_main.cxx ../src/cuda_src/quadratic_transform_image.cxx ../src/cuda_src/quadratic_transform_image.cu  ../src/cuda_src/cuda_image.cxx ../src/cuda_src/compute_entropy.cxx ../src/cuda_src/compute_entropy.cu ${SOURCES})
-     target_include_directories(Vol2SlRegistration   PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-     target_link_libraries(Vol2SlRegistration ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+     add_executable(Vol2SlRegistration_cuda   ../src/tools/Vol2SlRegistration/vol2sl_registration_main.cxx ../src/cuda_src/quadratic_transform_image.cxx ../src/cuda_src/quadratic_transform_image.cu  ../src/cuda_src/cuda_image.cxx ../src/cuda_src/compute_entropy.cxx ../src/cuda_src/compute_entropy.cu ${SOURCES})
+     target_include_directories(Vol2SlRegistration_cuda   PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+     target_link_libraries(Vol2SlRegistration_cuda ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
 
 
 
@@ -153,13 +153,14 @@ ENDIF(USECUDA)
  #   target_link_libraries(CreateMask ${ITK_LIBRARIES}  ${Boost_LIBRARIES} ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a -llapack -lblas)
 
 
-add_executable(EstimateTensor   ../src/tools/EstimateTensor/estimate_tensor_wlls_main.cxx ../src/tools/EstimateTensor/estimate_tensor_wlls.cxx ../src/tools/EstimateTensor/estimate_tensor_wlls_parser.cxx ${SOURCES})
+add_executable(EstimateTensor   ../src/tools/EstimateTensor/estimate_tensor_wlls_main.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateTensor/estimate_tensor_wlls_parser.cxx  ${SOURCES})
 target_link_libraries(EstimateTensor ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+target_compile_definitions(EstimateTensor PUBLIC -DNOTORTOISE)
 
 
 add_executable(EstimateMAPMRI   ../src/tools/EstimateMAPMRI/estimate_mapmri_main.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateMAPMRI/MAPMRIModel.cxx ../src/tools/EstimateTensor/estimate_tensor_wlls.cxx ../src/tools/EstimateMAPMRI/estimate_mapmri_parser.cxx ${SOURCES})
 target_link_libraries(EstimateMAPMRI ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
-
+target_compile_definitions(EstimateMAPMRI PUBLIC -DNOTORTOISE)
 
 
 add_executable(RotateBmatrix   ../src/tools/RotateBMatrix/rotate_bmatrix_main.cxx  ../src/tools/RotateBMatrix/rotate_bmatrix.cxx ${SOURCES})
@@ -167,6 +168,10 @@ target_link_libraries(RotateBmatrix ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
 
 add_executable(TORTOISEBmatrixToFSLBVecs   ../src/tools/TORTOISEBmatrixToFSLBVecs/tortoise_bmatrix_to_fsl_bvecs.cxx  ../src/utilities/read_bmatrix_file.cxx )
 target_link_libraries(TORTOISEBmatrixToFSLBVecs ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+
+add_executable(FSLBVecsToTORTOISEBmatrix   ../src/tools/TORTOISEBmatrixToFSLBVecs/fsl_bvecs_tortoise_bmatrix.cxx  )
+target_link_libraries(FSLBVecsToTORTOISEBmatrix ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+
 
 add_executable(CreateDummyJson   ../src/tools/CreateDummyJson/CreateDummyJson.cxx ../src/tools/CreateDummyJson/CreateDummyJson_parser.cxx ${SOURCES})
 target_link_libraries(CreateDummyJson ${ITK_LIBRARIES} ${Boost_LIBRARIES} )

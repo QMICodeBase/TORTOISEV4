@@ -41,7 +41,7 @@ void EstimateTensorWLLS_PARSER::CreateParserandFillText(int argc, char* argv[])
 {  
     this->SetCommand( argv[0] );
  
-    std::string commandDescription = std::string( "This program estiamtes the diffusion tensor with Weighted-Linear-Least-Squares regression.. " );
+    std::string commandDescription = std::string( "This program estimates the diffusion tensor with different types of regression models.. " );
     
     this->SetCommandDescription( commandDescription );    
     this->InitializeCommandLineOptions();        
@@ -105,8 +105,48 @@ void EstimateTensorWLLS_PARSER::InitializeCommandLineOptions()
         option->SetDescription( description );
         this->AddOption( option );
     }
+    {
+        std::string description = std::string( "Regression mode. Default:NLLS" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "reg_mode");
+        option->SetUsageOption(0,"WLLS: Weighted linear least squares");
+        option->SetUsageOption(1,"NLLS: Nonlinear least squares");
+        option->SetUsageOption(2,"RESTORE: Robust NLLS");
+        option->SetUsageOption(3,"DIAG: Diagonal Only NLLS");
+        option->SetUsageOption(4,"N2: Full diffusion tensor + free water NLLS");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+
+    {
+        std::string description = std::string( "Write the Chi-squred image? Default:0" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "write_CS");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+
+
 }
 
+bool EstimateTensorWLLS_PARSER::getWriteCSImg()
+{
+    OptionType::Pointer option = this->GetOption( "write_CS");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+       return 0;
+}
+
+std::string EstimateTensorWLLS_PARSER::getRegressionMode()
+{
+    OptionType::Pointer option = this->GetOption( "reg_mode");
+    if(option->GetNumberOfFunctions())
+        return option->GetFunction(0)->GetName();
+    else
+       return std::string("NLLS");
+
+}
 
 std::string EstimateTensorWLLS_PARSER::getInclusionImg()
 {

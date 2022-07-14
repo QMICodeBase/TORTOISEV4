@@ -6,6 +6,7 @@
 
 #include "cuda_utils.h"
 
+#define PADDING 2
 
 #define GRIDSIZE 16
 const int bSize = 256;
@@ -259,25 +260,57 @@ ComputeJointPartialHistogram_kernel(cudaPitchedPtr data1, float low_lim1, float 
         float val2 = row_data2[i];
 
 
-        /*
-        int bin_id1=   floor((val1 - low_lim1) * NUM_BINS / (high_lim1-low_lim1));
-        if(bin_id1>=NUM_BINS)
-            bin_id1=NUM_BINS-1;
-        if(bin_id1<0)
-            bin_id1=0;
+        if(val1>=low_lim1 && val2>=low_lim2 && val1<=high_lim1 && val2<=high_lim2)
+        {
+            float m_MovingImageBinSize =(high_lim2 -low_lim2)/ (NUM_BINS-2*PADDING);
+            float m_MovingImageNormalizedMin = low_lim2/m_MovingImageBinSize - PADDING;
+            float m_FixedImageBinSize =(high_lim1 -low_lim1)/ (NUM_BINS-2*PADDING);
+            float m_FixedImageNormalizedMin = low_lim1/m_FixedImageBinSize - PADDING;
 
-        int bin_id2=   floor((val2 - low_lim2) * NUM_BINS / (high_lim2-low_lim2));
-        if(bin_id2>=NUM_BINS)
-            bin_id2=NUM_BINS-1;
-        if(bin_id2<0)
-            bin_id2=0;
-        */
+            float movingImageParzenWindowTerm = val2 / m_MovingImageBinSize - m_MovingImageNormalizedMin;
+            auto movingImageParzenWindowIndex = (int)( movingImageParzenWindowTerm );
+            if( movingImageParzenWindowIndex < 2 )
+            {
+                movingImageParzenWindowIndex = 2;
+            }
+            else
+            {
+               if( movingImageParzenWindowIndex > NUM_BINS-3 )
+               {
+                  movingImageParzenWindowIndex = NUM_BINS-3;
+               }
+            }
+
+            float fixedImageParzenWindowTerm = val1 / m_FixedImageBinSize - m_FixedImageNormalizedMin;
+            auto fixedImageParzenWindowIndex = (int)( fixedImageParzenWindowTerm );
+            if( fixedImageParzenWindowIndex < 2 )
+            {
+                fixedImageParzenWindowIndex = 2;
+            }
+            else
+            {
+               if( fixedImageParzenWindowIndex > NUM_BINS-3)
+               {
+                  fixedImageParzenWindowIndex = NUM_BINS-3;
+               }
+            }
+
+            atomicAdd(&smem[fixedImageParzenWindowIndex*NUM_BINS + movingImageParzenWindowIndex], 1);
+
+
+
+
+
+        }
+
+       /*
         if(val1>=low_lim1 && val2>=low_lim2 && val1<high_lim1 && val2<high_lim2)
         {
             int bin_id1=   floor((val1 - low_lim1) * NUM_BINS / (high_lim1-low_lim1));
             int bin_id2=   floor((val2 - low_lim2) * NUM_BINS / (high_lim2-low_lim2));
             atomicAdd(&smem[bin_id1*NUM_BINS + bin_id2], 1);
         }
+       */
     }
     __syncthreads();
 
@@ -398,6 +431,20 @@ void ComputeJointEntropy_cuda(cudaPitchedPtr img1, float low_lim1, float high_li
         cudaMemcpy(&value2, d_entropy_img2, sizeof(float), cudaMemcpyDeviceToHost);
         cudaFree(d_entropy_img2);
     }
+
+/*
+    float okan_hist[40*40];
+    cudaMemcpy(okan_hist,d_hist,sizeof(float)*40*40,cudaMemcpyDeviceToHost);
+    for(int r=0;r<40;r++)
+    {
+        for(int c=0;c<40;c++)
+        {
+            std::cout<<okan_hist[r*40+c]<< " ";
+        }
+        std::cout<<std::endl;
+    }
+*/
+
 
 
     float* hist_sum;

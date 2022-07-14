@@ -4,7 +4,7 @@
 #include "estimate_tensor_wlls_parser.h"
 #include "../utilities/read_bmatrix_file.h"
 #include "../utilities/read_3Dvolume_from_4D.h"
-#include "TORTOISE.h"
+#include "DTIModel.h"
 #include "itkNiftiImageIO.h"
 
 
@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
 
     std::vector<ImageType3D::Pointer> final_data;
     final_data.resize(Nvols);
-    std::vector<ImageType3DBool::Pointer> inclusion_imgs;
+    std::vector<ImageType3D::Pointer> inclusion_imgs;
 
     if(parser->getInclusionImg()!="")
         inclusion_imgs.resize(Nvols);
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
     {
         final_data[v]= read_3D_volume_from_4D(input_name,v);
         if(parser->getInclusionImg()!="")
-            inclusion_imgs[v]= read_3D_volume_from_4DBool(parser->getInclusionImg(),v);
+            inclusion_imgs[v]= read_3D_volume_from_4D(parser->getInclusionImg(),v);
     }
 
     ImageType3D::Pointer mask_image=nullptr;
@@ -128,23 +128,74 @@ int main(int argc, char *argv[])
     }
 
 
-    std::vector<int> dummy;    
+    std::vector<int> bindices;
     {
         double bval_cut =parser->getBValCutoff();
         for(int i=0;i<Bmatrix.rows();i++)
         {
             double bval= Bmatrix(i,0)+ Bmatrix(i,3)+Bmatrix(i,5);
             if(bval<=1.05*bval_cut)
-                dummy.push_back(i);
+                bindices.push_back(i);
+        }
+    }
+
+    std::string regresion_mode = parser->getRegressionMode();
+
+    std::vector<ImageType3D::Pointer> graddev_img;
+    std::vector<  std::vector< ImageType3D::Pointer> > vbmat_img;
+
+
+    if(parser->getUseVoxelwiseBmat())
+    {
+        std::string Lname= input_name.substr(0,input_name.rfind(".nii")) + "_graddev.nii";
+        if(fs::exists(Lname))
+        {
+            graddev_img.resize(9);
+            for(int v=0;v<9;v++)
+            {
+                graddev_img[v]=read_3D_volume_from_4D(Lname,v);
+            }
+        }
+        else
+        {
+            std::string vbmat_name= input_name.substr(0,input_name.rfind(".nii")) + "_vbmat.nii";
+            if(fs::exists(vbmat_name))
+            {
+                vbmat_img.resize(Nvols);
+                for(int v=0; v< Nvols;v++)
+                {
+                    vbmat_img[v].resize(6);
+                    for(int bi=0;bi<6;bi++)
+                    {
+                        vbmat_img[v][bi]= read_3D_volume_from_4D(vbmat_name, v*6+bi);
+                    }
+                }
+            }
+            else
+            {
+                std::cout<<"Voxelwise bmat or grad_dev use requested but these files are not present. Disregarding this option."<<std::endl;
+            }
         }
     }
 
 
-    ImageType3D::Pointer A0_image=nullptr;
-    DTImageType::Pointer dt_image= nullptr;
 
-    dt_image= EstimateTensorWLLS_sub_nomm(final_data,Bmatrix,dummy,A0_image,mask_image,inclusion_imgs);
 
+    std::vector<int> dummyv;
+    DTIModel dti_estimator;
+    dti_estimator.SetBmatrix(Bmatrix);
+    dti_estimator.SetDWIData(final_data);
+    dti_estimator.SetWeightImage(inclusion_imgs);
+    dti_estimator.SetVoxelwiseBmatrix(vbmat_img);
+    dti_estimator.SetGradDev(graddev_img);
+    dti_estimator.SetMaskImage(mask_image);
+    dti_estimator.SetVolIndicesForFitting(bindices);
+    dti_estimator.SetFittingMode(regresion_mode);
+    dti_estimator.PerformFitting();
+
+
+    ImageType3D::Pointer A0_image=dti_estimator.GetA0Image();
+    DTImageType::Pointer dt_image= dti_estimator.GetOutput();
 
     typedef ImageType4D DTImageType4D;
 
@@ -211,12 +262,31 @@ int main(int argc, char *argv[])
         ++it;
     }
 
+    std::string ext;
+    if(regresion_mode=="WLLS")
+        ext="_L1";
+    if(regresion_mode=="NLLS")
+        ext="_N1";
+    if(regresion_mode=="RESTORE")
+        ext="_R1";
+    if(regresion_mode=="DIAG")
+        ext="_N0";
+    if(regresion_mode=="N2")
+        ext="_N2";
+
+
+
     std::string full_base_name=input_name.substr(0, input_name.find(".nii"));
-    std::string DT_name= full_base_name + std::string("_L0_DT.nii");
-    std::string AM_name= full_base_name + std::string("_L0_AM.nii");
+    std::string DT_name= full_base_name + ext+  std::string("_DT.nii");
+    std::string AM_name= full_base_name + ext+  std::string("_AM.nii");
 
     writeImageD<ImageType3D>(A0_image,AM_name);
     writeImageD<ImageType4D>(dt_image4d,DT_name);
+    if(parser->getWriteCSImg())
+    {
+        std::string CS_name= full_base_name + ext+  std::string("_CS.nii");
+        writeImageD<ImageType3D>(dti_estimator.getCSImg(),CS_name);
+    }
 
 }
 

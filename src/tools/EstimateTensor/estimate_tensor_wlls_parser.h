@@ -20,6 +20,9 @@ public:
     bool getUseNoise();
     bool getUseVoxelwiseBmat();
     std::string getInclusionImg();
+    std::string getRegressionMode();
+
+    bool getWriteCSImg();
 
      
 private:

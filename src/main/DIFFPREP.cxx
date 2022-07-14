@@ -1238,7 +1238,7 @@ void DIFFPREP::MotionAndEddy()
              if(low_DT_indices.size()<15)
                  low_DT_indices.resize(0);
 
-             std::vector<ImageType4D::Pointer> dummyv;
+             std::vector<std::vector<ImageType3D::Pointer> >dummyv;
              std::vector<int> dummy;
              DTIModel dti_estimator;
              dti_estimator.SetBmatrix(Bmatrix);
@@ -1361,17 +1361,17 @@ void DIFFPREP::MotionAndEddy()
                      if(epoch==1)
                          do_eddy=false;
 
-                     #ifdef USECUDA
-                 //       if(TORTOISE::ReserveGPU())
-                 //       {
-                 //           VolumeToSliceRegistration_cuda(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string);
-                 //           TORTOISE::ReleaseGPU();
-                 //       }
-                 //       else
+                  //   #ifdef USECUDA
+                  //      if(TORTOISE::ReserveGPU())
+                   //     {
+                   //         VolumeToSliceRegistration_cuda(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string);
+                   //         TORTOISE::ReleaseGPU();
+                   //     }
+                   //     else
                             VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string);
-                     #else
-                            VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string);
-                     #endif
+                 //    #else
+                //            VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string);
+                //     #endif
 
                      #pragma omp critical
                      {

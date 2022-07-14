@@ -138,7 +138,7 @@ int main(int argc, char *argv[])
 
 
 
-    std::vector<ImageType4D::Pointer > dummyv;
+    std::vector<std::vector<ImageType3D::Pointer> > dummyv;
     if(!A0_img || !dti_img)
     {
         DTIModel dti_estimator;
