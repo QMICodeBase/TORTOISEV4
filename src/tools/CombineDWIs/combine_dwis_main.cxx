@@ -131,7 +131,7 @@ int main(int argc, char *argv[])
     outfile<<tot_Bmatrix;
     outfile.close();
 
-    vnl_matrix<double> bvecs;
+    vnl_matrix<double> bvecs(3,tot_Nvols);
     vnl_matrix<double> bvals= tortoise_bmatrix_to_fsl_bvecs(tot_Bmatrix, bvecs);
 
 
@@ -158,5 +158,7 @@ int main(int argc, char *argv[])
             bvals_file<< bvals(0,j)<< " ";
         }
     bvals_file.close();
+
+    return EXIT_SUCCESS;
 
 }

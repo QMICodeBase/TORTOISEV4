@@ -401,9 +401,7 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
         {
             this->m_Gradient.Fill(0);
             DerivativeType m_CurrGrad= this->m_Gradient;
-
-        //    std::cout<<"MEtric: " <<this->m_CurrentMetricValue<<std::endl;
-            
+           
             double nrm =this->GetGrad(mode_ids[mode],m_CurrGrad);            
             if(nrm >0)
             {

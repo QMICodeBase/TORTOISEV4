@@ -266,9 +266,6 @@ MattesMutualInformationImageToImageMetricv4Okan<TFixedImage, TMovingImage, TVirt
       {
           const PDFValueType jointPDFValue = *( jointPDFPtr );
 
-          std::cout<<jointPDFValue<< " ";
-
-
           if(  (jointPDFValue > closeToZero ) )
           {
               sumjh+= jointPDFValue *std::log(jointPDFValue);
@@ -276,7 +273,6 @@ MattesMutualInformationImageToImageMetricv4Okan<TFixedImage, TMovingImage, TVirt
           }
 
       }
-      std::cout<<std::endl;
   }
 
   double sum= (sumf+summ)/sumjh;

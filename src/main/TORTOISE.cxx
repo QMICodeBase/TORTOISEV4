@@ -952,8 +952,70 @@ void TORTOISE::CheckAndCopyInputData()
                     outfile.close();
                 }
             }
+
+            //and finally copy JSON file
+            std::string input_basename = input_name.substr(0,input_name.rfind(".nii"));
+            std::string json_name=input_basename + std::string(".json");
+            bool json_exists =  fs::exists(json_name);
+            if(json_exists)
+            {
+                fs::copy_file(input_basename+std::string(".json"), this->proc_infos[PE].json_name, fs::copy_option::overwrite_if_exists );
+            }
+            else
+            {
+                json_name=input_basename + std::string(".JSON");
+                fs::copy_file(json_name, this->proc_infos[PE].json_name, fs::copy_option::overwrite_if_exists );
+            }
+
+
+            //Copy the data
             {
                 ImageType4D::Pointer in_img= readImageD<ImageType4D>(input_name);
+
+                json temp_json;
+                std::ifstream json_file(json_name);
+                json_file >> temp_json;
+                json_file.close();
+                if(temp_json["SliceTiming"]!=json::value_t::null)
+                {
+                    std::vector<float> slice_timing= temp_json["SliceTiming"];
+                    int Nslices_from_json= slice_timing.size();
+                    int Nslices_image= in_img->GetLargestPossibleRegion().GetSize()[2];
+
+                    if(Nslices_image!=Nslices_from_json)
+                    {
+                        (*stream)<<"WARNING: Number of slices in the image (" <<Nslices_image << ") does NOT match the json file (" <<Nslices_from_json<<")."<<std::endl;
+                        (*stream)<<"ARE YOU SURE EVERYTHING IS CORRECT?"<<std::endl;
+                        (*stream)<<"Padding/cropping the image to match the json file. If this is not desired, please manually fix the issue."<<std::endl;
+
+
+                        ImageType4D::SizeType sz= in_img->GetLargestPossibleRegion().GetSize();
+                        sz[2]=Nslices_from_json;
+
+                        ImageType4D::Pointer in_img2= ImageType4D::New();
+                        ImageType4D::IndexType start; start.Fill(0);
+                        ImageType4D::RegionType reg(start,sz);
+                        in_img2->SetRegions(reg);
+                        in_img2->Allocate();
+                        in_img2->SetSpacing(in_img->GetSpacing());
+                        in_img2->SetDirection(in_img->GetDirection());
+                        in_img2->SetOrigin(in_img->GetOrigin());
+                        in_img2->FillBuffer(0);
+
+                        if(Nslices_from_json>Nslices_image)
+                            sz[2]=Nslices_image;
+                        reg.SetSize(sz);
+
+                        itk::ImageRegionIteratorWithIndex<ImageType4D> it(in_img,reg);
+                        for(it.GoToBegin();!it.IsAtEnd();++it)
+                        {
+                            ImageType4D::IndexType ind4= it.GetIndex();
+                            in_img2->SetPixel(ind4,it.Get());
+                        }
+                        in_img= in_img2;
+                    }
+                }
+
                 writeImageD<ImageType4D>(in_img,this->proc_infos[PE].nii_name);
             }
 
@@ -964,11 +1026,22 @@ void TORTOISE::CheckAndCopyInputData()
 
             // Then deal with BMTXT or bvecs/bvals
 
-            std::string input_basename = input_name.substr(0,input_name.rfind(".nii"));
+
             bool bmtxt_exists = (fs::exists(input_basename + std::string(".bmtxt")));
             if(bmtxt_exists)
             {
-                fs::copy_file(input_basename+std::string(".bmtxt"), this->proc_infos[PE].bmtxt_name, fs::copy_option::overwrite_if_exists );
+                vnl_matrix<double> Bmatrix= read_bmatrix_file(input_basename+std::string(".bmtxt"));
+                for(int v=0;v< Bmatrix.rows();v++)
+                {
+                    Bmatrix(v,1)*= flipX*flipY;
+                    Bmatrix(v,2)*= flipX*flipZ;
+                    Bmatrix(v,4)*= flipY*flipZ;
+                }
+                std::ofstream bmat_stream(this->proc_infos[PE].bmtxt_name);
+                bmat_stream<<Bmatrix;
+                bmat_stream.close();
+
+                //fs::copy_file(input_basename+std::string(".bmtxt"), this->proc_infos[PE].bmtxt_name, fs::copy_option::overwrite_if_exists );
             }
             else
             {
@@ -1082,14 +1155,6 @@ void TORTOISE::CheckAndCopyInputData()
 
            } // if !bmtxt
 
-           //and finally copy JSON file
-           bool json_exists =  (fs::exists(input_basename + std::string(".json")));
-           if(json_exists)
-           {
-               fs::copy_file(input_basename+std::string(".json"), this->proc_infos[PE].json_name, fs::copy_option::overwrite_if_exists );
-           }
-           else
-               fs::copy_file(input_basename+std::string(".JSON"), this->proc_infos[PE].json_name, fs::copy_option::overwrite_if_exists );
         } //if input exists
     } //for PE
 

@@ -203,7 +203,7 @@ bool EstimateTensorWLLS_PARSER::getUseVoxelwiseBmat()
     if(option->GetNumberOfFunctions())
         return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
     else
-       return 1;
+       return 0;
 }
 
 

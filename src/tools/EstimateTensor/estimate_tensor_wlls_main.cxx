@@ -72,8 +72,6 @@ vnl_matrix<double> read_bvecs_bvals(std::string bvals_file, std::string bvecs_fi
 int main(int argc, char *argv[])
 {
 
-    TORTOISE t;
-
     EstimateTensorWLLS_PARSER *parser= new EstimateTensorWLLS_PARSER(argc,argv);
 
     std::string input_name = parser->getInputImageName();
@@ -285,8 +283,40 @@ int main(int argc, char *argv[])
     if(parser->getWriteCSImg())
     {
         std::string CS_name= full_base_name + ext+  std::string("_CS.nii");
-        writeImageD<ImageType3D>(dti_estimator.getCSImg(),CS_name);
+        if(dti_estimator.getCSImg())
+            writeImageD<ImageType3D>(dti_estimator.getCSImg(),CS_name);
     }
+
+    if(dti_estimator.getVFImg())
+    {
+        std::string VF_name= full_base_name + ext+  std::string("_VF.nii");
+        writeImageD<ImageType3D>(dti_estimator.getVFImg(),VF_name);
+
+        ImageType3D::Pointer VF_image = dti_estimator.getVFImg();
+        ImageType3D::Pointer one_m_VF_img= ImageType3D::New();
+        one_m_VF_img->SetRegions(VF_image->GetLargestPossibleRegion());
+        one_m_VF_img->Allocate();
+        one_m_VF_img->SetSpacing(VF_image->GetSpacing());
+        one_m_VF_img->SetDirection(VF_image->GetDirection());
+        one_m_VF_img->SetOrigin(VF_image->GetOrigin());
+        one_m_VF_img->FillBuffer(0);
+        itk::ImageRegionIteratorWithIndex<ImageType3D> it2(one_m_VF_img,one_m_VF_img->GetLargestPossibleRegion());
+        it2.GoToBegin();
+        while(!it2.IsAtEnd())
+        {
+            ImageType3D::IndexType index = it2.GetIndex();
+            DTType  dt_vec= dt_image->GetPixel(index);
+            if(dt_vec[0]+dt_vec[3]+dt_vec[5] > 1E-8)
+            {
+                it2.Set(1-VF_image->GetPixel(index));
+            }
+            ++it2;
+        }
+
+        std::string OMVF_name= full_base_name + ext+  std::string("_OMVF.nii");
+        writeImageD<ImageType3D>(one_m_VF_img,OMVF_name);
+    }
+
 
 }
 

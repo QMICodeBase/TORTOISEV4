@@ -432,21 +432,6 @@ void ComputeJointEntropy_cuda(cudaPitchedPtr img1, float low_lim1, float high_li
         cudaFree(d_entropy_img2);
     }
 
-/*
-    float okan_hist[40*40];
-    cudaMemcpy(okan_hist,d_hist,sizeof(float)*40*40,cudaMemcpyDeviceToHost);
-    for(int r=0;r<40;r++)
-    {
-        for(int c=0;c<40;c++)
-        {
-            std::cout<<okan_hist[r*40+c]<< " ";
-        }
-        std::cout<<std::endl;
-    }
-*/
-
-
-
     float* hist_sum;
     cudaMalloc((void**)&hist_sum, sizeof(float));
     ScalarFindSum2<<<1, bSize>>>(d_hist, Nbins*Nbins, hist_sum);
