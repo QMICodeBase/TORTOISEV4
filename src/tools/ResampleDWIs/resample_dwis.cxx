@@ -53,7 +53,10 @@ ImageType3D::Pointer resample_3D_image(ImageType3D::Pointer img,std::vector<floa
     one_one.Fill(1);
     ImageType3D::PointType oneone_pt;
     img->TransformIndexToPhysicalPoint(one_one,oneone_pt);
-    ImageType3D::PointType diff=  old_orig - oneone_pt;
+    ImageType3D::PointType diff;
+    diff[0]=  old_orig[0] - oneone_pt[0];
+    diff[1]=  old_orig[1] - oneone_pt[1];
+    diff[2]=  old_orig[2] - oneone_pt[2];
     ImageType3D::PointType new_orig;
     ImageType3D::SpacingType new_spc;
     ImageType3D::SizeType new_sz;

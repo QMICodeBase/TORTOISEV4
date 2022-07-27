@@ -300,7 +300,7 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
       itkExceptionMacro( "There are no input objects." );
       }
 
-    if( this->m_Metric->GetMetricCategory() == MetricType::MULTI_METRIC )
+    if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::MULTI_METRIC )
       {
       this->m_NumberOfMetrics = multiMetric->GetNumberOfMetrics();
       if( this->m_NumberOfMetrics != numberOfObjectPairs )
@@ -385,15 +385,15 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
 
     // Get index of first image metric
     this->m_FirstImageMetricIndex = -1;
-    if( this->m_NumberOfMetrics == 1 && this->m_Metric->GetMetricCategory() == MetricType::IMAGE_METRIC )
+    if( this->m_NumberOfMetrics == 1 && this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::IMAGE_METRIC )
       {
       this->m_FirstImageMetricIndex = 0;
       }
-    else if( this->m_Metric->GetMetricCategory() == MetricType::MULTI_METRIC )
+    else if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::MULTI_METRIC )
       {
       for( SizeValueType n = 0; n < this->m_NumberOfMetrics; n++ )
         {
-        if( multiMetric->GetMetricQueue()[n]->GetMetricCategory() == MetricType::IMAGE_METRIC )
+        if( multiMetric->GetMetricQueue()[n]->GetMetricCategory() == MetricType::MetricCategoryEnum::IMAGE_METRIC )
           {
           this->m_FirstImageMetricIndex = n;
           break;
@@ -424,17 +424,17 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
       this->m_FixedImageMasks[n] = ITK_NULLPTR;
       this->m_MovingImageMasks[n] = ITK_NULLPTR;
 
-      if( this->m_Metric->GetMetricCategory() == MetricType::IMAGE_METRIC ||
-          ( this->m_Metric->GetMetricCategory() == MetricType::MULTI_METRIC &&
-            multiMetric->GetMetricQueue()[n]->GetMetricCategory() == MetricType::IMAGE_METRIC ) )
+      if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::IMAGE_METRIC ||
+          ( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::MULTI_METRIC &&
+            multiMetric->GetMetricQueue()[n]->GetMetricCategory() == MetricType::MetricCategoryEnum::IMAGE_METRIC ) )
         {
 
-        if( this->m_Metric->GetMetricCategory() == MetricType::MULTI_METRIC )
+        if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::MULTI_METRIC )
           {
           this->m_FixedImageMasks[n] = dynamic_cast<ImageMetricType *>( multiMetric->GetMetricQueue()[n].GetPointer() )->GetFixedImageMask();
           this->m_MovingImageMasks[n] = dynamic_cast<ImageMetricType *>( multiMetric->GetMetricQueue()[n].GetPointer() )->GetMovingImageMask();
           }
-        else if( this->m_Metric->GetMetricCategory() == MetricType::IMAGE_METRIC )
+        else if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::IMAGE_METRIC )
           {
           this->m_FixedImageMasks[n] = dynamic_cast<ImageMetricType *>( this->m_Metric.GetPointer() )->GetFixedImageMask();
           this->m_MovingImageMasks[n] = dynamic_cast<ImageMetricType *>( this->m_Metric.GetPointer() )->GetMovingImageMask();
@@ -467,7 +467,7 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
     itkExceptionMacro( "A virtual domain image is not found.  It should be specified in one of the metrics." );
     }
 
-  if( this->m_Metric->GetMetricCategory() == MetricType::MULTI_METRIC )
+  if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::MULTI_METRIC )
     {
     if( fixedInitialTransform )
       {
@@ -487,7 +487,7 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
 
     for( SizeValueType n = 0; n < multiMetric->GetNumberOfMetrics(); n++ )
       {
-      if( multiMetric->GetMetricQueue()[n]->GetMetricCategory() == MetricType::IMAGE_METRIC )
+      if( multiMetric->GetMetricQueue()[n]->GetMetricCategory() == MetricType::MetricCategoryEnum::IMAGE_METRIC )
         {
         if( currentLevelVirtualDomainImage.IsNotNull() )
           {
@@ -498,7 +498,7 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
           itkExceptionMacro( "Virtual domain image is not specified." );
           }
         }
-      else if( multiMetric->GetMetricQueue()[n]->GetMetricCategory() == MetricType::POINT_SET_METRIC )
+      else if( multiMetric->GetMetricQueue()[n]->GetMetricCategory() == MetricType::MetricCategoryEnum::POINT_SET_METRIC )
         {
         if( currentLevelVirtualDomainImage.IsNotNull() )
           {
@@ -515,7 +515,7 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
         }
       }
     }
-  else if( this->m_Metric->GetMetricCategory() == MetricType::IMAGE_METRIC )
+  else if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::IMAGE_METRIC )
     {
     typename ImageMetricType::Pointer imageMetric = dynamic_cast<ImageMetricType *>( this->m_Metric.GetPointer() );
     if( fixedInitialTransform )
@@ -534,7 +534,7 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
       imageMetric->SetVirtualDomainFromImage( currentLevelVirtualDomainImage );
       }
     }
-  else if( this->m_Metric->GetMetricCategory() == MetricType::POINT_SET_METRIC )
+  else if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::POINT_SET_METRIC )
     {
     typename PointSetMetricType::Pointer pointSetMetric =
       dynamic_cast<PointSetMetricType *>( this->m_Metric.GetPointer() );
@@ -589,9 +589,9 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
     this->m_FixedPointSets[n] = ITK_NULLPTR;
     this->m_MovingPointSets[n] = ITK_NULLPTR;
 
-    if( this->m_Metric->GetMetricCategory() == MetricType::IMAGE_METRIC ||
-        ( this->m_Metric->GetMetricCategory() == MetricType::MULTI_METRIC &&
-          multiMetric->GetMetricQueue()[n]->GetMetricCategory() == MetricType::IMAGE_METRIC ) )
+    if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::IMAGE_METRIC ||
+        ( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::MULTI_METRIC &&
+          multiMetric->GetMetricQueue()[n]->GetMetricCategory() == MetricType::MetricCategoryEnum::IMAGE_METRIC ) )
       {
       typedef DiscreteGaussianImageFilter<FixedImageType, FixedImageType> FixedImageSmoothingFilterType;
       typename FixedImageSmoothingFilterType::Pointer fixedImageSmoothingFilter = FixedImageSmoothingFilterType::New();
@@ -631,7 +631,7 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
 
       // Update the image metric
 
-      if( this->m_Metric->GetMetricCategory() == MetricType::MULTI_METRIC )
+      if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::MULTI_METRIC )
         {
         multiMetric->GetMetricQueue()[n]->SetFixedObject( this->m_FixedSmoothImages[n] );
         multiMetric->GetMetricQueue()[n]->SetMovingObject( this->m_MovingSmoothImages[n] );
@@ -639,7 +639,7 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
         dynamic_cast<ImageMetricType *>( multiMetric->GetMetricQueue()[n].GetPointer() )->SetFixedImageMask( this->m_FixedImageMasks[n] );
         dynamic_cast<ImageMetricType *>( multiMetric->GetMetricQueue()[n].GetPointer() )->SetMovingImageMask( this->m_MovingImageMasks[n] );
         }
-      else if( this->m_Metric->GetMetricCategory() == MetricType::IMAGE_METRIC )
+      else if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::IMAGE_METRIC )
         {
         this->m_Metric->SetFixedObject( this->m_FixedSmoothImages[n] );
         this->m_Metric->SetMovingObject( this->m_MovingSmoothImages[n] );
@@ -652,21 +652,21 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
         itkExceptionMacro( "Invalid metric type." )
         }
       }
-    else if( this->m_Metric->GetMetricCategory() == MetricType::POINT_SET_METRIC ||
-        ( this->m_Metric->GetMetricCategory() == MetricType::MULTI_METRIC &&
-          multiMetric->GetMetricQueue()[n]->GetMetricCategory() == MetricType::POINT_SET_METRIC ) )
+    else if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::POINT_SET_METRIC ||
+        ( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::MULTI_METRIC &&
+          multiMetric->GetMetricQueue()[n]->GetMetricCategory() == MetricType::MetricCategoryEnum::POINT_SET_METRIC ) )
       {
       this->m_FixedPointSets[n] = this->GetFixedPointSet( n );
       this->m_MovingPointSets[n] = this->GetMovingPointSet( n );
 
       // Update the point set metric
 
-      if( this->m_Metric->GetMetricCategory() == MetricType::MULTI_METRIC )
+      if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::MULTI_METRIC )
         {
         multiMetric->GetMetricQueue()[n]->SetFixedObject( this->GetFixedPointSet( n ) );
         multiMetric->GetMetricQueue()[n]->SetMovingObject( this->GetMovingPointSet( n ) );
         }
-      else if( this->m_Metric->GetMetricCategory() == MetricType::POINT_SET_METRIC )
+      else if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::POINT_SET_METRIC )
         {
         this->m_Metric->SetFixedObject( this->GetFixedPointSet( n ) );
         this->m_Metric->SetMovingObject( this->GetMovingPointSet( n ) );
@@ -1077,18 +1077,18 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
 {
   // Get virtual domain image
   VirtualImageBaseConstPointer currentLevelVirtualDomainImage = ITK_NULLPTR;
-  if( this->m_Metric->GetMetricCategory() == MetricType::IMAGE_METRIC )
+  if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::IMAGE_METRIC )
     {
     currentLevelVirtualDomainImage = dynamic_cast<ImageMetricType *>( this->m_Metric.GetPointer() )->GetVirtualImage();
     }
-  else if( this->m_Metric->GetMetricCategory() == MetricType::POINT_SET_METRIC )
+  else if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::POINT_SET_METRIC )
     {
     currentLevelVirtualDomainImage = dynamic_cast<PointSetMetricType *>( this->m_Metric.GetPointer() )->GetVirtualImage();
     }
   else
     {
     typename MultiMetricType::Pointer multiMetric = dynamic_cast<MultiMetricType *>( this->m_Metric.GetPointer() );
-    if( multiMetric->GetMetricQueue()[0]->GetMetricCategory() == MetricType::POINT_SET_METRIC )
+    if( multiMetric->GetMetricQueue()[0]->GetMetricCategory() == MetricType::MetricCategoryEnum::POINT_SET_METRIC )
       {
       currentLevelVirtualDomainImage = dynamic_cast<PointSetMetricType *>( multiMetric->GetMetricQueue()[0].GetPointer() )->GetVirtualImage();
       }

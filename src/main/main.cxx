@@ -2,8 +2,11 @@
 #include "TORTOISE.h"
 #include <chrono>
 
+
 int main(int argc, char * argv[])
 {
+
+    itk::MultiThreaderBase::SetGlobalDefaultThreader(itk::MultiThreaderBase::ThreaderTypeFromString("Pool"));
 
     std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
     TORTOISE(argc,argv);    

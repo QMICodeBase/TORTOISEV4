@@ -44,18 +44,20 @@ TORTOISE::TORTOISE(int argc, char *argv[])
         SetNMaxCores(getNCores());
         float perc=system_settings_json["PercentOfCpuCoresToUse"];
 
-    //    if(perc<1)
-   //     {
-   //         std::string aa("ITK_GLOBAL_DEFAULT_THREADER=PLATFORM");
-    //        putenv((char *)aa.c_str());
-    //    }
-    //    else
+        /*
+        if(perc<1)
+        {
+            std::string aa("ITK_GLOBAL_DEFAULT_THREADER=PLATFORM");
+            putenv((char *)aa.c_str());
+        }
+        else
         {
             std::string aa("ITK_GLOBAL_DEFAULT_THREADER=POOL");
             putenv((char *)aa.c_str());
         }
+        */
 
-        int nc=(int)(GetNMaxCores()*perc);
+        int nc=(int)(GetNMaxCores()*perc)-1;
         if(nc==0)
             nc=1;
         SetNAvailableCores(nc);
@@ -112,7 +114,7 @@ TORTOISE::TORTOISE(int argc, char *argv[])
     for(int i=0;i<argc;i++)                   // Print the entered command for logging
         (*stream)<<argv[i]<< " ";
     (*stream)<<std::endl<<std::endl;
-    (*stream)<<"Using up to " << GetNAvailableCores()<< " CPU cores."<<std::endl;
+    (*stream)<<"Using up to " << GetNAvailableCores()+1<< " CPU cores."<<std::endl;
 
 
     //Set up the name of the output data and create directories if needed

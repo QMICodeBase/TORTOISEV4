@@ -3,7 +3,9 @@
 
 
 #include "DiffusionModel.h"
-using namespace itkeigen;
+#include <Eigen/Dense>
+
+using namespace Eigen;
 
 class MAPMRIModel: public DiffusionModel<MAPImageType>
 {

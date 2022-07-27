@@ -17,8 +17,8 @@ CUDAIMAGE::Pointer QuadraticTransformImageC(CUDAIMAGE::Pointer main_image, Trans
     float mat_arr[9]={mat(0,0),mat(0,1),mat(0,2),mat(1,0),mat(1,1),mat(1,2),mat(2,0),mat(2,1),mat(2,2)};
     TransformType::ParametersType params = tp->GetParameters();
 
-    float params_arr[NQUADPARAMS];
-    for(int p=0;p<NQUADPARAMS;p++)
+    float params_arr[TransformType::NQUADPARAMS];
+    for(int p=0;p<TransformType::NQUADPARAMS;p++)
         params_arr[p]=params[p];
 
 

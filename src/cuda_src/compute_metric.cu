@@ -829,6 +829,8 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
 
 
 
+
+
 __global__ void
 ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,                             
                             cudaPitchedPtr def_FINV, cudaPitchedPtr def_MINV, 

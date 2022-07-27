@@ -50,7 +50,8 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
      m_BracketParams[6]=0.000000001;
      m_BracketParams[7]=0.1;
 
-     grad_params.set_size(NQUADPARAMS);
+
+     grad_params.set_size(Nparams);
 
      grad_params[0]=2.5;    grad_params[1]=2.5;  grad_params[2]=2.5;
      grad_params[3]=0.04;   grad_params[4]=0.04; grad_params[5]=0.04;
@@ -75,7 +76,7 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
   // Must call the superclass version for basic validation and setup.
   Superclass::StartOptimization( doOnlyInitialization );
 
-  int Nparams= this->m_Metric->GetNumberOfParameters();
+
   if(this->m_Gradient.size()!=Nparams)
   {
       this->m_Gradient = DerivativeType(Nparams);
@@ -381,6 +382,8 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
   MeasureType last_cost= NumericTraits<MeasureType>::max();  
   int curr_halve=0;
 
+
+
   this->m_Stop = false;
   while( ! this->m_Stop )
   {
@@ -388,7 +391,7 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
     if ( this->m_CurrentIteration >= this->m_NumberOfIterations )
       {
       this->m_StopConditionDescription << "Maximum number of iterations (" << this->m_NumberOfIterations << ") exceeded.";
-      this->m_StopCondition = Superclass::MAXIMUM_NUMBER_OF_ITERATIONS;
+      this->m_StopCondition = Self::MAXIMUM_NUMBER_OF_ITERATIONS;
       this->StopOptimization();
       break;
       }
@@ -420,13 +423,13 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
                     ParametersType orig_params= this->m_Metric->GetParameters();
                     ParametersType temp_change= orig_params;
 
-                    for(int i=0;i<NQUADPARAMS;i++)
+                    for(int i=0;i<Nparams;i++)
                         temp_change[i]= m_CurrGrad[i]*grad_params[i]*0.01;
 
                     for(int i=0;i<3;i++)
                     {
                         ParametersType temp_trans=orig_params;
-                        for(int i=0;i<NQUADPARAMS;i++)
+                        for(int i=0;i<Nparams;i++)
                             temp_trans[i]= orig_params[i] -temp_change[i];
 
                         MeasureType temp_cost= ComputeMetric(temp_trans);
@@ -474,7 +477,7 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
             if(curr_halve<m_NumberHalves)
             {
                 curr_halve++;
-                for(int i=0;i<NQUADPARAMS;i++)
+                for(int i=0;i<Nparams;i++)
                     grad_params[i]/=1.7;
                 m_CurrentIteration=0;
             }
@@ -484,7 +487,7 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
     }
     catch ( ExceptionObject & err )
     {
-      this->m_StopCondition = Superclass::COSTFUNCTION_ERROR;
+      this->m_StopCondition = Self::COSTFUNCTION_ERROR;
       this->m_StopConditionDescription << "Metric error during optimization";
       this->StopOptimization();
 
@@ -526,7 +529,7 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
     }
   catch ( ExceptionObject & err )
     {
-    this->m_StopCondition = Superclass::UPDATE_PARAMETERS_ERROR;
+    this->m_StopCondition = Self::UPDATE_PARAMETERS_ERROR;
     this->m_StopConditionDescription << "UpdateTransformParameters error";
     this->StopOptimization();
 

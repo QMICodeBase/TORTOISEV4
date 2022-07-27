@@ -6,8 +6,8 @@
 #include <string>
 #include "itkNiftiImageIO.h"
 #include <stdio.h>
-#include "itkNiftiImageIOHeader.h"
-#include "itkNiftiImageIOHeaderFactory.h"
+//#include "itkNiftiImageIOHeader.h"
+//#include "itkNiftiImageIOHeaderFactory.h"
 
 
 template<typename PixelType>
@@ -127,11 +127,11 @@ void write_3D_image_to_4D_file(typename itk::Image<PixelType,3>::Pointer img, st
 
 
 
-        itk::ObjectFactoryBase::RegisterFactory(itk::NiftiImageIOHeaderFactory::New());
-        itk::NiftiImageIOHeader::Pointer myio2 = itk::NiftiImageIOHeader::New();
+       // itk::ObjectFactoryBase::RegisterFactory(itk::NiftiImageIOHeaderFactory::New());
+       // itk::NiftiImageIOHeader::Pointer myio2 = itk::NiftiImageIOHeader::New();
         typedef itk::ImageFileWriter<ImageType4D> WriterType;
         typename WriterType::Pointer wr= WriterType::New();
-        wr->SetImageIO(myio2);
+       // wr->SetImageIO(myio2);
         wr->SetFileName(filename);
         wr->SetInput(new_nifti);
         wr->Update();

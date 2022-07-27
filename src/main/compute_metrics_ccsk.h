@@ -2,10 +2,11 @@
 #define _COMPUTEMETRICSCCSK_H
 
 #include "defines.h"
+#include "drbuddi_image_utilities.h"
 
 #define LIMCCSK (1E-5)
 #define WIN_RAD 4
-#define WIN_RAD_Z 2
+//#define WIN_RAD_Z 2
 
 float  ComputeUpdateCCSK(ImageType3D::IndexType index, ImageType3D::Pointer up_img, ImageType3D::Pointer down_img,
                           ImageType3D::Pointer K_img, ImageType3D::Pointer str_img,

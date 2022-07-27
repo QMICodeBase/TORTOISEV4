@@ -694,8 +694,8 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         curr_stage.img_smoothing_std=0.;
         curr_stage.downsample_factor=1;
         curr_stage.learning_rate=0.75;
-        curr_stage.update_gaussian_sigma=8.;
-        curr_stage.total_gaussian_sigma=1.;
+        curr_stage.update_gaussian_sigma=5.;
+        curr_stage.total_gaussian_sigma=0.25;
         curr_stage.restrct=1;
         curr_stage.constrain=1;
         DRBUDDIMetric metric3;
@@ -705,7 +705,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
 
         DRBUDDIMetric metric1;
         metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
-        metric1.weight=0.5;
+        metric1.weight=0.6;
         curr_stage.metrics.push_back(metric1);
 
         for(int s=0;s<Nstr;s++)
@@ -737,7 +737,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
 
         DRBUDDIMetric metric1;
         metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
-        metric1.weight=0.3;
+        metric1.weight=0.6;
         curr_stage.metrics.push_back(metric1);
 
         for(int s=0;s<Nstr;s++)

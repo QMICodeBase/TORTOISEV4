@@ -53,11 +53,11 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
     typedef itk::MattesMutualInformationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType3;
     MetricType3::Pointer m= MetricType3::New();
     m->SetNumberOfHistogramBins(50);
-    m->SetMaximumNumberOfWorkUnits(NITK);
+    m->SetMaximumNumberOfWorkUnits(NITK);   
 
     typedef itk::CorrelationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType2;
     MetricType2::Pointer m2= MetricType2::New();
-    m2->SetMaximumNumberOfWorkUnits(NITK);
+    m2->SetMaximumNumberOfWorkUnits(NITK);        
 
     using MetricType =itk::ImageToImageMetricv4<ImageType3D,ImageType3D> ;
     MetricType::Pointer         metric        = nullptr;
@@ -88,7 +88,8 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
     rigidRegistration->SetMovingImage( 0, moving_img );
     rigidRegistration->SetMetric( metric );
     rigidRegistration->SetNumberOfWorkUnits(NITK);
-
+    rigidRegistration->GetMultiThreader()->SetMaximumNumberOfThreads(NITK);
+    rigidRegistration->GetMultiThreader()->SetNumberOfWorkUnits(NITK);
 
 
     RigidRegistrationType::ShrinkFactorsArrayType shrinkFactorsPerLevel;
@@ -137,7 +138,7 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
     initial_transform->SetFixedParameters(rot_center);
 
 
-    rigidRegistration->SetMetricSamplingStrategy(RigidRegistrationType::NONE);
+    rigidRegistration->SetMetricSamplingStrategy(RigidRegistrationType::MetricSamplingStrategyEnum::NONE);
     rigidRegistration->SetInitialTransform(initial_transform);
     rigidRegistration->SetInPlace(true);
 
@@ -163,7 +164,7 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
     optimizer->SetMinimumConvergenceValue( 1E-5 );
     optimizer->SetConvergenceWindowSize( 10 );
     optimizer->SetDoEstimateLearningRateAtEachIteration( true);
-    optimizer->SetDoEstimateLearningRateOnce( false );
+    optimizer->SetDoEstimateLearningRateOnce( false );    
     //optimizer->AddObserver(itk::IterationEvent(), observer );
 
     rigidRegistration->SetOptimizer(optimizer);

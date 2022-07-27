@@ -39,7 +39,7 @@
 #include "../utilities/math_utilities.h"
 
 #include <Eigen/Dense>
-using namespace itkeigen;
+using namespace Eigen;
 
 
 ImageType3D::Pointer FINALDATA::UnObliqueImage(ImageType3D::Pointer img)
@@ -512,7 +512,7 @@ void FINALDATA::ReadOrigTransforms()
 
                 OkanQuadraticTransformType::ParametersType params=quad_trans->GetParameters();
                 line=line.substr(1);
-                for(int p=0;p<NQUADPARAMS;p++)
+                for(int p=0;p<OkanQuadraticTransformType::NQUADPARAMS;p++)
                 {
                     int npos = line.find(", ");
                     std::string curr_p_string = line.substr(0,npos);
@@ -523,7 +523,7 @@ void FINALDATA::ReadOrigTransforms()
                 }
                 quad_trans->SetParameters(params);
                 OkanQuadraticTransformType::ParametersType flags;
-                flags.SetSize(NQUADPARAMS);
+                flags.SetSize(OkanQuadraticTransformType::NQUADPARAMS);
                 flags.Fill(0);
                 flags[0]=flags[1]=flags[2]=flags[3]=flags[4]=flags[5]=1;
                 quad_trans->SetParametersForOptimizationFlags(flags);
@@ -563,7 +563,7 @@ void FINALDATA::ReadOrigTransforms()
 
                     OkanQuadraticTransformType::ParametersType params=quad_trans->GetParameters();
                     line=line.substr(1);
-                    for(int p=0;p<NQUADPARAMS;p++)
+                    for(int p=0;p<OkanQuadraticTransformType::NQUADPARAMS;p++)
                     {
                         int npos = line.find(", ");
                         std::string curr_p_string = line.substr(0,npos);
@@ -574,7 +574,7 @@ void FINALDATA::ReadOrigTransforms()
                     }
                     quad_trans->SetParameters(params);
                     OkanQuadraticTransformType::ParametersType flags;
-                    flags.SetSize(NQUADPARAMS);
+                    flags.SetSize(OkanQuadraticTransformType::NQUADPARAMS);
                     flags.Fill(0);
                     flags[0]=flags[1]=flags[2]=flags[3]=flags[4]=flags[5]=1;
                     quad_trans->SetParametersForOptimizationFlags(flags);
@@ -899,7 +899,7 @@ void FINALDATA::GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer>
                         double det= b0_corrected_final->GetPixel(ind3)/b0_imgs[PE]->GetPixel(ind3);
                         float val1=it.Get();
                         double fval = val1*det;
-                        if(isnan(fval))
+                        if(std::isnan(fval))
                             fval=0;
 
                         it.Set(fval);
@@ -1645,13 +1645,16 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
 
             //Get average b=0 image and mask it
-            vnl_vector<double> bvals = Bmatrix.get_column(0) + Bmatrix.get_column(3)+ Bmatrix.get_column(5);
-            ImageType3D::Pointer orig_mask= create_mask(raw_data[0]);
+            vnl_vector<double> bvals = Bmatrix.get_column(0) + Bmatrix.get_column(3)+ Bmatrix.get_column(5);            
 
             #pragma omp parallel for
             for(int vol=0;vol<Nvols[PE];vol++)
             {
                 TORTOISE::EnableOMPThread();
+
+
+                ImageType3D::Pointer orig_mask= create_mask(raw_data[0]);
+                orig_mask->SetDirection(this->native_weight_img[PE][vol]->GetDirection());
 
                 //Generate a final mask that includes both the brain mask and outlier mask
                 using FilterType = itk::MultiplyImageFilter<ImageType3D, ImageType3D, ImageType3D>;

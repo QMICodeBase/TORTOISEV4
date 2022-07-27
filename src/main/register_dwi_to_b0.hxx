@@ -37,10 +37,10 @@ TransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img, ImageTyp
 
 
     TransformType::ParametersType flags, grd_scales;
-    flags.SetSize(NQUADPARAMS);
+    flags.SetSize(TransformType::NQUADPARAMS);
     flags.Fill(0);
-    grd_scales.SetSize(NQUADPARAMS);
-    for(int i=0;i<NQUADPARAMS;i++)
+    grd_scales.SetSize(TransformType::NQUADPARAMS);
+    for(int i=0;i<TransformType::NQUADPARAMS;i++)
     {
         flags[i]= mecc_settings->getFlags()[i];
     }

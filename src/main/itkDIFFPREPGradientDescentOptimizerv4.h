@@ -19,6 +19,7 @@
 #define itkDIFFPREPGradientDescentOptimizerv4_h
 
 #include "itkGradientDescentOptimizerBasev4.h"
+#include "itkOkanQuadraticTransform.h"
 
 #ifdef USECUDA
     #include "cuda_image.h"
@@ -60,7 +61,25 @@ public:
   using IndexRangeType = typename Superclass::IndexRangeType;
   using ScalesType = typename Superclass::ScalesType;
   using ParametersType = typename Superclass::ParametersType;
-  using StopConditionType = typename Superclass::StopConditionType;
+
+
+  static constexpr itk::StopConditionObjectToObjectOptimizerEnum MAXIMUM_NUMBER_OF_ITERATIONS =
+    itk::StopConditionObjectToObjectOptimizerEnum::MAXIMUM_NUMBER_OF_ITERATIONS;
+  static constexpr itk::StopConditionObjectToObjectOptimizerEnum COSTFUNCTION_ERROR =
+    itk::StopConditionObjectToObjectOptimizerEnum::COSTFUNCTION_ERROR;
+  static constexpr itk::StopConditionObjectToObjectOptimizerEnum UPDATE_PARAMETERS_ERROR =
+    itk::StopConditionObjectToObjectOptimizerEnum::UPDATE_PARAMETERS_ERROR;
+  static constexpr itk::StopConditionObjectToObjectOptimizerEnum STEP_TOO_SMALL =
+    itk::StopConditionObjectToObjectOptimizerEnum::STEP_TOO_SMALL;
+  static constexpr itk::StopConditionObjectToObjectOptimizerEnum CONVERGENCE_CHECKER_PASSED =
+    itk::StopConditionObjectToObjectOptimizerEnum::CONVERGENCE_CHECKER_PASSED;
+  static constexpr itk::StopConditionObjectToObjectOptimizerEnum GRADIENT_MAGNITUDE_TOLEARANCE =
+    itk::StopConditionObjectToObjectOptimizerEnum::GRADIENT_MAGNITUDE_TOLEARANCE;
+  static constexpr itk::StopConditionObjectToObjectOptimizerEnum OTHER_ERROR =
+    itk::StopConditionObjectToObjectOptimizerEnum::OTHER_ERROR;
+
+  static constexpr unsigned int Nparams= itk::OkanQuadraticTransform<double>::NQUADPARAMS;
+
 
   /** Set/Get the learning rate to apply. It is overridden by
    *  automatic learning rate estimation if enabled. See main documentation.

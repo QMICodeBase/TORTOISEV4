@@ -1,12 +1,13 @@
+
 /*=========================================================================
  *
- *  Copyright Insight Software Consortium
+ *  Copyright NumFOCUS
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
  *  You may obtain a copy of the License at
  *
- *         http://www.apache.org/licenses/LICENSE-2.0.txt
+ *         https://www.apache.org/licenses/LICENSE-2.0.txt
  *
  *  Unless required by applicable law or agreed to in writing, software
  *  distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,189 +16,158 @@
  *  limitations under the License.
  *
  *=========================================================================*/
-#ifndef __itkOkanQuadraticTransform_h
-#define __itkOkanQuadraticTransform_h
+#ifndef itkOkanQuadraticTransform_h
+#define itkOkanQuadraticTransform_h
 
+
+#include "itkMacro.h"
 #include "itkMatrix.h"
 #include "itkTransform.h"
-#include "itkMacro.h"
 
-#include <iostream> 
-#include <fstream> 
-//using namespace std;
-#include <stdio.h>
-
- #define NQUADPARAMS 24
+#include <iostream>
 
 namespace itk
 {
-// \class itkOkanQuadraticTransform
+
+/* MatrixOrthogonalityTolerance is a utility to
+ * allow setting the tolerance limits used for
+ * checking if a matrix meet the orthogonality
+ * constraints of being a rigid rotation matrix.
+ * The tolerance needs to be different for
+ * matrices of type float vs. double.
+ */
 
 
-template <  class TScalarType = double,         // Data type for scalars
-            unsigned int NInputDimensions = 3,  // Number of dimensions in the input space
-            unsigned int NOutputDimensions = 3>
-// Number of dimensions in the output space
-class OkanQuadraticTransform :   public Transform<TScalarType, NInputDimensions, NOutputDimensions>
+template <typename TParametersValueType = double, unsigned int VInputDimension = 3, unsigned int VOutputDimension = 3>
+class ITK_TEMPLATE_EXPORT OkanQuadraticTransform
+  : public Transform<TParametersValueType, VInputDimension, VOutputDimension>
 {
 public:
-  /** Standard typedefs   */
-  typedef OkanQuadraticTransform Self;
-  typedef Transform<TScalarType, NInputDimensions,NOutputDimensions>        Superclass;
+  ITK_DISALLOW_COPY_AND_MOVE(OkanQuadraticTransform);
 
-  typedef SmartPointer<Self>       Pointer;
-  typedef SmartPointer<const Self> ConstPointer;
+  using Self = OkanQuadraticTransform;
+  using Superclass = Transform<TParametersValueType, VInputDimension, VOutputDimension>;
 
-  /** Run-time type information (and related methods).   */
+  using Pointer = SmartPointer<Self>;
+  using ConstPointer = SmartPointer<const Self>;
+
   itkTypeMacro(OkanQuadraticTransform, Transform);
 
-  /** New macro for creation of through a Smart Pointer   */
   itkNewMacro(Self);
 
+  static constexpr unsigned int InputSpaceDimension = VInputDimension;
+  static constexpr unsigned int OutputSpaceDimension = VOutputDimension;
+  static constexpr unsigned int ParametersDimension = VOutputDimension * (VInputDimension + 1);
 
+  static constexpr unsigned int NQUADPARAMS=24;
 
-  /** Dimension of the domain space. */
-  itkStaticConstMacro(InputSpaceDimension, unsigned int, NInputDimensions);
-  itkStaticConstMacro(OutputSpaceDimension, unsigned int, NOutputDimensions);
-  itkStaticConstMacro( ParametersDimension, unsigned int, NQUADPARAMS);
-  
-  
-  
+  using typename Superclass::FixedParametersType;
+  using typename Superclass::FixedParametersValueType;
+  using typename Superclass::ParametersType;
+  using typename Superclass::ParametersValueType;
 
-  /** Parameters Type   */
-  typedef typename Superclass::ParametersType      ParametersType;
-  typedef typename Superclass::ParametersValueType ParametersValueType;
+  using typename Superclass::JacobianType;
+  using typename Superclass::JacobianPositionType;
+  using typename Superclass::InverseJacobianPositionType;
 
-  /** Jacobian Type   */
-  typedef typename Superclass::JacobianType JacobianType;
+  using typename Superclass::TransformCategoryEnum;
 
-  /** Transform category type. */
-  typedef typename Superclass::TransformCategoryType TransformCategoryType;
+  using typename Superclass::ScalarType;
 
-  /** Standard scalar type for this class */
-  typedef typename Superclass::ScalarType ScalarType;
+  using InputVectorType = Vector<TParametersValueType, Self::InputSpaceDimension>;
+  using OutputVectorType = Vector<TParametersValueType, Self::OutputSpaceDimension>;
+  using OutputVectorValueType = typename OutputVectorType::ValueType;
 
-  /** Standard vector type for this class   */
-  typedef Vector<TScalarType, itkGetStaticConstMacro(InputSpaceDimension)>  InputVectorType;
-  typedef Vector<TScalarType, itkGetStaticConstMacro(OutputSpaceDimension)> OutputVectorType;
-  typedef typename OutputVectorType::ValueType OutputVectorValueType;
+  using InputCovariantVectorType = CovariantVector<TParametersValueType, Self::InputSpaceDimension>;
+  using OutputCovariantVectorType = CovariantVector<TParametersValueType, Self::OutputSpaceDimension>;
 
-  /** Standard covariant vector type for this class   */
-  typedef CovariantVector<TScalarType, itkGetStaticConstMacro(InputSpaceDimension)>   InputCovariantVectorType;
-  typedef CovariantVector<TScalarType, itkGetStaticConstMacro(OutputSpaceDimension)>  OutputCovariantVectorType;
+  using typename Superclass::InputVectorPixelType;
+  using typename Superclass::OutputVectorPixelType;
 
-  typedef typename Superclass::InputVectorPixelType  InputVectorPixelType;
-  typedef typename Superclass::OutputVectorPixelType OutputVectorPixelType;
+  using typename Superclass::InputDiffusionTensor3DType;
+  using typename Superclass::OutputDiffusionTensor3DType;
 
-  /** Standard diffusion tensor type for this class */
-  typedef typename Superclass::InputDiffusionTensor3DType   InputDiffusionTensor3DType;
-  typedef typename Superclass::OutputDiffusionTensor3DType  OutputDiffusionTensor3DType;
+  using typename Superclass::InputSymmetricSecondRankTensorType;
+  using typename Superclass::OutputSymmetricSecondRankTensorType;
 
-  /** Standard tensor type for this class */
-  typedef typename Superclass::InputSymmetricSecondRankTensorType   InputSymmetricSecondRankTensorType;
-  typedef typename Superclass::OutputSymmetricSecondRankTensorType   OutputSymmetricSecondRankTensorType;
+  using InputTensorEigenVectorType = CovariantVector<TParametersValueType, InputDiffusionTensor3DType::Dimension>;
 
-  typedef CovariantVector<TScalarType, InputDiffusionTensor3DType::Dimension>   InputTensorEigenVectorType;
+  using InputVnlVectorType = vnl_vector_fixed<TParametersValueType, Self::InputSpaceDimension>;
+  using OutputVnlVectorType = vnl_vector_fixed<TParametersValueType, Self::OutputSpaceDimension>;
 
-  /** Standard vnl_vector type for this class   */
-  typedef vnl_vector_fixed<TScalarType, itkGetStaticConstMacro(InputSpaceDimension)>  InputVnlVectorType;
-  typedef vnl_vector_fixed<TScalarType, itkGetStaticConstMacro(OutputSpaceDimension)>   OutputVnlVectorType;
+  using InputPointType = Point<TParametersValueType, Self::InputSpaceDimension>;
+  using InputPointValueType = typename InputPointType::ValueType;
+  using OutputPointType = Point<TParametersValueType, Self::OutputSpaceDimension>;
+  using OutputPointValueType = typename OutputPointType::ValueType;
 
-  /** Standard coordinate point type for this class   */
-  typedef Point<TScalarType, itkGetStaticConstMacro(InputSpaceDimension)>  InputPointType;
-  typedef typename InputPointType::ValueType InputPointValueType;
-  typedef Point<TScalarType,itkGetStaticConstMacro(OutputSpaceDimension)>  OutputPointType;
-  typedef typename OutputPointType::ValueType OutputPointValueType;
+  using MatrixType = Matrix<TParametersValueType, Self::OutputSpaceDimension, Self::InputSpaceDimension>;
+  using MatrixValueType = typename MatrixType::ValueType;
 
-  /** Standard matrix type for this class   */
-  typedef Matrix<TScalarType, itkGetStaticConstMacro(OutputSpaceDimension), itkGetStaticConstMacro(InputSpaceDimension)>  MatrixType;
-  typedef typename MatrixType::ValueType MatrixValueType;
+  using InverseMatrixType = Matrix<TParametersValueType, Self::InputSpaceDimension, Self::OutputSpaceDimension>;
 
-  /** Standard inverse matrix type for this class   */
-  typedef Matrix<TScalarType, itkGetStaticConstMacro(InputSpaceDimension), itkGetStaticConstMacro(OutputSpaceDimension)>   InverseMatrixType;
+  using CenterType = InputPointType;
 
-  //typedef InputPointType CenterType;
+ // using OffsetType = OutputVectorType;
+ // using OffsetValueType = typename OffsetType::ValueType;
 
-  //typedef OutputVectorType               OffsetType;
-  //typedef typename OffsetType::ValueType OffsetValueType;
+  using TranslationType = OutputVectorType;
 
-  typedef OutputVectorType TranslationType;
+  using TranslationValueType = typename TranslationType::ValueType;
 
-  typedef typename TranslationType::ValueType TranslationValueType;
+  using InverseTransformBaseType = typename Superclass::InverseTransformBaseType;
+  using InverseTransformBasePointer = typename InverseTransformBaseType::Pointer;
 
-  /** Base inverse transform type. This type should not be changed to the
-   * concrete inverse transform type or inheritance would be lost. */
-  typedef typename Superclass::InverseTransformBaseType InverseTransformBaseType;
-  typedef typename InverseTransformBaseType::Pointer    InverseTransformBasePointer;
+  using InverseTransformType = OkanQuadraticTransform<TParametersValueType, VOutputDimension, VInputDimension>;
+  friend class OkanQuadraticTransform<TParametersValueType, VOutputDimension, VInputDimension>;
 
-  /** Set the transformation to an Identity
-   *
-   * This sets the matrix to identity and the Offset to null. */
-  virtual void SetIdentity(void);
+  virtual void
+  SetIdentity();
 
-  /** Indicates the category transform.
-   *  e.g. an affine transform, or a local one, e.g. a deformation field.
-   */
-  virtual TransformCategoryType GetTransformCategory() const
+  TransformCategoryEnum
+  GetTransformCategory() const override
   {
-    return Self::UnknownTransformCategory;    
+    return Self::TransformCategoryEnum::Linear;
   }
 
-  /** Set matrix of an OkanQuadraticTransform
-   *
-   * This method sets the matrix of an OkanQuadraticTransform to a
-   * value specified by the user.
-   *
-   * This updates the Offset wrt to current translation
-   * and center.  See the warning regarding offset-versus-translation
-   * in the documentation for SetCenter.
-   *
-   * To define an affine transform, you must set the matrix,
-   * center, and translation OR the matrix and offset */
-  
-  
-  
-
-
-  virtual const MatrixType & GetMatrix() const
+  virtual void
+  SetMatrix(const MatrixType & matrix)
   {
-      return m_Matrix;
+    m_Matrix = matrix;    
+    this->ComputeMatrixParameters();
+    m_MatrixMTime.Modified();
+    this->Modified();
+    return;
+  }
+  virtual const MatrixType &
+  GetMatrix() const
+  {
+    return m_Matrix;
   }
 
 
-  /** Set translation of an OkanQuadraticTransform
-   *
-   * This method sets the translation of an OkanQuadraticTransform.
-   * This updates Offset to reflect current translation.
-   * To define an affine transform, you must set the matrix,
-   * center, and translation OR the matrix and offset */
-  void SetTranslation(const OutputVectorType & translation)
+
+  void
+  SetTranslation(const OutputVectorType & translation)
   {
       this->m_Parameters[0]= translation[0];
       this->m_Parameters[1]= translation[1];
       this->m_Parameters[2]= translation[2];
-    m_Translation = translation; 
-    this->Modified(); 
-    return;
-  }
 
-  /** Get translation component of the OkanQuadraticTransform
-   *
-   * This method returns the translation used after rotation
-   * about the center point.
-   * To define an affine transform, you must set the matrix,
-   * center, and translation OR the matrix and offset */
-  const OutputVectorType & GetTranslation(void) const
+      m_Translation = translation;      
+      this->Modified();
+      return;
+  }
+  const OutputVectorType &
+  GetTranslation() const
   {
     return m_Translation;
   }
 
-  /** Set the transformation from a container of parameters.
-   * The first (NOutputDimension x NInputDimension) parameters define the
-   * matrix and the last NOutputDimension parameters the translation.
-   * Offset is updated based on current center. */
-  void SetParameters(const ParametersType & parameters);
+  void
+  SetParameters(const ParametersType & parameters) override;
 
+  const ParametersType &
+  GetParameters() const override;
 
   void SetParametersForOptimizationFlags(const ParametersType & flags)
   {
@@ -213,118 +183,79 @@ public:
 
 
 
-  /** Get the Transformation Parameters. */
-  const ParametersType & GetParameters(void) const;
-
-  /** Set the fixed parameters and update internal transformation. */
   virtual void SetFixedParameters(const ParametersType &fp){this->m_FixedParameters = fp;};
 
   /** Get the Fixed Parameters. */
 //  virtual const ParametersType & GetFixedParameters(void) const;
   virtual const ParametersType & GetFixedParameters(void) const{return this->m_FixedParameters;};
 
-  /** Compose with another OkanQuadraticTransform
-   *
-   * This method composes self with another OkanQuadraticTransform of the
-   * same dimension, modifying self to be the composition of self
-   * and other.  If the argument pre is true, then other is
-   * precomposed with self; that is, the resulting transformation
-   * consists of first applying other to the source, followed by
-   * self.  If pre is false or omitted, then other is post-composed
-   * with self; that is the resulting transformation consists of
-   * first applying self to the source, followed by other.
-   * This updates the Translation based on current center. */
-  void Compose(const Self *other, bool pre = 0);
+  void
+  Compose(const Self * other, bool pre = false);
 
-  /** Transform by an affine transformation
-   *
-   * This method applies the affine transform given by self to a
-   * given point or vector, returning the transformed point or
-   * vector.  The TransformPoint method transforms its argument as
-   * an affine point, whereas the TransformVector method transforms
-   * its argument as a vector. */
-
-  OutputPointType       TransformPoint(const InputPointType & point) const;
+  OutputPointType
+  TransformPoint(const InputPointType & point) const override;
 
   using Superclass::TransformVector;
 
-  OutputVectorType      TransformVector(const InputVectorType & vector) const;
+  OutputVectorType
+  TransformVector(const InputVectorType & vect) const override;
 
-  OutputVnlVectorType   TransformVector(const InputVnlVectorType & vector) const;
+  OutputVnlVectorType
+  TransformVector(const InputVnlVectorType & vect) const override;
 
-  OutputVectorPixelType TransformVector(const InputVectorPixelType & vector) const;
+  OutputVectorPixelType
+  TransformVector(const InputVectorPixelType & vect) const override;
 
   using Superclass::TransformCovariantVector;
 
-  OutputCovariantVectorType TransformCovariantVector(const InputCovariantVectorType & vector) const;
+  OutputCovariantVectorType
+  TransformCovariantVector(const InputCovariantVectorType & vec) const override;
 
-  OutputVectorPixelType TransformCovariantVector(const InputVectorPixelType & vector) const;
+  OutputVectorPixelType
+  TransformCovariantVector(const InputVectorPixelType & vect) const override;
 
   using Superclass::TransformDiffusionTensor3D;
 
-  OutputDiffusionTensor3DType TransformDiffusionTensor3D(const InputDiffusionTensor3DType & tensor) const;
+  OutputDiffusionTensor3DType
+  TransformDiffusionTensor3D(const InputDiffusionTensor3DType & tensor) const override;
 
-  OutputVectorPixelType TransformDiffusionTensor3D(const InputVectorPixelType & tensor ) const;
+  OutputVectorPixelType
+  TransformDiffusionTensor3D(const InputVectorPixelType & tensor) const override;
 
   using Superclass::TransformSymmetricSecondRankTensor;
-  OutputSymmetricSecondRankTensorType TransformSymmetricSecondRankTensor( const InputSymmetricSecondRankTensorType & tensor ) const;
+  OutputSymmetricSecondRankTensorType
+  TransformSymmetricSecondRankTensor(const InputSymmetricSecondRankTensorType & inputTensor) const override;
 
-  OutputVectorPixelType TransformSymmetricSecondRankTensor( const InputVectorPixelType & tensor ) const;
+  OutputVectorPixelType
+  TransformSymmetricSecondRankTensor(const InputVectorPixelType & inputTensor) const override;
 
-  /** Compute the Jacobian of the transformation
-   *
-   * This method computes the Jacobian matrix of the transformation.
-   * given point or vector, returning the transformed point or
-   * vector. The rank of the Jacobian will also indicate if the transform
-   * is invertible at this point.
-   * Get local Jacobian for the given point
-   * \c j will sized properly as needed.
-   */
-  virtual void ComputeJacobianWithRespectToParameters(const InputPointType  & x, JacobianType & j) const;
 
-  /** Get the jacobian with respect to position. This simply returns
-   * the current Matrix. jac will be resized as needed, but it's
-   * more efficient if it's already properly sized. */
+  void
+  ComputeJacobianWithRespectToParameters(const InputPointType & p, JacobianType & jacobian) const override;
+
+
+  //void
+  //ComputeJacobianWithRespectToPosition(const InputPointType & x, JacobianPositionType & jac) const override;
+  //using Superclass::ComputeJacobianWithRespectToPosition;
   virtual void ComputeJacobianWithRespectToPosition(const InputPointType  & x, JacobianType & jac) const;
 
-  /** Get the jacobian with respect to position. This simply returns
-   * the inverse of the current Matrix. jac will be resized as needed, but it's
-   * more efficient if it's already properly sized. */
+
+  //void   ComputeInverseJacobianWithRespectToPosition(const InputPointType &        x,
+  //                                            InverseJacobianPositionType & jac) const override;
+  //using Superclass::ComputeInverseJacobianWithRespectToPosition;
+
   virtual void ComputeInverseJacobianWithRespectToPosition(const InputPointType  & x, JacobianType & jac) const;
 
-  /** Create inverse of an affine transformation
-   *
-   * This populates the parameters an affine transform such that
-   * the transform is the inverse of self. If self is not invertible,
-   * an exception is thrown.
-   * Note that by default the inverese transform is centered at
-   * the origin. If you need to compute the inverse centered at a point, p,
-   *
-   * \code
-   * transform2->SetCenter( p );
-   * transform1->GetInverse( transform2 );
-   * \endcode
-   *
-   * transform2 will now contain the inverse of transform1 and will
-   * with its center set to p. Flipping the two statements will produce an
-   * incorrect transform.
-   *
-   */
-  bool GetInverse(Self *inverse) const;
+  bool
+  GetInverse(InverseTransformType * inverse) const;
+  InverseTransformBasePointer
+  GetInverseTransform() const override;
 
-  /** Return an inverse of this transform. */
-  virtual InverseTransformBasePointer GetInverseTransform() const;
-
-  /** Indicates that this transform is linear. That is, given two
-   * points P and Q, and scalar coefficients a and b, then
-   *
-   *           T( a*P + b*Q ) = a * T(P) + b * T(Q)
-   */
-  virtual bool IsLinear() const
+  bool
+  IsLinear() const override
   {
     return false;
   }
-  
   void SetPhase(std::string np)
   {
       if(np=="horizontal")
@@ -339,117 +270,99 @@ public:
   {
       this->phase=p;
   }
-  
+
   short GetPhase(){return this->phase;};
 
- 
-  
-
-#if !defined(ITK_LEGACY_REMOVE)
-
-public:
-#else
 
 protected:
-#endif
-  /** \deprecated Use GetInverse for public API instead.
-   * Method will eventually be made a protected member function */
-  const InverseMatrixType & GetInverseMatrix(void) const;
+  const InverseMatrixType &
+  GetInverseMatrix() const;
 
-  
 protected:
-  /** Construct an OkanQuadraticTransform object
-   *
-   * This method constructs a new OkanQuadraticTransform object and
-   * initializes the matrix and offset parts of the transformation
-   * to values specified by the caller.  If the arguments are
-   * omitted, then the OkanQuadraticTransform is initialized to an identity
-   * transformation in the appropriate number of dimensions. */
   OkanQuadraticTransform(const ParametersType params);
   OkanQuadraticTransform(unsigned int paramDims);
   OkanQuadraticTransform();
+  ~OkanQuadraticTransform() override = default;
 
-  /** Destroy an OkanQuadraticTransform object */
-  virtual ~OkanQuadraticTransform();
+  void
+  PrintSelf(std::ostream & os, Indent indent) const override;
 
-  /** Print contents of an OkanQuadraticTransform */
-  void PrintSelf(std::ostream & s, Indent indent) const;
-
-  const InverseMatrixType & GetVarInverseMatrix(void) const
+  const InverseMatrixType &
+  GetVarInverseMatrix() const
   {
     return m_InverseMatrix;
   }
-  void SetVarInverseMatrix(const InverseMatrixType & matrix) const
+  void
+  SetVarInverseMatrix(const InverseMatrixType & matrix) const
   {
-    m_InverseMatrix = matrix; m_InverseMatrixMTime.Modified();
+    m_InverseMatrix = matrix;
+    m_InverseMatrixMTime.Modified();
   }
-  
-  bool InverseMatrixIsOld(void) const
+  bool
+  InverseMatrixIsOld() const
   {
-    if( m_MatrixMTime != m_InverseMatrixMTime )
-      {
+    if (m_MatrixMTime != m_InverseMatrixMTime)
+    {
       return true;
-      }
+    }
     else
-      {
+    {
       return false;
-      }
+    }
   }
 
-  virtual void ComputeMatrixParameters(void);
+  virtual void
+  ComputeMatrixParameters();
 
-  virtual void ComputeMatrix(void);
+  virtual void
+  ComputeMatrix();
 
-  void SetVarMatrix(const MatrixType & matrix)
+  void
+  SetVarMatrix(const MatrixType & matrix)
   {
-    m_Matrix = matrix; 
+    m_Matrix = matrix;
     m_MatrixMTime.Modified();
   }
 
-  virtual void ComputeTranslation(void);
+  virtual void
+  ComputeTranslation();
 
-  void SetVarTranslation(const OutputVectorType & translation)
+  void
+  SetVarTranslation(const OutputVectorType & translation)
   {
     m_Translation = translation;
   }
 
-  
 
-  
+  void
+  SetVarCenter(const InputPointType & center)
+  {
+    m_Center = center;
+  }
+
+  itkGetConstMacro(Singular, bool);
 
 private:
+  MatrixType                m_Matrix{ MatrixType::GetIdentity() };               // Matrix of the transformation
+  OutputVectorType          m_Offset{};                                          // Offset of the transformation
+  mutable InverseMatrixType m_InverseMatrix{ InverseMatrixType::GetIdentity() }; // Inverse of the matrix
+  mutable bool              m_Singular{ false };                                 // Is m_Inverse singular?
 
-  OkanQuadraticTransform(const Self & other);
-  const Self & operator=(const Self &);
+  InputPointType   m_Center{};
+  OutputVectorType m_Translation{};
 
-  MatrixType                m_Matrix;           // Matrix of the transformation
-  mutable InverseMatrixType m_InverseMatrix;    // Inverse of the matrix
-  mutable bool              m_Singular;         // Is m_Inverse singular?
- 
+   ParametersType m_ParametersForOptimizationFlags;
+   short phase;
+   bool do_cubic;
 
-  OutputVectorType m_Translation;
-  
-  
- // ParametersType m_Parameters;
-  ParametersType m_ParametersForOptimizationFlags;
-  short phase;
-  bool do_cubic;
-  
 
-  /** To avoid recomputation of the inverse if not needed */
   TimeStamp         m_MatrixMTime;
   mutable TimeStamp m_InverseMatrixMTime;
 }; // class OkanQuadraticTransform
-
-
-
-}  // namespace itk
-
-
+} // namespace itk
 
 #ifndef ITK_MANUAL_INSTANTIATION
-#include "itkOkanQuadraticTransform.hxx"
+#  include "itkOkanQuadraticTransform.hxx"
 #endif
 
-#endif /* __itkOkanQuadraticTransform_h */
- 
+#endif /* itkOkanQuadraticTransform_h */

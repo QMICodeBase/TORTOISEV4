@@ -97,13 +97,7 @@ OkanQuadraticTransform<TScalarType, NInputDimensions, NOutputDimensions>
     m_MatrixMTime.Modified();
 }
 
-// Destructor
-template <class TScalarType, unsigned int NInputDimensions, unsigned int NOutputDimensions>
-OkanQuadraticTransform<TScalarType, NInputDimensions, NOutputDimensions>
-::~OkanQuadraticTransform()
-{
-  return;
-}
+
 
 // Print self
 template <class TScalarType, unsigned int NInputDimensions, unsigned int NOutputDimensions>
@@ -361,15 +355,6 @@ const typename OkanQuadraticTransform<TScalarType,NInputDimensions,NOutputDimens
   return m_InverseMatrix;
   }
 
-// return an inverse transformation
-template <class TScalarType, unsigned int NInputDimensions, unsigned int NOutputDimensions>
-bool
-OkanQuadraticTransform<TScalarType, NInputDimensions, NOutputDimensions>
-::GetInverse(Self *inverse) const
-{
-
-  return false;
-}
 
 // Return an inverse of this transform
 template <class TScalarType, unsigned int NInputDimensions, unsigned int NOutputDimensions>

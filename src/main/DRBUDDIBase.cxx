@@ -368,8 +368,8 @@ void DRBUDDIBase::CreateCorrectionImage(std::string nii_filename,ImageType3D::Po
              }
          }
 
-         int b0_vol_id = my_json["B0VolId"];
-         ImageType3D::Pointer mask_img= create_mask(final_data[b0_vol_id]);
+         //int b0_vol_id = my_json["B0VolId"];
+         ImageType3D::Pointer mask_img= create_mask(final_data[0]);
          ImageType3D::Pointer A0_image=nullptr;
          DTImageType::Pointer  dt_image=nullptr;
          if(dummy.size()<15)

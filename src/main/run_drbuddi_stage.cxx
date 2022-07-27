@@ -578,7 +578,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
             while(curr<prev)
             {
                 lr*=mult;
-                if(lr>16)
+                if(lr>8)
                     break;
                 ScaleUpdateField(updateFieldF,lr);
                 ScaleUpdateField(updateFieldM,lr);

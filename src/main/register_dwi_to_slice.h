@@ -86,8 +86,8 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
         initialTransform->SetIdentity();
 
         OkanQuadraticTransformType::ParametersType flags, grd_scales;
-        grd_scales.SetSize(NQUADPARAMS);
-        flags.SetSize(NQUADPARAMS);
+        grd_scales.SetSize(OkanQuadraticTransformType::NQUADPARAMS);
+        flags.SetSize(OkanQuadraticTransformType::NQUADPARAMS);
         flags.Fill(0);
         flags[0]=flags[1]=flags[2]=flags[3]=flags[4]=flags[5]=1;
         if(do_eddy)

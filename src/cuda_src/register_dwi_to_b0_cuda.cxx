@@ -90,10 +90,10 @@ TransformType::Pointer  RegisterDWIToB0_cuda(ImageType3D::Pointer fixed_img, Ima
 
 
     TransformType::ParametersType flags, grd_scales;
-    flags.SetSize(NQUADPARAMS);
+    flags.SetSize(TransformType::NQUADPARAMS);
     flags.Fill(0);
-    grd_scales.SetSize(NQUADPARAMS);
-    for(int i=0;i<NQUADPARAMS;i++)
+    grd_scales.SetSize(TransformType::NQUADPARAMS);
+    for(int i=0;i<TransformType::NQUADPARAMS;i++)
     {
         flags[i]= mecc_settings->getFlags()[i];
     }
@@ -119,7 +119,7 @@ TransformType::Pointer  RegisterDWIToB0_cuda(ImageType3D::Pointer fixed_img, Ima
     if(phase=="slice")
         ph=2;
 
-    if( mecc_settings->getGrdSteps().size()==NQUADPARAMS)
+    if( mecc_settings->getGrdSteps().size()==TransformType::NQUADPARAMS)
     {
         for(int i=0;i<24;i++)
             grd_scales[i]=  mecc_settings->getGrdSteps()[i];
@@ -166,7 +166,7 @@ TransformType::Pointer  RegisterDWIToB0_cuda(ImageType3D::Pointer fixed_img, Ima
     if(initialize)
     {
         TransformType::ParametersType flags2;
-        flags2.SetSize(NQUADPARAMS);
+        flags2.SetSize(TransformType::NQUADPARAMS);
         flags2.Fill(0);
         flags2[0]=mecc_settings->getFlags()[0];
         flags2[1]=mecc_settings->getFlags()[1];
