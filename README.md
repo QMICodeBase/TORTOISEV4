@@ -62,6 +62,8 @@ There are 3 ways you can use TORTOISEV4:
 2) Download the Docker containers from  https://tortoise.nibib.nih.gov/
 3) Compile the source code
 
+Please note that the source code here will always be up-to-date. However, the assembled packages might take a while to be updated.
+
 ## TORTOISEV4 Source code compilation
 
 ### TORTOISEV4 Prerequisite Libraries
