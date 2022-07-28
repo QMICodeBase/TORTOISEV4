@@ -80,6 +80,8 @@ mkdir libraries
 cd libraries
 ```
 
+#### 0) Install LAPACK and LBLAS
+sudo apt-get install libblas-dev liblapack-dev
 
 #### 1) CUDA installation (OPTIONAL. If you have an NIVIDA GPU and want to make TORTOISE faster)
 
@@ -106,7 +108,7 @@ sudo apt install libeigen3-dev
 wget https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.tar.gz
 tar -xvf boost_1_76_0.tar.gz
 cd boost_1_76_0
-/bootstrap.sh --with-libraries=iostreams,filesystem,system,regex --prefix=/usr/local/boost176
+./bootstrap.sh --with-libraries=iostreams,filesystem,system,regex --prefix=/usr/local/boost176
 sudo ./b2 install
 cd ..
 ```
