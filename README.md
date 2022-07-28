@@ -80,6 +80,8 @@ mkdir libraries
 cd libraries
 ```
 
+#### 0) Install LAPACK and LBLAS
+sudo apt-get install libblas-dev liblapack-dev
 
 #### 1) CUDA installation (OPTIONAL. If you have an NIVIDA GPU and want to make TORTOISE faster)
 
