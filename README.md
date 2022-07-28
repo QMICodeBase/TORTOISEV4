@@ -68,9 +68,9 @@ Please note that the source code here will always be up-to-date. However, the as
 
 ### TORTOISEV4 Prerequisite Libraries
 TORTOISE requires the following libraries to be installed beforehand:
- * ITK 5.3.0,  Boost 1.76, CUDA 11.3 (for CUDA executables), Eigen 3.3, FFTW3,  VTK 8.0.1 (only for a single executable). It also uses the nlohmann/json C++ library (https://github.com/nlohmann/json), and bet brain masking library from FSL, which are included in the distribution.
+ * ITK 5.3.0,  Boost 1.76, CUDA 11.3 (for CUDA executables), Eigen 3.3, FFTW3,  VTK 8.0.1 (only for a single executable). It also uses the nlohmann/json C++ library (https://github.com/nlohmann/json), MPFIT library from  C. Markwardt (http://cow.physics.wisc.edu/~craigm/idl/idl.html) and bet brain masking library from FSL, which are included in the distribution.
 
-The compilation has been tested with GCC-9, G++9  however older or newer compilers should be okay. You also need Cmake for compilation.
+The compilation has been tested with GCC-9/G++9 and  GCC-11/G++11.  Nnewer compilers should be okay but we ran into compilation issues compiling with GCC/G++-7.  You also need Cmake for compilation. The version used for testing was Cmake-3.20.
 
 Initial Instructions:
 ```
