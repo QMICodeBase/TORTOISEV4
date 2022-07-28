@@ -90,10 +90,10 @@ OkanQuadraticTransform<TScalarType, NInputDimensions, NOutputDimensions>
         this->phase=1;
 
 
-  
+
     this->ComputeMatrix();
-    this->ComputeTranslation();    
-    
+    this->ComputeTranslation();
+
     m_MatrixMTime.Modified();
 }
 
