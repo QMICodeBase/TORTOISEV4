@@ -18,7 +18,7 @@
 
 #include <set>
 
-#include <Eigen/Cholesky> 
+//#include <Eigen/Cholesky>
 
 
 //#define DEBUG_ICLS

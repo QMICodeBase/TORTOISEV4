@@ -106,7 +106,9 @@ public:
   itkNewMacro( Self );
 
   /** ImageDimension constants */
-  itkStaticConstMacro( ImageDimension, unsigned int, TFixedImage::ImageDimension );
+
+  using ImageDimensionType = unsigned int;
+  static constexpr ImageDimensionType ImageDimension = TFixedImage::ImageDimension ;
 
   /** Run-time type information (and related methods). */
   itkTypeMacro( OkanImageRegistrationMethodv4, ProcessObject );
@@ -528,7 +530,7 @@ protected:
 
 
 private:
-  ITK_DISALLOW_COPY_AND_ASSIGN(OkanImageRegistrationMethodv4);
+  ITK_DISALLOW_COPY_AND_MOVE(OkanImageRegistrationMethodv4);
 
   bool                                                            m_InPlace;
 

@@ -102,7 +102,7 @@ class ITK_TEMPLATE_EXPORT MattesMutualInformationImageToImageMetricv4Okan :
   public ImageToImageMetricv4<TFixedImage, TMovingImage, TVirtualImage, TInternalComputationValueType, TMetricTraits>
 {
 public:
-  ITK_DISALLOW_COPY_AND_ASSIGN(MattesMutualInformationImageToImageMetricv4Okan);
+  ITK_DISALLOW_COPY_AND_MOVE(MattesMutualInformationImageToImageMetricv4Okan);
 
   /** Standard class type aliases. */
   using Self = MattesMutualInformationImageToImageMetricv4Okan;

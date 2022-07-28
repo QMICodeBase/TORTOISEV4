@@ -441,7 +441,7 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
           }
         else
           {
-          itkExceptionMacro( "Invalid metric type." )
+          itkExceptionMacro( "Invalid metric type." );
           }
         }
       }
@@ -597,11 +597,11 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
       typename FixedImageSmoothingFilterType::Pointer fixedImageSmoothingFilter = FixedImageSmoothingFilterType::New();
       if( this->m_SmoothingSigmasAreSpecifiedInPhysicalUnits == true )
         {
-        fixedImageSmoothingFilter->SetUseImageSpacingOn();
+        fixedImageSmoothingFilter->SetUseImageSpacing(true);
         }
       else
         {
-        fixedImageSmoothingFilter->SetUseImageSpacingOff();
+        fixedImageSmoothingFilter->SetUseImageSpacing(false);
         }
       fixedImageSmoothingFilter->SetVariance( itk::Math::sqr( this->m_SmoothingSigmasPerLevel[level] ) );
       fixedImageSmoothingFilter->SetMaximumError( 0.01 );
@@ -615,11 +615,11 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
       typename MovingImageSmoothingFilterType::Pointer movingImageSmoothingFilter = MovingImageSmoothingFilterType::New();
       if( this->m_SmoothingSigmasAreSpecifiedInPhysicalUnits == true )
         {
-        movingImageSmoothingFilter->SetUseImageSpacingOn();
+        movingImageSmoothingFilter->SetUseImageSpacing(true);
         }
       else
         {
-        movingImageSmoothingFilter->SetUseImageSpacingOff();
+        movingImageSmoothingFilter->SetUseImageSpacing(false);
         }
       movingImageSmoothingFilter->SetVariance( itk::Math::sqr( this->m_SmoothingSigmasPerLevel[level] ) );
       movingImageSmoothingFilter->SetMaximumError( 0.01 );
@@ -649,7 +649,7 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
         }
       else
         {
-        itkExceptionMacro( "Invalid metric type." )
+        itkExceptionMacro( "Invalid metric type." );
         }
       }
     else if( this->m_Metric->GetMetricCategory() == MetricType::MetricCategoryEnum::POINT_SET_METRIC ||
@@ -673,12 +673,12 @@ OkanImageRegistrationMethodv4<TFixedImage, TMovingImage, TTransform, TVirtualIma
         }
       else
         {
-        itkExceptionMacro( "Invalid metric type." )
+        itkExceptionMacro( "Invalid metric type." );
         }
       }
     else
       {
-      itkExceptionMacro( "Invalid metric type." )
+      itkExceptionMacro( "Invalid metric type." );
       }
     }
 

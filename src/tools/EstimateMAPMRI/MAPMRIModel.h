@@ -3,7 +3,7 @@
 
 
 #include "DiffusionModel.h"
-#include <Eigen/Dense>
+
 
 using namespace Eigen;
 

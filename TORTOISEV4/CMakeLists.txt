@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 
 PROJECT(TORTOISEV4  )
 
-SET(ISDEBUG 0)
+
 SET(USEOPENMP 1)
 
 if ( NOT DEFINED USECUDA)
@@ -12,10 +12,25 @@ if ( NOT DEFINED USE_VTK)
     SET(USE_VTK 0)
 endif()
 
+if ( DEFINED CMAKE_BUILD_TYPE)
+
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        SET(CMAKE_BUILD_TYPE Release)
+        SET(ISDEBUG 0)
+    else()
+        SET(CMAKE_BUILD_TYPE Debug)
+        SET(ISDEBUG 1)
+    endif()
+else()
+    SET(CMAKE_BUILD_TYPE Release)
+    SET(ISDEBUG 0)
+endif()
 
 
-SET(CMAKE_C_COMPILER /usr/bin/gcc-9)
-SET(CMAKE_CXX_COMPILER /usr/bin/g++-9)
+
+
+#SET(CMAKE_C_COMPILER /usr/bin/gcc-9)
+#SET(CMAKE_CXX_COMPILER /usr/bin/g++-9)
 
 message(${CMAKE_BINARY_DIR})
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin/)
@@ -24,12 +39,12 @@ set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin/lib/ )
 
 
 IF(USEOPENMP)
-    SET(CMAKE_CXX_FLAGS "-fopenmp -std=c++14 ")
-    SET(CMAKE_C_FLAGS "-fopenmp ")
+    SET(CMAKE_CXX_FLAGS "-fopenmp -std=c++14 -Wno-deprecated-declarations -Wno-unused-result -Wno-narrowing")
+    SET(CMAKE_C_FLAGS "-fopenmp -Wno-deprecated-declarations -Wno-unused-result -Wno-narrowing")
     add_definitions(-DUSE_OPENMP)
 ELSE(USEOPENMP)
-    SET(CMAKE_CXX_FLAGS "-fPIC ")
-    SET(CMAKE_C_FLAGS "-fPIC ")
+    SET(CMAKE_CXX_FLAGS "-fPIC -Wno-deprecated-declarations -Wno-unused-result -Wno-narrowing")
+    SET(CMAKE_C_FLAGS "-fPIC -Wno-deprecated-declarations -Wno-unused-result -Wno-narrowing")
 ENDIF(USEOPENMP)
 
 
@@ -85,11 +100,10 @@ IF(ISDEBUG)
     FIND_PACKAGE(ITK) 
     IF(ITK_FOUND) 
         INCLUDE(${ITK_USE_FILE})
-        MESSAGE("ITK 5.01 Debug version used!")
+        MESSAGE("ITK 5.3rc Debug version used!")
     ELSE(ITK_FOUND) 
         MESSAGE(FATAL_ERROR "ITK not found. Please set ITK_DIR.")
-    ENDIF(ITK_FOUND)
-    SET(CMAKE_BUILD_TYPE Debug)
+    ENDIF(ITK_FOUND)    
 ELSE(ISDEBUG)    
     if ( NOT DEFINED ITK_DIR)
         #SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-5.0.1-release)
@@ -98,18 +112,18 @@ ELSE(ISDEBUG)
     FIND_PACKAGE(ITK) 
     IF(ITK_FOUND) 
        INCLUDE(${ITK_USE_FILE})
-       MESSAGE("ITK 5.01 Release version used!")
+       MESSAGE("ITK 5.3rc Release version used!")
     ELSE(ITK_FOUND) 
         MESSAGE(FATAL_ERROR "ITK not found. Please set ITK_DIR.")
-    ENDIF(ITK_FOUND)
-    SET(CMAKE_BUILD_TYPE Release)
+    ENDIF(ITK_FOUND)    
 ENDIF(ISDEBUG)
 
 
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 if(Eigen3_FOUND)
     message("Eigen found.")
-message(${EIGEN3_INCLUDE_DIR})
+    message(${EIGEN3_INCLUDE_DIR})
+    include_directories(${EIGEN3_INCLUDE_DIR})
 endif()
 
 
