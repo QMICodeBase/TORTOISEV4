@@ -68,7 +68,7 @@ Please note that the source code here will always be up-to-date. However, the as
 
 ### TORTOISEV4 Prerequisite Libraries
 TORTOISE requires the following libraries to be installed beforehand:
- * ITK 5.0.1,  Boost 1.76, CUDA 11.3 (for CUDA executables), Eigen 3.3, FFTW3,  VTK 8.0.1 (only for a single executable). It also uses the nlohmann/json C++ library (https://github.com/nlohmann/json), and bet brain masking library from FSL, which are included in the distribution.
+ * ITK 5.3.0,  Boost 1.76, CUDA 11.3 (for CUDA executables), Eigen 3.3, FFTW3,  VTK 8.0.1 (only for a single executable). It also uses the nlohmann/json C++ library (https://github.com/nlohmann/json), and bet brain masking library from FSL, which are included in the distribution.
 
 The compilation has been tested with GCC-9, G++9  however older or newer compilers should be okay. You also need Cmake for compilation.
 
@@ -117,11 +117,11 @@ cd ..
 #### 5) ITK installation
 
 ```
-wget https://github.com/InsightSoftwareConsortium/ITK/releases/download/v5.0.1/InsightToolkit-5.0.1.tar.gz
-tar -xvf InsightToolkit-5.0.1.tar.gz
-mkdir InsightToolkit-5.0.1_build
-cd InsightToolkit-5.0.1_build
-cmake ../InsightToolkit-5.0.1
+wget https://github.com/InsightSoftwareConsortium/ITK/releases/download/v5.3rc02/InsightToolkit-5.3rc03.tar.gz
+tar -xvf InsightToolkit-5.3rc03.tar.gz
+mkdir InsightToolkit-5.3rc02_build
+cd InsightToolkit-5.3rc02_build
+cmake ../InsightToolkit-5.3rc02
 make -j 16
 cd ..
 ```
@@ -148,17 +148,17 @@ cd TORTOISEV4/TORTOISEV4
 ```
 For nonCUDA version:
 ```
-cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.0.1_build 
+cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc02_build 
 ```
 
 For CUDA version:
 ```
-cmake . -D USECUDA=1 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.0.1_build 
+cmake . -D USECUDA=1 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc02_build 
 ```
 
 For ComputeGlyphMaps executable version:
 ```
-cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightToolkit-5.0.1_build -D VTK_DIR=../../libraries/VTK-8.0.1_build
+cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc02_build -D VTK_DIR=../../libraries/VTK-8.0.1_build
 ```
 
 Then,
