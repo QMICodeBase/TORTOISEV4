@@ -1041,6 +1041,9 @@ void DIFFPREP::MotionAndEddy()
     if(correction_mode=="off" && !slice_to_volume)
         iterative=false;
 
+    if(Nepoch==0)
+        iterative=false;
+
     if(iterative && ! slice_to_volume && !outlier_replacement)
         Nepoch=1;
 

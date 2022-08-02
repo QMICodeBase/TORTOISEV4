@@ -387,7 +387,7 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
 
 
     {
-        std::string description = std::string("Number of iterations for high_bvalue / s2v / repol correction. Has no effect for dti regime data with s2v and repol disabled. Default:4  ")  ;
+        std::string description = std::string("Number of iterations for high_bvalue / s2v / repol correction. Has no effect for dti regime data with s2v and repol disabled. Default:4 . Zero disables all iterative correction such as high-b, s2v or repol. ")  ;
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "niter");
         option->SetDescription( description );
