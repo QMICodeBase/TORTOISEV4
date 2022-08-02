@@ -328,7 +328,7 @@ ImageType3D::Pointer GaussianSmoothImage(ImageType3D::Pointer img,double varianc
 
     using SmootherType= itk::DiscreteGaussianImageFilter<ImageType3D, ImageType3D> ;
     SmootherType::Pointer smoother = SmootherType::New();
-    smoother->SetUseImageSpacingOff();
+    smoother->SetUseImageSpacing(false);
     smoother->SetVariance(  variance );
     smoother->SetMaximumError( 0.01 );
     smoother->SetInput( img );
