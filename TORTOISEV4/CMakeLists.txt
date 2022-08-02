@@ -110,6 +110,7 @@ IF(ISDEBUG)
 ELSE(ISDEBUG)    
     if ( NOT DEFINED ITK_DIR)        
         SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-5.3.0_rc-release)
+        #SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-5.1.0-release)
     endif()
     FIND_PACKAGE(ITK) 
     IF(ITK_FOUND) 
@@ -209,6 +210,9 @@ target_link_libraries(Gibbs ${ITK_LIBRARIES} ${Boost_LIBRARIES} fftw3 )
 
 add_executable(CombineDWIs ../src/tools/CombineDWIs/combine_dwis_main.cxx  ${SOURCES})
 target_link_libraries(CombineDWIs ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(CombineDWIsWithBmatrix ../src/tools/CombineDWIs/combine_dwis_with_bmatrix_main.cxx  ${SOURCES})
+target_link_libraries(CombineDWIsWithBmatrix ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 add_executable(ExtractDWISubset ../src/tools/ExtractDWISubset/extract_dwi_subset.cxx   ../src/tools/ExtractDWISubset/extract_dwi_subset_parser.cxx ${SOURCES})
