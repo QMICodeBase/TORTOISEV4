@@ -124,6 +124,7 @@ void write_3D_image_to_4D_file(typename itk::Image<PixelType,3>::Pointer img, st
         new_nifti->SetSpacing(spc);
         new_nifti->SetDirection(dir);
         new_nifti->SetRegions(reg);
+        new_nifti->Allocate();
 
 
 
