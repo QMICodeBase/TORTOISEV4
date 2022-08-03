@@ -93,7 +93,7 @@ private:
 
     void CheckAndCopyInputData();
     void DenoiseData(std::string input_name,double &b0_noise_mean, double &b0_noise_std);
-    void GibbsUnringData(std::string input_name,float PF);
+    void GibbsUnringData(std::string input_name,float PF,std::string PE);
     void EPICorrectData();
     void AlignB0ToReorientation();
     void DriftCorrect(std::string nii_name);

@@ -442,7 +442,7 @@ void TORTOISE::Process()
         for(int PE=0;PE<2;PE++)
         {
             if(this->proc_infos[PE].nii_name!="")
-                GibbsUnringData(this->proc_infos[PE].nii_name,this->my_jsons[PE]["PartialFourier"]);
+                GibbsUnringData(this->proc_infos[PE].nii_name,this->my_jsons[PE]["PartialFourier"],this->my_jsons[PE]["PhaseEncodingDirection"] );
         }
     }
 
@@ -513,7 +513,9 @@ void TORTOISE::Process()
             for(int PE=0;PE<2;PE++)
             {
                 if(this->proc_infos[PE].nii_name!="")
-                    GibbsUnringData(this->proc_infos[PE].nii_name,this->my_jsons[PE]["PartialFourier"]);
+                {
+                    GibbsUnringData(this->proc_infos[PE].nii_name,this->my_jsons[PE]["PartialFourier"],this->my_jsons[PE]["PhaseEncodingDirection"]);
+                }
             }
 
         }
@@ -782,13 +784,23 @@ void TORTOISE::EPICorrectData()
     }
 }
 
-void TORTOISE::GibbsUnringData(std::string input_name, float PF)
+void TORTOISE::GibbsUnringData(std::string input_name, float PF,std::string json_PE)
 {
     bool gibbs_option= RegistrationSettings::get().getValue<bool>("gibbs");
     float gibbs_kspace_coverage= RegistrationSettings::get().getValue<float>("gibbs_kspace_coverage");
     int gibbs_nsh= RegistrationSettings::get().getValue<int>("gibbs_nsh");
     int gibbs_minW= RegistrationSettings::get().getValue<int>("gibbs_minW");
     int gibbs_maxW= RegistrationSettings::get().getValue<int>("gibbs_maxW");
+
+
+    short phase=0;
+    if(json_PE.find("j")!=std::string::npos)
+       phase=1;
+    else
+        if(json_PE.find("i")!=std::string::npos)
+            phase=0;
+        else
+            phase=2;
 
 
     if(input_name!="" && gibbs_option)
@@ -798,6 +810,35 @@ void TORTOISE::GibbsUnringData(std::string input_name, float PF)
             ks_cov = gibbs_kspace_coverage;      // what is reported in the json file.
 
         ImageType4D::Pointer dwis= readImageD<ImageType4D>(input_name);
+        if(phase==0)
+        {
+            ImageType4D::SizeType new_size;
+            new_size[0]=dwis->GetLargestPossibleRegion().GetSize()[1];
+            new_size[1]=dwis->GetLargestPossibleRegion().GetSize()[0];
+            new_size[2]=dwis->GetLargestPossibleRegion().GetSize()[2];
+            new_size[3]=dwis->GetLargestPossibleRegion().GetSize()[3];
+
+            ImageType4D::IndexType start; start.Fill(0);
+            ImageType4D::RegionType reg(start,new_size);
+
+            ImageType4D::Pointer dwis2= ImageType4D::New();
+            dwis2->SetRegions(reg);
+            dwis2->Allocate();
+            dwis2->FillBuffer(0);
+
+            itk::ImageRegionIteratorWithIndex<ImageType4D> it(dwis2,dwis2->GetLargestPossibleRegion());
+            for(it.GoToBegin();!it.IsAtEnd();++it)
+            {
+                ImageType4D::IndexType ind4= it.GetIndex();
+                ImageType4D::IndexType ind4_old=ind4;
+                ind4_old[0]=ind4[1];
+                ind4_old[1]=ind4[0];
+                it.Set(dwis->GetPixel(ind4_old));
+            }
+            dwis=dwis2;
+        }
+
+
 
         if(ks_cov>=0.9375)
         {
@@ -825,6 +866,36 @@ void TORTOISE::GibbsUnringData(std::string input_name, float PF)
             }
         }
         (*stream)<<std::endl;
+        if(phase==0)
+        {
+            ImageType4D::SizeType new_size;
+            new_size[0]=dwis->GetLargestPossibleRegion().GetSize()[1];
+            new_size[1]=dwis->GetLargestPossibleRegion().GetSize()[0];
+            new_size[2]=dwis->GetLargestPossibleRegion().GetSize()[2];
+            new_size[3]=dwis->GetLargestPossibleRegion().GetSize()[3];
+
+            ImageType4D::IndexType start; start.Fill(0);
+            ImageType4D::RegionType reg(start,new_size);
+
+            ImageType4D::Pointer dwis2= ImageType4D::New();
+            dwis2->SetRegions(reg);
+            dwis2->Allocate();
+            dwis2->FillBuffer(0);
+
+            itk::ImageRegionIteratorWithIndex<ImageType4D> it(dwis2,dwis2->GetLargestPossibleRegion());
+            for(it.GoToBegin();!it.IsAtEnd();++it)
+            {
+                ImageType4D::IndexType ind4= it.GetIndex();
+                ImageType4D::IndexType ind4_old=ind4;
+                ind4_old[0]=ind4[1];
+                ind4_old[1]=ind4[0];
+                it.Set(dwis->GetPixel(ind4_old));
+            }
+            dwis=dwis2;
+        }
+
+
+
         writeImageD<ImageType4D>(dwis,input_name);
     }
 }

@@ -290,7 +290,7 @@ ImageType4D::Pointer UnRingFull(ImageType4D::Pointer input_img, int nsh=25, int 
     my_plans.pinvtr1d= &pinv1dtr;
 
 
-    #pragma omp parallel for
+   #pragma omp parallel for
     for(int t=0;t<sz[3];t++)
     {
         TORTOISE::EnableOMPThread();
@@ -421,7 +421,6 @@ ImageType3D::Pointer UnRingFull(ImageType3D::Pointer input_img, my_plans_struct 
 
     return output_img;
 }
-
 
 
 
@@ -624,12 +623,9 @@ ImageType4D::Pointer UnRing78(ImageType4D::Pointer input_img, int nsh=25, int mi
         ImageType3D::Pointer img3d= extract_3D_volume_from_4D(padded_img4d,v);
 
 
-        std::vector<float> up_factors;
-        up_factors.push_back(1);up_factors.push_back(3); up_factors.push_back(1);
+        std::vector<float> up_factors={1,3,1};
         ImageType3D::Pointer img3d_upsampled= resample_3D_image(img3d,std::vector<float>(),up_factors,"NN");
-
         std::vector<ImageType3D::Pointer> img3d_upsampled_split= SplitImageRows(img3d_upsampled,4);
-
         for(int s=0;s<img3d_upsampled_split.size();s++)
         {
             img3d_upsampled_split[s]= UnRingFull(img3d_upsampled_split[s],&my_plans_down, nsh, minW, maxW);
@@ -722,6 +718,7 @@ ImageType4D::Pointer UnRing68(ImageType4D::Pointer input_img, int nsh=25, int mi
     dup->SetInputImage(input_img);
     dup->Update();
     ImageType4D::Pointer output_img= dup->GetOutput();
+    output_img->FillBuffer(0);
     ImageType4D::SizeType orig_sz= output_img->GetLargestPossibleRegion().GetSize();
 
 
@@ -862,65 +859,38 @@ ImageType4D::Pointer UnRing68(ImageType4D::Pointer input_img, int nsh=25, int mi
             fftw_execute_dft(*(my_plans.pinv2d),tmp1,data1);
             fftw_execute_dft(*(my_plans.pinv_tr2d),tmp2,data2);
 
+            // bottom part of figure 4 in the paper is done with next line
             unring_1D(data1,dim_sz[0],dim_sz[1],nsh,minW,maxW,&my_plans,0);
             unring_1D(data2,dim_sz[1],dim_sz[0],nsh,minW,maxW,&my_plans,1);
 
 
-            ImageType3D::SizeType sl_sz;
-            sl_sz[0]= sz[0];
-            sl_sz[1]= sz[1];
-            sl_sz[2]=1;
-            ImageType3D::IndexType sl_start; sl_start.Fill(0);
-            ImageType3D::RegionType sl_reg(sl_start,sl_sz);
-            ImageType3D::Pointer sl_img = ImageType3D::New();
-            sl_img->SetRegions(sl_reg);
-            sl_img->Allocate();
-            sl_img->FillBuffer(0);
-            ImageType3D::IndexType sl_ind;
-            sl_ind[2]=0;
-            for (int j = 0 ; j < sz[1];j++)
+
+
+            for (int yy = 0 ; yy < sz[0];yy++)
             {
-                sl_ind[1]=j;
-                for (int i = 0 ; i < sz[0];i++)
+                for (int xx = 0 ; xx < sz[1]/2;xx++)
                 {
-                    sl_ind[0]=i;
-                    //sl_img->SetPixel(sl_ind,data2[sz[1]*i+j][0]);
-                    sl_img->SetPixel(sl_ind,data1[sz[0]*j+i][0]);
+                    data2a[ yy*sz[1]/2+xx][0]= data2[yy*sz[1]+2*xx][0];
+                    data2a[ yy*sz[1]/2+xx][1]= data2[yy*sz[1]+2*xx][1];
+                    data2b[ yy*sz[1]/2+xx][0]= data2[yy*sz[1]+2*xx+1][0];
+                    data2b[ yy*sz[1]/2+xx][1]= data2[yy*sz[1]+2*xx+1][1];
                 }
             }
 
-
-            std::vector<ImageType3D::Pointer> imgs = SplitImageRows(sl_img,2);
-
-            for (int j = 0 ; j < sz[1]/2;j++)
-            {
-                sl_ind[1]=j;
-                for (int i = 0 ; i < sz[0];i++)
-                {
-                    sl_ind[0]=i;
-
-                    data2a[sz[1]/2*i+j][0]=(double) imgs[0]->GetPixel(sl_ind);
-                    data2a[sz[1]/2*i+j][1]=0;
-                    data2b[sz[1]/2*i+j][0]=(double) imgs[1]->GetPixel(sl_ind);
-                    data2b[sz[1]/2*i+j][1]=0;
-                }
-            }
             unring_1D(data2a,dim_sz[1]/2,dim_sz[0],nsh,minW,maxW,&my_plans_down,1);
             unring_1D(data2b,dim_sz[1]/2,dim_sz[0],nsh,minW,maxW,&my_plans_down,1);
 
-            for (int j = 0 ; j < sz[1]/2;j++)
+
+            for (int yy = 0 ; yy < sz[0];yy++)
             {
-
-                for (int i = 0 ; i < sz[0];i++)
+                for (int xx = 0 ; xx < sz[1]/2;xx++)
                 {
-
-                    data2[sz[1]*i + 2*j+0 ][0] =   data2a[ sz[1]/2*i+j ][0];
-                    data2[sz[1]*i + 2*j+0 ][1] =   data2a[ sz[1]/2*i+j ][1];
-                    data2[sz[1]*i + 2*j+1 ][0] =   data2b[ sz[1]/2*i+j ][0];
-                    data2[sz[1]*i + 2*j+1 ][1] =   data2b[ sz[1]/2*i+j ][1];
+                    data2[yy*sz[1]+2*xx][0]  =data2a[ yy*sz[1]/2+xx][0];
+                    data2[yy*sz[1]+2*xx][1]  =data2a[ yy*sz[1]/2+xx][1];
+                    data2[yy*sz[1]+2*xx+1][0]=data2b[ yy*sz[1]/2+xx][0];
+                    data2[yy*sz[1]+2*xx+1][1]=data2b[ yy*sz[1]/2+xx][1];
                 }
             }
-
 
             fftw_execute_dft(*(my_plans.p2d),data1,tmp1);
             fftw_execute_dft(*(my_plans.p_tr2d),data2,tmp2);
@@ -939,7 +909,7 @@ ImageType4D::Pointer UnRing68(ImageType4D::Pointer input_img, int nsh=25, int mi
 
             for (int j = 0 ; j < sz[1];j++)
             {
-                if(j<orig_sz[2])
+                if(j<orig_sz[1])
                 {
                     index[1]=j;
                     for (int i = 0 ; i < sz[0];i++)
