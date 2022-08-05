@@ -517,7 +517,6 @@ void TORTOISE::Process()
                     GibbsUnringData(this->proc_infos[PE].nii_name,this->my_jsons[PE]["PartialFourier"],this->my_jsons[PE]["PhaseEncodingDirection"]);
                 }
             }
-
         }
 
         (*stream)<<"Writing final outputs..."<<std::endl;
