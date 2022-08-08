@@ -7,7 +7,7 @@ PROJECT(TORTOISEV4  )
 SET(USEOPENMP 1)
 
 if ( NOT DEFINED USECUDA)
-    SET(USECUDA 1)
+    SET(USECUDA 0)
 endif()
 if ( NOT DEFINED USE_VTK)
     SET(USE_VTK 0)
@@ -189,6 +189,11 @@ target_link_libraries(RotateBmatrix ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
 
 add_executable(TORTOISEBmatrixToFSLBVecs   ../src/tools/TORTOISEBmatrixToFSLBVecs/tortoise_bmatrix_to_fsl_bvecs.cxx  ../src/utilities/read_bmatrix_file.cxx )
 target_link_libraries(TORTOISEBmatrixToFSLBVecs ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+
+add_executable(TORTOISEBMatrixToBT   ../src/tools/TORTOISEBMatrixToBT/tortoise_bmatrix_to_bt.cxx  ../src/utilities/read_bmatrix_file.cxx )
+target_link_libraries(TORTOISEBMatrixToBT ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+
+
 
 add_executable(FSLBVecsToTORTOISEBmatrix   ../src/tools/TORTOISEBmatrixToFSLBVecs/fsl_bvecs_tortoise_bmatrix.cxx  )
 target_link_libraries(FSLBVecsToTORTOISEBmatrix ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
@@ -420,6 +425,11 @@ target_link_libraries(ZeroSlices3D ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 add_executable(ApplyTransformationToScalar2 ../src/tools/ApplyTransformationToScalar2/ApplyTransformationToScalar2.cxx ${SOURCES})
 target_link_libraries(ApplyTransformationToScalar2 ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+add_executable(CreateGradientNonlinearityBMatrix ../src/tools/CreateGradientNonlinearityBMatrix/CreateGradientNonlinearityBMatrix.cxx  ../src/tools/CreateGradientNonlinearityBMatrix/CreateGradientNonlinearityBMatrix_parser.cxx ${SOURCES})
+target_link_libraries(CreateGradientNonlinearityBMatrix  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
 
 
 
