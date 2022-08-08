@@ -7,7 +7,7 @@ PROJECT(TORTOISEV4  )
 SET(USEOPENMP 1)
 
 if ( NOT DEFINED USECUDA)
-    SET(USECUDA 0)
+    SET(USECUDA 1)
 endif()
 if ( NOT DEFINED USE_VTK)
     SET(USE_VTK 0)
@@ -220,6 +220,214 @@ target_link_libraries(ExtractDWISubset ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 add_executable(IsDirectionPositiveDet ../src/tools/IsDirectionPositiveDet/IsDirectionPositiveDet.cxx  ${SOURCES})
 target_link_libraries(IsDirectionPositiveDet ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+
+
+
+
+
+
+
+
+
+
+add_executable(ExtractImage ../src/tools/ExtractImage/extract_image.cxx  ../src/tools/ExtractImage/extract_image_parser.cxx ${SOURCES} )
+target_link_libraries(ExtractImage ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+
+
+add_executable(ExtractComponentFromDisplacementField ../src/tools/ExtractImage/extract_component_from_itk_vector_image.cxx  ../src/tools/ExtractImage/extract_image_parser.cxx ${SOURCES} )
+target_link_libraries(ExtractComponentFromDisplacementField  ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+
+
+#add_executable(SynthesizeDWIsFromTensor ../src/tools/SynthesizeDWIsFromTensor/synthesize_dwis_from_tensor.cxx  ${SOURCES} )
+#target_link_libraries(SynthesizeDWIsFromTensor ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+
+#add_executable(SynthesizeDWIsFromMAPMRI ../src/tools/SynthesizeDWIFromMAPMRI/synthesize_dwis_from_mapmri.cxx  ${SOURCES} )
+#target_link_libraries(SynthesizeDWIsFromMAPMRI ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+
+
+
+add_executable(DWIDenoise ../src/tools/DWIDenoise/dwi_denoise.cxx ${SOURCES} )
+target_link_libraries(DWIDenoise ${ITK_LIBRARIES} ${Boost_LIBRARIES} Eigen3::Eigen)
+
+
+#add_executable(ConvertParametersToDefFields ../src/tools/ConvertParametersToDefFields/convert_parameters_to_def_fields_parser.cxx ../src/tools/ConvertParametersToDefFields/convert_parameters_to_def_fields.cxx ${SOURCES})
+#target_link_libraries(ConvertParametersToDefFields ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+
+add_executable(ExtractPNGFromNIFTI  ../src/tools/ExtractPNGFromNIFTI/extract_png_from_nifti.cxx)
+target_link_libraries(ExtractPNGFromNIFTI ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+add_executable(ExtractAllPNGsFromNIFTI  ../src/tools/ExtractAllPNGsFromNIFTI/extract_all_pngs_from_nifti.cxx)
+target_link_libraries(ExtractAllPNGsFromNIFTI ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+
+
+add_executable(Set4DImageDirection  ../src/tools/Set4DImageDirection/set_4dimage_direction.cxx ${SOURCES})
+target_link_libraries(Set4DImageDirection ${ITK_LIBRARIES}  ${Boost_LIBRARIES} )
+
+add_executable(Set4DImageOrigin  ../src/tools/Set4DImageOrigin/set_4dimage_origin.cxx ${SOURCES})
+target_link_libraries(Set4DImageOrigin ${ITK_LIBRARIES}  ${Boost_LIBRARIES} )
+
+add_executable(Set4DImageResolution  ../src/tools/Set4DImageResolution/Set4DImageResolution.cxx ${SOURCES})
+target_link_libraries(Set4DImageResolution ${ITK_LIBRARIES}  ${Boost_LIBRARIES} )
+
+#add_executable(TransformDWIDataWithTextTransformations  ../src/tools/TransformDWIDataWithTextTransformations/transform_dwi_data_with_text_transformations.cxx ../src/Main/itkNiftiImageIOHeader.cxx ../src/Main/itkNiftiImageIOHeaderFactory.cxx ${SOURCES})
+#target_link_libraries(TransformDWIDataWithTextTransformations ${ITK_LIBRARIES}  ${Boost_LIBRARIES} )
+
+add_executable(ReorientImage ../src/tools/ReorientImage/reorient_image.cxx  ../src/tools/ReorientImage/reorient_image_parser.cxx  ${SOURCES})
+target_link_libraries(ReorientImage ${ITK_LIBRARIES}  ${Boost_LIBRARIES})
+
+add_executable(ReorientImage3D ../src/tools/ReorientImage3D/reorient_image3d.cxx  ../src/tools/ReorientImage3D/reorient_image_parser.cxx  ${SOURCES})
+target_link_libraries(ReorientImage3D ${ITK_LIBRARIES}  ${Boost_LIBRARIES})
+
+
+
+add_executable(EstimateExperimentalDeviationScalar ../src/tools/EstimateExperimentalDeviationScalar/estimate_experimental_deviation_scalar.cxx ../src/tools/EstimateExperimentalDeviationScalar/estimate_experimental_deviation_scalar_parser.cxx  ../src/external_src/cmpfit-1.3a/mpfit.c ../src/tools/EstimateTensor/DTIModel.cxx ${SOURCES})
+target_link_libraries(EstimateExperimentalDeviationScalar ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+
+
+
+add_executable(DIFFPREPAnonymizer ../src/tools/DIFFPREPAnonymizer/diffprep_anonymizer.cxx ../src/tools/DIFFPREPAnonymizer/itkGDCMImageIOOkan.cxx ${SOURCES})
+target_link_libraries(DIFFPREPAnonymizer ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+
+
+
+
+add_executable(ComputeMAPMRI_NG ../src/tools/ComputeMAPMRI_NG/estimate_mapmri_ng.cxx)
+target_link_libraries(ComputeMAPMRI_NG ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(ComputeMAPMRI_RTOP ../src/tools/ComputeMAPMRI_RTOP/estimate_mapmri_rtop.cxx)
+target_link_libraries(ComputeMAPMRI_RTOP ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(ComputeMAPMRI_PA ../src/tools/ComputeMAPMRI_PA/estimate_mapmri_pa.cxx)
+target_link_libraries(ComputeMAPMRI_PA ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+
+
+add_executable(ComputeWLMap  ../src/tools/ComputeWLMap/compute_wl_map.cxx)
+target_link_libraries(ComputeWLMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+add_executable(ComputeWPMap  ../src/tools/ComputeWPMap/compute_wp_map.cxx)
+target_link_libraries(ComputeWPMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+add_executable(ComputeWSMap  ../src/tools/ComputeWSMap/compute_ws_map.cxx)
+target_link_libraries(ComputeWSMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(ComputeADMap  ../src/tools/ComputeADMap/compute_ad_map.cxx)
+target_link_libraries(ComputeADMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(ComputeRDMap  ../src/tools/ComputeRDMap/compute_rd_map.cxx)
+target_link_libraries(ComputeRDMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(ComputeMODEMap  ../src/tools/ComputeMODEMap/compute_mode_map.cxx)
+target_link_libraries(ComputeMODEMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(ComputeFAMap  ../src/tools/ComputeFAMap/compute_fa_map.cxx)
+target_link_libraries(ComputeFAMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(ComputeTRMap  ../src/tools/ComputeTRMap/compute_tr_map.cxx)
+target_link_libraries(ComputeTRMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(ComputeEigVecImage  ../src/tools/ComputeEigVecImage/compute_eigvec_image.cxx)
+target_link_libraries(ComputeEigVecImage ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(ComputeLIMap  ../src/tools/ComputeLIMap/compute_li_map.cxx)
+target_link_libraries(ComputeLIMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(ComputeDECMap  ../src/tools/ComputeDECMap/compute_dec_map.cxx ../src/tools/ComputeDECMap/compute_dec_map_parser.cxx ${SOURCES})
+target_link_libraries(ComputeDECMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+
+add_executable(ComputeWLDECMap  ../src/tools/ComputeDECMap/compute_wldec_map.cxx   ../src/tools/ComputeDECMap/compute_dec_map_parser.cxx    ${SOURCES})
+target_link_libraries(ComputeWLDECMap ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+
+add_executable(ComputeWPDECMap  ../src/tools/ComputeDECMap/compute_wpdec_map.cxx   ../src/tools/ComputeDECMap/compute_dec_map_parser.cxx     ${SOURCES})
+target_link_libraries(ComputeWPDECMap ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+
+
+add_executable(ComputeNSDECMap  ../src/tools/ComputeNSDECMap/compute_ns_dec_map.cxx   ../src/tools/ComputeNSDECMap/compute_ns_dec_map_parser.cxx     ${SOURCES})
+target_link_libraries(ComputeNSDECMap ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+
+
+add_executable(ComputeRTOPDTIMaps  ../src/tools/ComputeRTOPDTIMaps/compute_rtop_dti_maps.cxx)
+target_link_libraries(ComputeRTOPDTIMaps ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+add_executable(FlipImage3D  ../src/tools/FlipImage3D/flip_image_3d.cxx)
+target_link_libraries(FlipImage3D ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(FlipImage4D  ../src/tools/FlipImage4D/flip_image_4d.cxx)
+target_link_libraries(FlipImage4D ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+add_executable(StdevImages3D  ../src/tools/StdevImages3D/stdev_images_3d.cxx)
+target_link_libraries(StdevImages3D ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+add_executable(MaskTensorWith3D  ../src/tools/MaskTensorWith3D/MaskTensorWith3D.cxx)
+target_link_libraries(MaskTensorWith3D ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(Pad4DImage  ../src/tools/Pad4DImage/Pad4DImage.cxx)
+target_link_libraries(Pad4DImage ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(Pad3DImage  ../src/tools/Pad4DImage/Pad3DImage.cxx)
+target_link_libraries(Pad3DImage ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+add_executable(FlipSwapBMatrix ../src/tools/FlipSwapBMatrix/FlipSwapBMatrix.cxx ../src/tools/FlipSwapBMatrix/FlipSwapBMatrix_parser.cxx ../src/tools/FlipSwapBMatrix/antsCommandLineParser2.cxx  ${SOURCES})
+target_link_libraries(FlipSwapBMatrix ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+
+add_executable(Convert4DImageToDisplacementField  ../src/tools/Convert4DImageToDisplacementField/Convert4DImageToDisplacementField.cxx)
+target_link_libraries(Convert4DImageToDisplacementField ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+add_executable(PrintHeaderT ../src/tools/PrintHeaderT/PrintHeader.cxx)
+target_link_libraries(PrintHeaderT ${ITK_LIBRARIES}  )
+
+#add_executable(FitNIFTIIso
+#    ../src/tools/FitNIFTIIso/main.cxx
+#    ../src/tools/FitNIFTIIso/Fit_nifti_iso.cxx
+#    ../src/tools/FitNIFTIIso/init_iso_gw.cxx
+#    ../src/tools/FitNIFTIIso/iso_gw.cxx
+#    ../src/tools/FitNIFTIIso/erodeMask.cxx
+#    ../src/tools/FitNIFTIIso/fit_nifti_iso_parser.cxx
+#    ../src/tools/FitNIFTIIso/gradcal.cxx
+#    ../src/Main/itkNiftiImageIOHeader.cxx
+#    ../src/Main/itkNiftiImageIOHeaderFactory.cxx
+#    ../src/external_codes/cmpfit-1.3a/mpfit.c
+#    ${SOURCES})
+#target_link_libraries(FitNIFTIIso ${ITK_LIBRARIES} ${Boost_LIBRARIES} Eigen3::Eigen)
+
+
+
+add_executable(InvertTransformation ../src/tools/InvertTransformation/invert_transformation.cxx)
+target_link_libraries(InvertTransformation ${ITK_LIBRARIES}  )
+
+
+add_executable(ZeroSlices3D ../src/tools/ZeroSlices3D/ZeroSlices3D.cxx ${SOURCES})
+target_link_libraries(ZeroSlices3D ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(ApplyTransformationToScalar2 ../src/tools/ApplyTransformationToScalar2/ApplyTransformationToScalar2.cxx ${SOURCES})
+target_link_libraries(ApplyTransformationToScalar2 ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+
+
+
+
+
+
 
 
 IF(USE_VTK)

@@ -14,6 +14,7 @@ struct vars_struct
 };
 
 
+int myNLLS_with_derivs(int m, int n, double *p, double *deviates,   double **derivs, void *vars);
 
 class DTIModel: public DiffusionModel<DTImageType>
 {
