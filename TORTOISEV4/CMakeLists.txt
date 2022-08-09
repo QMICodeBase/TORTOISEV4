@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.20)
 
 PROJECT(TORTOISEV4  )
 
-
-
 SET(USEOPENMP 1)
 
 if ( NOT DEFINED USECUDA)
@@ -131,7 +129,6 @@ endif()
 
 
 set(SOURCES ../src/main/defines.cxx  ../src/main/TORTOISE_global.cxx ../src/main/antsCommandLineParser.cxx ../src/main/antsCommandLineOption.cxx  ../src/utilities/TORTOISE_Utilities.cxx ../src/utilities/extract_3Dvolume_from_4D.cxx  ../src/utilities/read_3Dvolume_from_4D.cxx ../src/utilities/read_bmatrix_file.cxx ../src/utilities/math_utilities.cxx ../src/external_src/cmpfit-1.3a/mpfit.c)
-#../src/utilities/itkNiftiImageIOHeader.cxx ../src/utilities/itkNiftiImageIOHeaderFactory.cxx
 include_directories(../src/main)
 
 IF(USECUDA)
@@ -427,7 +424,7 @@ add_executable(ApplyTransformationToScalar2 ../src/tools/ApplyTransformationToSc
 target_link_libraries(ApplyTransformationToScalar2 ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
-add_executable(CreateGradientNonlinearityBMatrix ../src/tools/CreateGradientNonlinearityBMatrix/CreateGradientNonlinearityBMatrix.cxx  ../src/tools/CreateGradientNonlinearityBMatrix/CreateGradientNonlinearityBMatrix_parser.cxx ${SOURCES})
+add_executable(CreateGradientNonlinearityBMatrix ../src/tools/CreateGradientNonlinearityBMatrix/CreateGradientNonlinearityBMatrix.cxx  ../src/tools/CreateGradientNonlinearityBMatrix/CreateGradientNonlinearityBMatrix_parser.cxx ../src/tools/gradnonlin/init_iso_gw.cxx ../src/tools/gradnonlin/gradcal.cxx ../src/main/rigid_register_images.cxx ${SOURCES})
 target_link_libraries(CreateGradientNonlinearityBMatrix  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 

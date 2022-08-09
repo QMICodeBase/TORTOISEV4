@@ -46,26 +46,25 @@ void CreateGradientNonlinearityBMatrix_PARSER::CreateParserandFillText(int argc,
 void CreateGradientNonlinearityBMatrix_PARSER::InitializeCommandLineOptions()
 {
     typedef itk::ants::CommandLineParser::OptionType OptionType;
-
    
     {
-        std::string description = std::string( "Final processed DWI NIFTI image.  This image might be in native space or aligned to another image (such as ana anatomical). The gradient deviation tensor will be generated in this space. " );
+        std::string description = std::string( "Final processed b=0 NIFTI image.  This image might be in native space or aligned to another image (such as ana anatomical). The gradient deviation tensor will be generated in this space. " );
  
         OptionType::Pointer option = OptionType::New();
         option->SetShortName( 'f');
         option->SetLongName( "final_image");
-        option->SetDescription( description );
+        option->SetDescription( description );        
         this->AddOption( option );
     }
 
 
     {
-        std::string description = std::string( "Initial DWI NIFTI image. Optional. If not provided, the code will assume the final image is in native space. This image should pretty much be the raw DWIs." );
+        std::string description = std::string( "Initial b=0 NIFTI image. Optional. If not provided, the code will assume the final image is in native space. This image should pretty much be the raw DWIs." );
  
         OptionType::Pointer option = OptionType::New();
-        option->SetShortName( 'r');
-        option->SetLongName( "input_orient");
-        option->SetDescription( description );
+        option->SetShortName( 'i');
+        option->SetLongName( "initial_image");
+        option->SetDescription( description );        
         this->AddOption( option );
     }
 
@@ -76,7 +75,7 @@ void CreateGradientNonlinearityBMatrix_PARSER::InitializeCommandLineOptions()
         OptionType::Pointer option = OptionType::New();
         option->SetShortName( 'g');
         option->SetLongName( "nonlinearity");
-        option->SetDescription( description );
+        option->SetDescription( description );        
         this->AddOption( option );
     }
 
@@ -85,7 +84,7 @@ void CreateGradientNonlinearityBMatrix_PARSER::InitializeCommandLineOptions()
 
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "isGE");
-        option->SetDescription( description );
+        option->SetDescription( description );        
         this->AddOption( option );
     }
 }

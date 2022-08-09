@@ -212,7 +212,7 @@ public:
   std::string          m_Description;
   UsageOptionStackType m_UsageOptions;
   FunctionStackType    m_OptionFunctions;
-  int module_to_belong;
+  int module_to_belong{0};
 };
 } // end namespace ants
 } // end namespace itk
