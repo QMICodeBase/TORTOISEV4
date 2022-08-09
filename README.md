@@ -37,6 +37,7 @@ DISCLAIMER: TORTOISEV4 IS INCOMPATIBLE WITH PREVIOUS VERSIONS.
       * Weighted Least Squares (WLLS)
       * Non-linear least Squares (NLLS)
       * Diagonal fitting
+      * Non-linear 1 full DT +  free-water compartment fitting. (data must have intermediate b=values)
       * Robust Fitting (Restore)
     * A rich set of scalar map computations
   * Mean Apparent Propagator (MAPMRI)
