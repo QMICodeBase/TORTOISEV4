@@ -738,7 +738,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
     {
         for(int s=0;s<shells.size();s++)
         {
-            if(fabs(bvals[vol] -shells[s])<10)
+            if(fabs(bvals[vol] -shells[s])<30)
             {
                 volumes_per_shell[s]++;
                 break;
@@ -759,7 +759,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
         int shell_id=-1;
         for(int s=0;s<shells.size();s++)
         {
-            if(fabs(bvals[vol] -shells[s])<10)
+            if(fabs(bvals[vol] -shells[s])<40)
             {
                 shell_id=s;
                 shell_ids[vol]=shell_id;
@@ -1038,8 +1038,8 @@ void DIFFPREP::MotionAndEddy()
     if( (is_human_brain && high_bval_present) || slice_to_volume || outlier_replacement)
         iterative=true;
 
-    if(correction_mode=="off" && !slice_to_volume)
-        iterative=false;
+  //  if(correction_mode=="off" && !slice_to_volume)
+    //    iterative=false;
 
     if(Nepoch==0)
         iterative=false;
@@ -2014,7 +2014,7 @@ void DIFFPREP::SetBoId()
     std::vector<int> b0_ids;
     for(int v=0;v<bvals.size();v++)
     {
-        if(fabs(bvals[v]-b0_val)<10)
+        if(fabs(bvals[v]-b0_val)<30)
             b0_ids.push_back(v);
     }
 

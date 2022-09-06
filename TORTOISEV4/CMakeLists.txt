@@ -4,6 +4,8 @@ PROJECT(TORTOISEV4  )
 
 SET(USEOPENMP 1)
 
+
+
 if ( NOT DEFINED USECUDA)
     SET(USECUDA 0)
 endif()
@@ -242,11 +244,11 @@ add_executable(ExtractComponentFromDisplacementField ../src/tools/ExtractImage/e
 target_link_libraries(ExtractComponentFromDisplacementField  ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
 
-#add_executable(SynthesizeDWIsFromTensor ../src/tools/SynthesizeDWIsFromTensor/synthesize_dwis_from_tensor.cxx  ${SOURCES} )
-#target_link_libraries(SynthesizeDWIsFromTensor ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+add_executable(SynthesizeDWIsFromTensor ../src/tools/SynthesizeDWIsFromTensor/synthesize_dwis_from_tensor.cxx ../src/tools/EstimateTensor/DTIModel.cxx ${SOURCES} )
+target_link_libraries(SynthesizeDWIsFromTensor ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
-#add_executable(SynthesizeDWIsFromMAPMRI ../src/tools/SynthesizeDWIFromMAPMRI/synthesize_dwis_from_mapmri.cxx  ${SOURCES} )
-#target_link_libraries(SynthesizeDWIsFromMAPMRI ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+add_executable(SynthesizeDWIsFromMAPMRI ../src/tools/SynthesizeDWIFromMAPMRI/synthesize_dwis_from_mapmri.cxx  ../src/tools/EstimateMAPMRI/MAPMRIModel.cxx  ../src/tools/EstimateTensor/DTIModel.cxx ${SOURCES} )
+target_link_libraries(SynthesizeDWIsFromMAPMRI ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
 
 
@@ -397,19 +399,17 @@ target_link_libraries(Convert4DImageToDisplacementField ${ITK_LIBRARIES} ${Boost
 add_executable(PrintHeaderT ../src/tools/PrintHeaderT/PrintHeader.cxx)
 target_link_libraries(PrintHeaderT ${ITK_LIBRARIES}  )
 
-#add_executable(FitNIFTIIso
-#    ../src/tools/FitNIFTIIso/main.cxx
-#    ../src/tools/FitNIFTIIso/Fit_nifti_iso.cxx
-#    ../src/tools/FitNIFTIIso/init_iso_gw.cxx
-#    ../src/tools/FitNIFTIIso/iso_gw.cxx
-#    ../src/tools/FitNIFTIIso/erodeMask.cxx
-#    ../src/tools/FitNIFTIIso/fit_nifti_iso_parser.cxx
-#    ../src/tools/FitNIFTIIso/gradcal.cxx
-#    ../src/Main/itkNiftiImageIOHeader.cxx
-#    ../src/Main/itkNiftiImageIOHeaderFactory.cxx
-#    ../src/external_codes/cmpfit-1.3a/mpfit.c
-#    ${SOURCES})
-#target_link_libraries(FitNIFTIIso ${ITK_LIBRARIES} ${Boost_LIBRARIES} Eigen3::Eigen)
+add_executable(FitNIFTIIso
+    ../src/tools/FitNIFTIIso/main.cxx
+    ../src/tools/FitNIFTIIso/Fit_nifti_iso.cxx
+    ../src/tools/FitNIFTIIso/init_iso_gw.cxx
+    ../src/tools/FitNIFTIIso/iso_gw.cxx
+    ../src/tools/FitNIFTIIso/erodeMask.cxx
+    ../src/tools/FitNIFTIIso/fit_nifti_iso_parser.cxx
+    ../src/tools/FitNIFTIIso/gradcal.cxx
+    ../src/external_src/cmpfit-1.3a/mpfit.c
+    ${SOURCES})
+target_link_libraries(FitNIFTIIso ${ITK_LIBRARIES} ${Boost_LIBRARIES} Eigen3::Eigen)
 
 
 
