@@ -24,6 +24,7 @@ public:
     double getLatticeIndexMax();
     double getLatticeIndexMin();
     double getScaleXp();
+    bool getUseFA();
      
 private:
     void CreateParserandFillText(int argc , char * argv[] );

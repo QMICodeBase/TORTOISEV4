@@ -151,6 +151,14 @@ void DRBUDDIStage::PreprocessImagesAndFields()
             this->def_FINV->sz=  this->virtual_img->sz;
             this->def_FINV->components_per_voxel= 3;
             this->def_FINV->Allocate();
+
+            this->def_F= CUDAIMAGE::New();
+            this->def_F->orig=  this->virtual_img->orig;
+            this->def_F->dir=  this->virtual_img->dir;
+            this->def_F->spc=  this->virtual_img->spc;
+            this->def_F->sz=  this->virtual_img->sz;
+            this->def_F->components_per_voxel= 3;
+            this->def_F->Allocate();
         }
         if(this->def_MINV==nullptr || (this->def_MINV && this->def_MINV->getFloatdata().ptr==nullptr) )
         {
@@ -161,6 +169,15 @@ void DRBUDDIStage::PreprocessImagesAndFields()
             this->def_MINV->sz=  this->virtual_img->sz;
             this->def_MINV->components_per_voxel= 3;
             this->def_MINV->Allocate();
+
+
+            this->def_M= CUDAIMAGE::New();
+            this->def_M->orig=  this->virtual_img->orig;
+            this->def_M->dir=  this->virtual_img->dir;
+            this->def_M->spc=  this->virtual_img->spc;
+            this->def_M->sz=  this->virtual_img->sz;
+            this->def_M->components_per_voxel= 3;
+            this->def_M->Allocate();
         }
     #else
         if(this->def_FINV==nullptr )
@@ -173,6 +190,14 @@ void DRBUDDIStage::PreprocessImagesAndFields()
             this->def_FINV->Allocate();
             DisplacementFieldType::PixelType zeros; zeros.Fill(0);
             this->def_FINV->FillBuffer(zeros);
+
+            this->def_F= DisplacementFieldType::New();
+            this->def_F->SetOrigin(this->virtual_img->GetOrigin());
+            this->def_F->SetSpacing(this->virtual_img->GetSpacing());
+            this->def_F->SetDirection(this->virtual_img->GetDirection());
+            this->def_F->SetRegions(this->virtual_img->GetLargestPossibleRegion());
+            this->def_F->Allocate();
+            this->def_F->FillBuffer(zeros);
         }
         if(this->def_MINV==nullptr )
         {
@@ -184,6 +209,14 @@ void DRBUDDIStage::PreprocessImagesAndFields()
             this->def_MINV->Allocate();
             DisplacementFieldType::PixelType zeros; zeros.Fill(0);
             this->def_MINV->FillBuffer(zeros);
+
+            this->def_M= DisplacementFieldType::New();
+            this->def_M->SetOrigin(this->virtual_img->GetOrigin());
+            this->def_M->SetSpacing(this->virtual_img->GetSpacing());
+            this->def_M->SetDirection(this->virtual_img->GetDirection());
+            this->def_M->SetRegions(this->virtual_img->GetLargestPossibleRegion());
+            this->def_M->Allocate();
+            this->def_M->FillBuffer(zeros);
         }
     #endif
 
@@ -197,9 +230,11 @@ void DRBUDDIStage::PreprocessImagesAndFields()
         this->def_FINV= ResampleImage(this->def_FINV, this->virtual_img);
         this->def_MINV= ResampleImage(this->def_MINV, this->virtual_img);
     }
-
-    this->def_F= InvertField(this->def_FINV);
-    this->def_M= InvertField(this->def_MINV);
+    if(this->def_F==nullptr)
+    {
+        this->def_F= InvertField(this->def_FINV);
+        this->def_M= InvertField(this->def_MINV);
+    }
 
 
     resampled_smoothed_up_images.resize(this->settings->metrics.size());
@@ -667,20 +702,19 @@ void DRBUDDIStage::RunDRBUDDIStage()
             f2midtmp  = ComposeFields(this->def_F,updateFieldF);
             f2midtmp = GaussianSmoothImage(f2midtmp,this->settings->total_gaussian_sigma);
             CurrentFieldType::Pointer f2midtotal_inv= InvertField(f2midtmp, this->def_FINV );
-            CurrentFieldType::Pointer f2midtotal = InvertField(f2midtotal_inv, f2midtmp );
+            //CurrentFieldType::Pointer f2midtotal = InvertField(f2midtotal_inv, f2midtmp );
 
             m2midtmp  = ComposeFields(this->def_M,updateFieldM);
             m2midtmp = GaussianSmoothImage(m2midtmp,this->settings->total_gaussian_sigma);
             CurrentFieldType::Pointer m2midtotal_inv= InvertField(m2midtmp, this->def_MINV );
-            CurrentFieldType::Pointer m2midtotal = InvertField(m2midtotal_inv, m2midtmp );
+            //CurrentFieldType::Pointer m2midtotal = InvertField(m2midtotal_inv, m2midtmp );
 
             if(this->settings->constrain)
             {
-                ContrainDefFields(f2midtotal_inv,m2midtotal_inv);
-
-                CurrentFieldType::Pointer f2midtotal = InvertField(f2midtotal_inv, m2midtotal_inv );
-                CurrentFieldType::Pointer m2midtotal = InvertField(m2midtotal_inv, f2midtotal_inv );
+                ContrainDefFields(f2midtotal_inv,m2midtotal_inv);                
             }
+            CurrentFieldType::Pointer f2midtotal = InvertField(f2midtotal_inv, m2midtotal_inv );
+            CurrentFieldType::Pointer m2midtotal = InvertField(m2midtotal_inv, f2midtotal_inv );
 
             this->def_FINV=f2midtotal_inv;
             this->def_F=f2midtotal;
@@ -694,8 +728,11 @@ void DRBUDDIStage::RunDRBUDDIStage()
         for(int i=0;i<Nmetrics;i++)
         {
             double current_conv= all_ConvergenceMonitoring[i]->GetConvergenceValue();
-            average_convergence+=current_conv*this->settings->metrics[i].weight;
+            float curr_w= this->settings->metrics[i].weight * this->settings->metrics[i].weight;
+            tot_w +=curr_w;
+            average_convergence+=current_conv*curr_w;
         }
+        average_convergence/=tot_w;
         curr_convergence= average_convergence;
 
         if( (0.7*curr_convergence+0.3*prev_conv) < 1E-6)

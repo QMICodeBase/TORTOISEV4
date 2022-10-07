@@ -4,8 +4,8 @@
 #include "defines.h"
 #include "drbuddi_image_utilities.h"
 
-#define WIN_RAD 4
-#define WIN_RAD_Z 3
+#define WIN_RADCC 4
+#define WIN_RADCC_Z 3
 #define LIMCC (1E-10)
 
 float  ComputeUpdateCC(ImageType3D::IndexType index,  
@@ -20,23 +20,23 @@ float  ComputeUpdateCC(ImageType3D::IndexType index,
 
     ImageType3D::IndexType start,end;
 
-    start[2]=index[2]-WIN_RAD_Z;
+    start[2]=index[2]-WIN_RADCC_Z;
     if(start[2]<0)
         start[2]=0;
-    start[1]=index[1]-WIN_RAD;
+    start[1]=index[1]-WIN_RADCC;
     if(start[1]<0)
         start[1]=0;
-    start[0]=index[0]-WIN_RAD;
+    start[0]=index[0]-WIN_RADCC;
     if(start[0]<0)
         start[0]=0;
 
-    end[2]=index[2]+WIN_RAD_Z+1;
+    end[2]=index[2]+WIN_RADCC_Z+1;
     if(end[2]>d_sz[2])
         end[2]=d_sz[2];
-    end[1]=index[1]+WIN_RAD+1;
+    end[1]=index[1]+WIN_RADCC+1;
     if(end[1]>d_sz[1])
         end[1]=d_sz[1];
-    end[0]=index[0]+WIN_RAD+1;
+    end[0]=index[0]+WIN_RADCC+1;
     if(end[0]>d_sz[0])
         end[0]=d_sz[0];
         

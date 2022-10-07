@@ -19,6 +19,8 @@ public:
     std::string getUpJSonName();
     std::string getDownInputName();
     std::vector<std::string> getStructuralNames();
+    std::string getDRBUDDIOutput();
+    int getDRBUDDIStep();
 
     std::string getGradNonlinInput();
     void setGradNonlinInput(std::string fname);

@@ -55,6 +55,14 @@ void ComputeDecMap_PARSER::InitializeCommandLineOptions()
     }
 
     {
+        std::string description = std::string( "Use FA instead of lattice index?  Default:0" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "useFA");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+
+    {
         std::string description = std::string( "Color Parameter 0: increases the brightness of the blue (default:0.35)" );
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "color_par_0");
@@ -132,6 +140,14 @@ void ComputeDecMap_PARSER::InitializeCommandLineOptions()
 
 
 
+bool ComputeDecMap_PARSER::getUseFA()
+{
+    OptionType::Pointer option = this->GetOption( "useFA");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+       return false;
+}
 
 
 std::string ComputeDecMap_PARSER::getInputImageName()

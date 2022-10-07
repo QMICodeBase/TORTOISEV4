@@ -39,6 +39,9 @@ public:
     int getFlipY();
     int getFlipZ();
 
+    float getBigDelta();
+    float getSmallDelta();
+
 
     std::string getStartStep();
     bool getDoQC();

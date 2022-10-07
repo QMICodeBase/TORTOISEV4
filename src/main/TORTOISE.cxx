@@ -228,6 +228,9 @@ void TORTOISE::UpdateSettingsFromCommandLine()
     RegistrationSettings::get().setValue<int>("flipY", parser->getFlipY());
     RegistrationSettings::get().setValue<int>("flipZ", parser->getFlipZ());
 
+    RegistrationSettings::get().setValue<float>("big_delta", parser->getBigDelta());
+    RegistrationSettings::get().setValue<float>("small_delta", parser->getSmallDelta());
+
 
     RegistrationSettings::get().setValue<std::string>("step",parser->getStartStep());
     RegistrationSettings::get().setValue<bool>("do_QC",parser->getDoQC());
@@ -635,7 +638,7 @@ void TORTOISE::DriftCorrect(std::string nii_name)
             ImageType3D::IndexType ind3= it.GetIndex();
             if(mask_img->GetPixel(ind3))
             {
-                if(inc_img && inc_img->GetPixel(ind3))
+                if((inc_img && inc_img->GetPixel(ind3)) || !inc_img )
                 {
                     sm+=it.Get();
                     N++;
@@ -802,6 +805,11 @@ void TORTOISE::GibbsUnringData(std::string input_name, float PF,std::string json
             phase=2;
 
 
+    ImageType4D::DirectionType orig_dir;
+    ImageType4D::SpacingType orig_spc;
+    ImageType4D::RegionType orig_reg;
+    ImageType4D::PointType orig_or;
+
     if(input_name!="" && gibbs_option)
     {
         float ks_cov= PF;
@@ -811,6 +819,13 @@ void TORTOISE::GibbsUnringData(std::string input_name, float PF,std::string json
         ImageType4D::Pointer dwis= readImageD<ImageType4D>(input_name);
         if(phase==0)
         {
+
+            orig_dir=dwis->GetDirection();
+            orig_spc=dwis->GetSpacing();
+            orig_reg=dwis->GetLargestPossibleRegion();
+            orig_or =dwis->GetOrigin();
+
+
             ImageType4D::SizeType new_size;
             new_size[0]=dwis->GetLargestPossibleRegion().GetSize()[1];
             new_size[1]=dwis->GetLargestPossibleRegion().GetSize()[0];
@@ -820,9 +835,11 @@ void TORTOISE::GibbsUnringData(std::string input_name, float PF,std::string json
             ImageType4D::IndexType start; start.Fill(0);
             ImageType4D::RegionType reg(start,new_size);
 
+            ImageType4D::SpacingType new_spc;
+
             ImageType4D::Pointer dwis2= ImageType4D::New();
             dwis2->SetRegions(reg);
-            dwis2->Allocate();
+            dwis2->Allocate();            
             dwis2->FillBuffer(0);
 
             itk::ImageRegionIteratorWithIndex<ImageType4D> it(dwis2,dwis2->GetLargestPossibleRegion());
@@ -836,7 +853,6 @@ void TORTOISE::GibbsUnringData(std::string input_name, float PF,std::string json
             }
             dwis=dwis2;
         }
-
 
 
         if(ks_cov>=0.9375)
@@ -866,18 +882,12 @@ void TORTOISE::GibbsUnringData(std::string input_name, float PF,std::string json
         }
         (*stream)<<std::endl;
         if(phase==0)
-        {
-            ImageType4D::SizeType new_size;
-            new_size[0]=dwis->GetLargestPossibleRegion().GetSize()[1];
-            new_size[1]=dwis->GetLargestPossibleRegion().GetSize()[0];
-            new_size[2]=dwis->GetLargestPossibleRegion().GetSize()[2];
-            new_size[3]=dwis->GetLargestPossibleRegion().GetSize()[3];
-
-            ImageType4D::IndexType start; start.Fill(0);
-            ImageType4D::RegionType reg(start,new_size);
-
+        {            
             ImageType4D::Pointer dwis2= ImageType4D::New();
-            dwis2->SetRegions(reg);
+            dwis2->SetRegions(orig_reg);
+            dwis2->SetSpacing(orig_spc);
+            dwis2->SetDirection(orig_dir);
+            dwis2->SetOrigin(orig_or);
             dwis2->Allocate();
             dwis2->FillBuffer(0);
 

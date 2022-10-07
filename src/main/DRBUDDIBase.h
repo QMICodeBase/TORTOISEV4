@@ -27,7 +27,16 @@ public:
     virtual ~DRBUDDIBase(){};
 
     //void SetParser(TORTOISE_PARSER* p){this->parser=p;}
-    void SetParser(DRBUDDI_PARSERBASE* p){this->parser=p;}
+    void SetParser(DRBUDDI_PARSERBASE* p)
+    {
+        this->parser=p;
+        if(parser->getDRBUDDIOutput()!="")
+        {
+            this->proc_folder = parser->getDRBUDDIOutput();
+            if(!fs::exists(this->proc_folder))
+                fs::create_directories(this->proc_folder);
+        }
+    }
 
 
 protected:            //Subfunctions the main processing functions use

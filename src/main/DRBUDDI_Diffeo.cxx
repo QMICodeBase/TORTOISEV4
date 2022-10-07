@@ -69,6 +69,9 @@ void DRBUDDI_Diffeo::SetUpStages()
     }
 }
 
+
+/*
+
 void DRBUDDI_Diffeo::SetDefaultStages()
 {
     int Nstr=parser->getNumberOfStructurals();
@@ -78,9 +81,9 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=4.5;
         curr_stage.downsample_factor=8;
-        curr_stage.learning_rate=0.2;
+        curr_stage.learning_rate=0.25;
         curr_stage.update_gaussian_sigma=8.5;
-        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.total_gaussian_sigma=0.1;
         curr_stage.restrct=1;
         curr_stage.constrain=1;
         DRBUDDIMetric metric;
@@ -94,7 +97,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=4.;
         curr_stage.downsample_factor=8;
-        curr_stage.learning_rate=0.1;
+        curr_stage.learning_rate=0.15;
         curr_stage.update_gaussian_sigma=7.5;
         curr_stage.total_gaussian_sigma=0.05;
         curr_stage.restrct=1;
@@ -165,19 +168,43 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         curr_stage.constrain=1;
         DRBUDDIMetric metric1;
         metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
-        metric1.weight=1;
+        metric1.weight=0.8;
         curr_stage.metrics.push_back(metric1);
         for(int s=0;s<Nstr;s++)
         {
             DRBUDDIMetric metric2;
-            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
             metric2.weight=1;
             curr_stage.metrics.push_back(metric2);
         }
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                                 //7
+        DRBUDDIStageSettings curr_stage;                                //7
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=1.;
+        curr_stage.downsample_factor=8;
+        curr_stage.learning_rate=0.05;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+        }
+        this->stages.push_back(curr_stage);
+    }
+
+    {
+        DRBUDDIStageSettings curr_stage;                                 //8
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=4.;
         curr_stage.downsample_factor=6;
@@ -198,14 +225,14 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         for(int s=0;s<Nstr;s++)
         {
             DRBUDDIMetric metric4;
-            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
             metric4.weight=1;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                                 //8
+        DRBUDDIStageSettings curr_stage;                                 //9
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=3.5;
         curr_stage.downsample_factor=6;
@@ -226,14 +253,14 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         for(int s=0;s<Nstr;s++)
         {
             DRBUDDIMetric metric4;
-            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
             metric4.weight=1;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                                  //9
+        DRBUDDIStageSettings curr_stage;                                  //10
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=3.;
         curr_stage.downsample_factor=6;
@@ -254,14 +281,14 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         for(int s=0;s<Nstr;s++)
         {
             DRBUDDIMetric metric4;
-            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
             metric4.weight=1;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                                //10
+        DRBUDDIStageSettings curr_stage;                                //11
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=2.5;
         curr_stage.downsample_factor=6;
@@ -283,19 +310,19 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         for(int s=0;s<Nstr;s++)
         {
             DRBUDDIMetric metric4;
-            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
             metric4.weight=1;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                              //11
+        DRBUDDIStageSettings curr_stage;                              //12
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=2.;
         curr_stage.downsample_factor=6;
-        curr_stage.learning_rate=0.15;
-        curr_stage.update_gaussian_sigma=4.5;
+        curr_stage.learning_rate=0.1;
+        curr_stage.update_gaussian_sigma=4.;
         curr_stage.total_gaussian_sigma=0.05;
         curr_stage.restrct=1;
         curr_stage.constrain=1;
@@ -310,14 +337,14 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         for(int s=0;s<Nstr;s++)
         {
             DRBUDDIMetric metric4;
-            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
             metric4.weight=1;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                            //12
+        DRBUDDIStageSettings curr_stage;                            //13
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=2.;
         curr_stage.downsample_factor=6;
@@ -344,7 +371,37 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                                  //13
+        DRBUDDIStageSettings curr_stage;                            //14
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=1.;
+        curr_stage.downsample_factor=6;
+        curr_stage.learning_rate=0.05;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=0.8;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+
+
+
+    {
+        DRBUDDIStageSettings curr_stage;                                  //15
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=3.;
         curr_stage.downsample_factor=4;
@@ -366,7 +423,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
 
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=0.5;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -376,11 +433,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                                   //14
+        DRBUDDIStageSettings curr_stage;                                   //16
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=2.5;
         curr_stage.downsample_factor=4;
-        curr_stage.learning_rate=0.5;
+        curr_stage.learning_rate=0.35;
         curr_stage.update_gaussian_sigma=4.5;
         curr_stage.total_gaussian_sigma=0.2;
         curr_stage.restrct=1;
@@ -397,7 +454,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=0.5;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -407,71 +464,9 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                                //15
+        DRBUDDIStageSettings curr_stage;                                //17
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=2.;
-        curr_stage.downsample_factor=4;
-        curr_stage.learning_rate=0.35;
-        curr_stage.update_gaussian_sigma=3.5;
-        curr_stage.total_gaussian_sigma=0.2;
-        curr_stage.restrct=1;
-        curr_stage.constrain=1;
-        DRBUDDIMetric metric1;
-        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
-        metric1.weight=1;
-        curr_stage.metrics.push_back(metric1);
-        for(int s=0;s<Nstr;s++)
-        {
-            DRBUDDIMetric metric2;
-            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
-            curr_stage.metrics.push_back(metric2);
-            DRBUDDIMetric metric4;
-            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
-            curr_stage.metrics.push_back(metric4);
-        }
-        DRBUDDIMetric metric3;
-        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
-        metric3.weight=1;
-        curr_stage.metrics.push_back(metric3);
-        this->stages.push_back(curr_stage);
-    }
-    {
-        DRBUDDIStageSettings curr_stage;                                   //16
-        curr_stage.niter=100;
-        curr_stage.img_smoothing_std=1.5;
-        curr_stage.downsample_factor=4;
-        curr_stage.learning_rate=0.35;
-        curr_stage.update_gaussian_sigma=3.5;
-        curr_stage.total_gaussian_sigma=0.2;
-        curr_stage.restrct=1;
-        curr_stage.constrain=1;
-        DRBUDDIMetric metric1;
-        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
-        metric1.weight=1;
-        curr_stage.metrics.push_back(metric1);
-        for(int s=0;s<Nstr;s++)
-        {
-            DRBUDDIMetric metric2;
-            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
-            curr_stage.metrics.push_back(metric2);
-            DRBUDDIMetric metric4;
-            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
-            curr_stage.metrics.push_back(metric4);
-        }
-        DRBUDDIMetric metric3;
-        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
-        metric3.weight=1;
-        curr_stage.metrics.push_back(metric3);
-        this->stages.push_back(curr_stage);
-    }
-    {
-        DRBUDDIStageSettings curr_stage;                                     //17
-        curr_stage.niter=100;
-        curr_stage.img_smoothing_std=1.;
         curr_stage.downsample_factor=4;
         curr_stage.learning_rate=0.25;
         curr_stage.update_gaussian_sigma=3.5;
@@ -490,7 +485,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=0.5;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -500,11 +495,73 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                               //18
+        DRBUDDIStageSettings curr_stage;                                   //18
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=1.5;
+        curr_stage.downsample_factor=4;
+        curr_stage.learning_rate=0.25;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.2;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                     //19
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=1.;
+        curr_stage.downsample_factor=4;
+        curr_stage.learning_rate=0.20;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.2;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                               //20
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=1;
         curr_stage.downsample_factor=4;
-        curr_stage.learning_rate=0.3;
+        curr_stage.learning_rate=0.15;
         curr_stage.update_gaussian_sigma=3.;
         curr_stage.total_gaussian_sigma=0.2;
         curr_stage.restrct=1;
@@ -521,7 +578,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=0.5;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -531,7 +588,40 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                                 //19
+        DRBUDDIStageSettings curr_stage;                               //21
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0;
+        curr_stage.downsample_factor=4;
+        curr_stage.learning_rate=0.05;
+        curr_stage.update_gaussian_sigma=3.;
+        curr_stage.total_gaussian_sigma=0.2;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=0.8;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+
+
+    {
+        DRBUDDIStageSettings curr_stage;                                 //22
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=1;
         curr_stage.downsample_factor=2;
@@ -552,7 +642,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=0.5;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -562,11 +652,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                             //20
+        DRBUDDIStageSettings curr_stage;                             //23
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=0.5;
         curr_stage.downsample_factor=2;
-        curr_stage.learning_rate=1.;
+        curr_stage.learning_rate=0.5;
         curr_stage.update_gaussian_sigma=3.5;
         curr_stage.total_gaussian_sigma=0.1;
         curr_stage.restrct=1;
@@ -579,7 +669,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
+            metric2.weight=0.5;
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
@@ -593,18 +683,18 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                                //21
+        DRBUDDIStageSettings curr_stage;                                //24
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=0.5;
         curr_stage.downsample_factor=2;
-        curr_stage.learning_rate=0.75;
+        curr_stage.learning_rate=0.25;
         curr_stage.update_gaussian_sigma=3.;
         curr_stage.total_gaussian_sigma=0.1;
         curr_stage.restrct=1;
         curr_stage.constrain=1;
         DRBUDDIMetric metric1;
         metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
-        metric1.weight=1;
+        metric1.weight=0.8;
         curr_stage.metrics.push_back(metric1);
         for(int s=0;s<Nstr;s++)
         {
@@ -614,7 +704,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=0.5;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -624,12 +714,12 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                                   //22
+        DRBUDDIStageSettings curr_stage;                                   //25
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=0.25;
         curr_stage.downsample_factor=1;
         curr_stage.learning_rate=1.;
-        curr_stage.update_gaussian_sigma=8.;
+        curr_stage.update_gaussian_sigma=6.;
         curr_stage.total_gaussian_sigma=0.05;
         curr_stage.restrct=1;
         curr_stage.constrain=1;
@@ -645,7 +735,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=0.5;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -655,13 +745,13 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         this->stages.push_back(curr_stage);
     }
     {
-        DRBUDDIStageSettings curr_stage;                                   //23
+        DRBUDDIStageSettings curr_stage;                                   //26
         curr_stage.niter=60;
         curr_stage.img_smoothing_std=0.;
         curr_stage.downsample_factor=1;
-        curr_stage.learning_rate=0.75;
-        curr_stage.update_gaussian_sigma=4.;
-        curr_stage.total_gaussian_sigma=0.0;
+        curr_stage.learning_rate=0.05;
+        curr_stage.update_gaussian_sigma=5.;
+        curr_stage.total_gaussian_sigma=0.05;
         curr_stage.restrct=1;
         curr_stage.constrain=1;
         DRBUDDIMetric metric3;
@@ -676,7 +766,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=0.5;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric1;
@@ -689,13 +779,13 @@ void DRBUDDI_Diffeo::SetDefaultStages()
 
     if(Nstr>0 || (this->FA_up_img  && this->FA_down_img) )
     {
-        DRBUDDIStageSettings curr_stage;                                   //24
+        DRBUDDIStageSettings curr_stage;                                   //27
         curr_stage.niter=60;
         curr_stage.img_smoothing_std=0.;
         curr_stage.downsample_factor=1;
-        curr_stage.learning_rate=0.75;
-        curr_stage.update_gaussian_sigma=5.;
-        curr_stage.total_gaussian_sigma=0.25;
+        curr_stage.learning_rate=0.2;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.05;
         curr_stage.restrct=1;
         curr_stage.constrain=1;
         DRBUDDIMetric metric3;
@@ -705,7 +795,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
 
         DRBUDDIMetric metric1;
         metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
-        metric1.weight=0.6;
+        metric1.weight=0.8;
         curr_stage.metrics.push_back(metric1);
 
         for(int s=0;s<Nstr;s++)
@@ -721,11 +811,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
 
     if(Nstr>0 || (this->FA_up_img  && this->FA_down_img) )
     {
-        DRBUDDIStageSettings curr_stage;                                   //25
+        DRBUDDIStageSettings curr_stage;                                   //28
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=0.;
         curr_stage.downsample_factor=1;
-        curr_stage.learning_rate=0.5;
+        curr_stage.learning_rate=0.75;
         curr_stage.update_gaussian_sigma=3.;
         curr_stage.total_gaussian_sigma=0.0;
         curr_stage.restrct=0;
@@ -737,7 +827,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
 
         DRBUDDIMetric metric1;
         metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
-        metric1.weight=0.6;
+        metric1.weight=0.8;
         curr_stage.metrics.push_back(metric1);
 
         for(int s=0;s<Nstr;s++)
@@ -748,64 +838,870 @@ void DRBUDDI_Diffeo::SetDefaultStages()
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=0.4;
+            metric4.weight=0.3;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
     }
 
-
-
-
-
-
-
-
-    /*
-
+    if(Nstr>0 && this->FA_up_img  && this->FA_down_img )
     {
-        this->stages[23].niter=60;
-        this->stages[23].img_smoothing_std=1.;
-        this->stages[23].downsample_factor=1;
-        this->stages[23].learning_rate=1.75;
-        this->stages[23].update_gaussian_sigma=4.5;
-        this->stages[23].total_gaussian_sigma=0.1;
-        this->stages[23].restrct=0;
-        this->stages[23].constrain=0;
+        DRBUDDIStageSettings curr_stage;                                   //29
+        curr_stage.niter=60;
+        curr_stage.img_smoothing_std=0.;
+        curr_stage.downsample_factor=1;
+        curr_stage.learning_rate=0.25;
+        curr_stage.update_gaussian_sigma=3.;
+        curr_stage.total_gaussian_sigma=0.0;
+        curr_stage.restrct=0;
+        curr_stage.constrain=0;
         DRBUDDIMetric metric3;
         metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
         metric3.weight=1;
-        this->stages[23].metrics.push_back(metric3);
+        curr_stage.metrics.push_back(metric3);
+
         for(int s=0;s<Nstr;s++)
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
             metric2.weight=1;
-            this->stages[23].metrics.push_back(metric2);
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.3;
+            curr_stage.metrics.push_back(metric4);
         }
+        this->stages.push_back(curr_stage);
+    }
+
+}
+
+*/
+
+
+
+void DRBUDDI_Diffeo::SetDefaultStages()
+{
+    int Nstr=parser->getNumberOfStructurals();
+
+    {
+        DRBUDDIStageSettings curr_stage;                                //1
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=1.5;
+        curr_stage.downsample_factor=8;
+        curr_stage.learning_rate=0.4;
+        curr_stage.update_gaussian_sigma=11.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric;
+        metric.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric.weight=1;
+        curr_stage.metrics.push_back(metric);
+        DRBUDDIMetric metric4;
+        metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+        metric4.weight=0.5;
+        curr_stage.metrics.push_back(metric4);
+        this->stages.push_back(curr_stage);
     }
     {
-        this->stages[24].niter=10;
-        this->stages[24].img_smoothing_std=1.;
-        this->stages[24].downsample_factor=1;
-        this->stages[24].learning_rate=1.75;
-        this->stages[24].update_gaussian_sigma=4.5;
-        this->stages[24].total_gaussian_sigma=0.1;
-        this->stages[24].restrct=0;
-        this->stages[24].constrain=0;
-        DRBUDDIMetric metric3;
-        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
-        metric3.weight=1;
-        this->stages[24].metrics.push_back(metric3);
+        DRBUDDIStageSettings curr_stage;                                //2
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=1.;
+        curr_stage.downsample_factor=8;
+        curr_stage.learning_rate=0.15;
+        curr_stage.update_gaussian_sigma=9.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric;
+        metric.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric.weight=1;
+        curr_stage.metrics.push_back(metric);
+        DRBUDDIMetric metric4;
+        metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+        metric4.weight=0.5;
+        curr_stage.metrics.push_back(metric4);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                //3
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.5;
+        curr_stage.downsample_factor=8;
+        curr_stage.learning_rate=0.1;
+        curr_stage.update_gaussian_sigma=7.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric;
+        metric.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric.weight=1;
+        curr_stage.metrics.push_back(metric);
+        DRBUDDIMetric metric4;
+        metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+        metric4.weight=0.5;
+        curr_stage.metrics.push_back(metric4);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                //4
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.25;
+        curr_stage.downsample_factor=8;
+        curr_stage.learning_rate=0.15;
+        curr_stage.update_gaussian_sigma=5.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric;
+        metric.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric.weight=1;
+        curr_stage.metrics.push_back(metric);
+        DRBUDDIMetric metric4;
+        metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+        metric4.weight=0.5;
+        curr_stage.metrics.push_back(metric4);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                //5
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.25;
+        curr_stage.downsample_factor=8;
+        curr_stage.learning_rate=0.075;
+        curr_stage.update_gaussian_sigma=4.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric;
+        metric.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric.weight=1;
+        curr_stage.metrics.push_back(metric);
+        DRBUDDIMetric metric4;
+        metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+        metric4.weight=0.5;
+        curr_stage.metrics.push_back(metric4);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                //6
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.1;
+        curr_stage.downsample_factor=8;
+        curr_stage.learning_rate=0.75;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1.;
+      //  curr_stage.metrics.push_back(metric1);
         for(int s=0;s<Nstr;s++)
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=4;
-            this->stages[24].metrics.push_back(metric2);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
         }
+        this->stages.push_back(curr_stage);
     }
-    */
+    {
+        DRBUDDIStageSettings curr_stage;                                //7
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.1;
+        curr_stage.downsample_factor=8;
+        curr_stage.learning_rate=0.5;
+        curr_stage.update_gaussian_sigma=5.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=0.4;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+        }
+        this->stages.push_back(curr_stage);
+    }
+
+    {
+        DRBUDDIStageSettings curr_stage;                                 //8
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=1.5;
+        curr_stage.downsample_factor=6;
+        curr_stage.learning_rate=0.3;
+        curr_stage.update_gaussian_sigma=8.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        DRBUDDIMetric metric2;
+        metric2.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric2.weight=1;
+
+        curr_stage.metrics.push_back(metric1);
+        curr_stage.metrics.push_back(metric2);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric4.weight=1;
+            curr_stage.metrics.push_back(metric4);
+        }
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                 //9
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=1.;
+        curr_stage.downsample_factor=6;
+        curr_stage.learning_rate=0.25;
+        curr_stage.update_gaussian_sigma=7.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        DRBUDDIMetric metric2;
+        metric2.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric2.weight=1;
+
+        curr_stage.metrics.push_back(metric1);
+        curr_stage.metrics.push_back(metric2);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric4.weight=1;
+            curr_stage.metrics.push_back(metric4);
+        }
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                  //10
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.5;
+        curr_stage.downsample_factor=6;
+        curr_stage.learning_rate=0.25;
+        curr_stage.update_gaussian_sigma=6.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        DRBUDDIMetric metric2;
+        metric2.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric2.weight=1;
+
+        curr_stage.metrics.push_back(metric1);
+        curr_stage.metrics.push_back(metric2);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric4.weight=1;
+            curr_stage.metrics.push_back(metric4);
+        }
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                //11
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.5;
+        curr_stage.downsample_factor=6;
+        curr_stage.learning_rate=0.2;
+        curr_stage.update_gaussian_sigma=5.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        DRBUDDIMetric metric2;
+        metric2.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric2.weight=1;
+
+        curr_stage.metrics.push_back(metric1);
+        curr_stage.metrics.push_back(metric2);
+
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric4.weight=1;
+            curr_stage.metrics.push_back(metric4);
+        }
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                              //12
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.25;
+        curr_stage.downsample_factor=6;
+        curr_stage.learning_rate=0.1;
+        curr_stage.update_gaussian_sigma=4.;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        DRBUDDIMetric metric2;
+        metric2.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric2.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        curr_stage.metrics.push_back(metric2);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric4.weight=1;
+            curr_stage.metrics.push_back(metric4);
+        }
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                            //13
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.25;
+        curr_stage.downsample_factor=6;
+        curr_stage.learning_rate=0.2;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                            //14
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.1;
+        curr_stage.downsample_factor=6;
+        curr_stage.learning_rate=0.25;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=0.6;
+     //   curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+
+
+
+    {
+        DRBUDDIStageSettings curr_stage;                                  //15
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=1.;
+        curr_stage.downsample_factor=4;
+        curr_stage.learning_rate=0.75;
+        curr_stage.update_gaussian_sigma=5.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                   //16
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=1.;
+        curr_stage.downsample_factor=4;
+        curr_stage.learning_rate=0.35;
+        curr_stage.update_gaussian_sigma=4.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                //17
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.75;
+        curr_stage.downsample_factor=4;
+        curr_stage.learning_rate=0.25;
+        curr_stage.update_gaussian_sigma=4.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                   //18
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.5;
+        curr_stage.downsample_factor=4;
+        curr_stage.learning_rate=0.25;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                     //19
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=.25;
+        curr_stage.downsample_factor=4;
+        curr_stage.learning_rate=0.20;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                               //20
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=.2;
+        curr_stage.downsample_factor=4;
+        curr_stage.learning_rate=0.15;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                               //21
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.1;
+        curr_stage.downsample_factor=4;
+        curr_stage.learning_rate=0.05;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=0.8;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+
+
+    {
+        DRBUDDIStageSettings curr_stage;                                 //22
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.5;
+        curr_stage.downsample_factor=2;
+        curr_stage.learning_rate=1.5;
+        curr_stage.update_gaussian_sigma=4.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                             //23
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.25;
+        curr_stage.downsample_factor=2;
+        curr_stage.learning_rate=0.5;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=0.5;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=1;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                //24
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.;
+        curr_stage.downsample_factor=2;
+        curr_stage.learning_rate=0.25;
+        curr_stage.update_gaussian_sigma=3.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=0.8;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                   //25
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.1;
+        curr_stage.downsample_factor=1;
+        curr_stage.learning_rate=1.;
+        curr_stage.update_gaussian_sigma=6.;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        this->stages.push_back(curr_stage);
+    }
+    {
+        DRBUDDIStageSettings curr_stage;                                   //26
+        curr_stage.niter=60;
+        curr_stage.img_smoothing_std=0.;
+        curr_stage.downsample_factor=1;
+        curr_stage.learning_rate=0.05;
+        curr_stage.update_gaussian_sigma=5.;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.5;
+            curr_stage.metrics.push_back(metric4);
+        }
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=1;
+        curr_stage.metrics.push_back(metric1);
+        this->stages.push_back(curr_stage);
+    }
+
+
+    if(Nstr>0 || (this->FA_up_img  && this->FA_down_img) )
+    {
+        DRBUDDIStageSettings curr_stage;                                   //27
+        curr_stage.niter=60;
+        curr_stage.img_smoothing_std=0.;
+        curr_stage.downsample_factor=1;
+        curr_stage.learning_rate=0.2;
+        curr_stage.update_gaussian_sigma=4.5;
+        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.restrct=1;
+        curr_stage.constrain=1;
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=0.8;
+        curr_stage.metrics.push_back(metric1);
+
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+        }
+        this->stages.push_back(curr_stage);
+    }
+
+
+    if(Nstr>0 || (this->FA_up_img  && this->FA_down_img) )
+    {
+        DRBUDDIStageSettings curr_stage;                                   //28
+        curr_stage.niter=100;
+        curr_stage.img_smoothing_std=0.;
+        curr_stage.downsample_factor=1;
+        curr_stage.learning_rate=0.75;
+        curr_stage.update_gaussian_sigma=5.5;
+        curr_stage.total_gaussian_sigma=0.1;
+        curr_stage.restrct=0;
+        curr_stage.constrain=0;
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+
+        DRBUDDIMetric metric1;
+        metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+        metric1.weight=0.7;
+        curr_stage.metrics.push_back(metric1);
+
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.3;
+            curr_stage.metrics.push_back(metric4);
+        }
+        this->stages.push_back(curr_stage);
+    }
+
+    if(Nstr>0 && this->FA_up_img  && this->FA_down_img )
+    {
+        DRBUDDIStageSettings curr_stage;                                   //29
+        curr_stage.niter=60;
+        curr_stage.img_smoothing_std=0.;
+        curr_stage.downsample_factor=1;
+        curr_stage.learning_rate=1.75;
+        curr_stage.update_gaussian_sigma=5.5;
+        curr_stage.total_gaussian_sigma=0.1;
+        curr_stage.restrct=0;
+        curr_stage.constrain=0;
+        DRBUDDIMetric metric3;
+        metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
+        metric3.weight=1;
+        curr_stage.metrics.push_back(metric3);
+
+        for(int s=0;s<Nstr;s++)
+        {
+            DRBUDDIMetric metric2;
+            metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
+            metric2.weight=1;
+            curr_stage.metrics.push_back(metric2);
+            DRBUDDIMetric metric4;
+            metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
+            metric4.weight=0.3;
+            curr_stage.metrics.push_back(metric4);
+        }
+        this->stages.push_back(curr_stage);
+    }
+
 }
 
 

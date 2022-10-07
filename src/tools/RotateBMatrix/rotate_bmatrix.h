@@ -17,13 +17,13 @@ using RigidTransformType= itk::Euler3DTransform<double>;
 
 vnl_vector<double> RotateBMatrixVec(vnl_vector<double> Bmatrixvec, const vnl_matrix_fixed<double,3,3> &rotmat);
 
-vnl_matrix<double> RotateBMatrix(const vnl_matrix<double> &Bmatrix, const vnl_matrix_fixed<double,3,3> &rotmat, const vnl_matrix_fixed<double,3,3> &dirmat );
+vnl_matrix<double> RotateBMatrix(const vnl_matrix<double> &Bmatrix, const vnl_matrix_fixed<double,3,3> &rotmat, const vnl_matrix_fixed<double,3,3> &fixed_dirmat,const vnl_matrix_fixed<double,3,3> &moving_dirmat);
 
 
-vnl_matrix<double> RotateBMatrix(vnl_matrix<double> Bmatrix, std::vector<OkanQuadraticTransformType::Pointer> transforms,const vnl_matrix_fixed<double,3,3> &dirmat);
+vnl_matrix<double> RotateBMatrix(vnl_matrix<double> Bmatrix, std::vector<OkanQuadraticTransformType::Pointer> transforms,const vnl_matrix_fixed<double,3,3> &fixed_dirmat,const vnl_matrix_fixed<double,3,3> &moving_dirmat);
 
 
-vnl_matrix<double> RotateBMatrix(vnl_matrix<double> Bmatrix, std::vector<CompositeTransformType::Pointer> transforms,const vnl_matrix_fixed<double,3,3> &dirmat);
+vnl_matrix<double> RotateBMatrix(vnl_matrix<double> Bmatrix, std::vector<CompositeTransformType::Pointer> transforms,const vnl_matrix_fixed<double,3,3> &fixed_dirmat,const vnl_matrix_fixed<double,3,3> &moving_dirmat);
 
 
 #endif

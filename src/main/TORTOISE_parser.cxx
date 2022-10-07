@@ -170,6 +170,24 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
         option->SetModule(0);
         this->AddOption( option );
     }
+    {
+        std::string description = std::string( "Big Delta. In case it is not in JSON file and high b-value processing is needed. Default:0  " );
+
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "big_delta");
+        option->SetDescription( description );
+        option->SetModule(0);
+        this->AddOption( option );
+    }
+    {
+        std::string description = std::string( "Small Delta. In case it is not in JSON file and high b-value processing is needed. Default:0  " );
+
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "small_delta");
+        option->SetDescription( description );
+        option->SetModule(0);
+        this->AddOption( option );
+    }
 
 
 
@@ -305,6 +323,7 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
         option->SetLongName( "rot_eddy_center");
         option->SetUsageOption(0, "isocenter: the (0,0,0) coordinate from the NIFTI header (ideally the magnet isocenter) will be used as the center" );
         option->SetUsageOption(1, "center_voxel:  the very center voxel of the image will be used as the isocenter." );
+        option->SetUsageOption(2, "center_slice:  0,0,center_slice" );
         option->SetDescription( description );
         option->SetModule(4);
         this->AddOption( option );
@@ -602,6 +621,26 @@ int TORTOISE_PARSER::getFlipZ()
             return -1;
     }
     return 1;
+}
+
+float TORTOISE_PARSER::getBigDelta()
+{
+    OptionType::Pointer option = this->GetOption( "big_delta");
+    if(option->GetNumberOfFunctions())
+    {
+        return (float)( atof(option->GetFunction(0)->GetName().c_str()));
+    }
+    return 0;
+}
+
+float TORTOISE_PARSER::getSmallDelta()
+{
+    OptionType::Pointer option = this->GetOption( "small_delta");
+    if(option->GetNumberOfFunctions())
+    {
+        return (float)( atof(option->GetFunction(0)->GetName().c_str()));
+    }
+    return 0;
 }
 
 

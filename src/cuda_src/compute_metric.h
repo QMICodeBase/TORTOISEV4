@@ -36,7 +36,7 @@ void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 		   cudaPitchedPtr def_FINV, cudaPitchedPtr def_MINV,
    		   cudaPitchedPtr updateFieldF, cudaPitchedPtr updateFieldM,
                    float3 phase_vector,int kernel_sz, float* h_kernel, float &metric_value
-		   );
+);
 
 
 

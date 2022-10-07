@@ -34,12 +34,15 @@ public:
     ImageType3D::Pointer SynthesizeDWI(vnl_vector<double> bmat_vec);
     ImageType3D::Pointer getCSImg(){return CS_img;}
     ImageType3D::Pointer getVFImg(){return VF_img;}
+    ImageType3D::Pointer getVFImg2(){return VF_img2;}
+    DTImageType::Pointer getFlowImg(){return flow_tensor_img;}
 
 
 private:
     void EstimateTensorWLLS();
     void EstimateTensorNLLS();
     void EstimateTensorN2();
+    void EstimateTensorNT2();
     void EstimateTensorWLLSDiagonal();
     void EstimateTensorRESTORE();
 
@@ -49,6 +52,8 @@ private:
     std::string fitting_mode;
     ImageType3D::Pointer CS_img{nullptr};
     ImageType3D::Pointer VF_img{nullptr};
+    ImageType3D::Pointer VF_img2{nullptr};
+    DTImageType::Pointer flow_tensor_img{nullptr};
 };
 
 

@@ -122,6 +122,7 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         this->AddOption( option );
     }
 
+
     {
         std::string description = std::string( "Gradient Nonlinearity information file. Can be in ITK displacement field format, TORTOISE coefficients .gc format, GE coefficients gw_coils format or Siemens coefficients .coeffs format. If it is GE, it should be specified in brackets. If 1D or 2D gradwarp is desired, it should be specified. Default:3D   " );
 
@@ -136,6 +137,25 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         option->SetModule(0);
         this->AddOption( option );
     }
+    {
+        std::string description = std::string( "DRBUDDI transformation output folder." );
+
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "DRBUDDI_output");
+        option->SetDescription( description );
+        option->SetModule(6);
+        this->AddOption( option );
+    }
+    {
+        std::string description = std::string( "DRBUDDI start step. 0: beginning. Creates b=0 and FA images. 1: Assumes b=0 and FA images are present with correct name and starts with rigid registration. 2: Assumes all images and rigid transformations are present and starts with diffeomorphic distortion correction. " );
+
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "DRBUDDI_step");
+        option->SetDescription( description );
+        option->SetModule(6);
+        this->AddOption( option );
+    }
+
 
     {
         std::string description = std::string("Initial transform field for the up data.")  ;
@@ -262,7 +282,24 @@ std::vector<std::string> DRBUDDI_PARSERBASE::getStructuralNames()
     return names;
 }
 
+std::string DRBUDDI_PARSERBASE::getDRBUDDIOutput()
+{
+    OptionType::Pointer option = this->GetOption( "DRBUDDI_output");
+    if(option->GetNumberOfFunctions())
+        return option->GetFunction(0)->GetName();
+    else
+       return std::string("");
+}
 
+
+int DRBUDDI_PARSERBASE::getDRBUDDIStep()
+{
+    OptionType::Pointer option = this->GetOption( "DRBUDDI_step");
+    if(option->GetNumberOfFunctions())
+        return atoi(option->GetFunction(0)->GetName().c_str());
+
+    return 0;
+}
 
 std::string DRBUDDI_PARSERBASE::getGradNonlinInput()
 {
@@ -362,7 +399,11 @@ bool DRBUDDI_PARSERBASE::getEstimateLRPerIteration()
     if(option->GetNumberOfFunctions())
          return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
     else
+#ifdef USECUDA
         return 0;
+#else
+        return 0;
+#endif
 }
 
 std::string  DRBUDDI_PARSERBASE::getRigidMetricType()

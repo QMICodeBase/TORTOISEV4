@@ -35,9 +35,20 @@ int main(int argc, char* argv[])
 
     float ks_cov= gibbs_kspace_coverage;
 
+    ImageType4D::DirectionType orig_dir;
+    ImageType4D::SpacingType orig_spc;
+    ImageType4D::RegionType orig_reg;
+    ImageType4D::PointType orig_or;
+
+
     ImageType4D::Pointer dwis= readImageD<ImageType4D>(input_name);
     if(phase==0)
     {
+        orig_dir=dwis->GetDirection();
+        orig_spc=dwis->GetSpacing();
+        orig_reg=dwis->GetLargestPossibleRegion();
+        orig_or =dwis->GetOrigin();
+
         ImageType4D::SizeType new_size;
         new_size[0]=dwis->GetLargestPossibleRegion().GetSize()[1];
         new_size[1]=dwis->GetLargestPossibleRegion().GetSize()[0];
@@ -93,17 +104,11 @@ int main(int argc, char* argv[])
 
     if(phase==0)
     {
-        ImageType4D::SizeType new_size;
-        new_size[0]=dwis->GetLargestPossibleRegion().GetSize()[1];
-        new_size[1]=dwis->GetLargestPossibleRegion().GetSize()[0];
-        new_size[2]=dwis->GetLargestPossibleRegion().GetSize()[2];
-        new_size[3]=dwis->GetLargestPossibleRegion().GetSize()[3];
-
-        ImageType4D::IndexType start; start.Fill(0);
-        ImageType4D::RegionType reg(start,new_size);
-
         ImageType4D::Pointer dwis2= ImageType4D::New();
-        dwis2->SetRegions(reg);
+        dwis2->SetRegions(orig_reg);
+        dwis2->SetSpacing(orig_spc);
+        dwis2->SetDirection(orig_dir);
+        dwis2->SetOrigin(orig_or);
         dwis2->Allocate();
         dwis2->FillBuffer(0);
 

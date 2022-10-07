@@ -53,7 +53,7 @@ int main(int argc, char* argv[])
 
     }
 
-    vnl_matrix<double> newBmat= RotateBMatrix(Bmatrix,rot_mat,dirmat);
+    vnl_matrix<double> newBmat= RotateBMatrix(Bmatrix,rot_mat,dirmat,dirmat);
 
     std::string bmat_name= argv[1];
     std::string new_bmat_name=  bmat_name.substr(0,bmat_name.find(".bmtxt")) + "_rot.bmtxt";

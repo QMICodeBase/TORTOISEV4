@@ -271,6 +271,8 @@ int main(int argc, char *argv[])
         ext="_N0";
     if(regresion_mode=="N2")
         ext="_N2";
+    if(regresion_mode=="NT2")
+        ext="_NT2";
 
 
 
@@ -315,6 +317,56 @@ int main(int argc, char *argv[])
 
         std::string OMVF_name= full_base_name + ext+  std::string("_OMVF.nii");
         writeImageD<ImageType3D>(one_m_VF_img,OMVF_name);
+    }
+    if(dti_estimator.getVFImg2())
+    {
+        std::string VF_name= full_base_name + ext+  std::string("_VF2.nii");
+        writeImageD<ImageType3D>(dti_estimator.getVFImg2(),VF_name);
+
+    }
+
+
+    if(dti_estimator.getFlowImg())
+    {
+        DTImageType::Pointer flow_img= dti_estimator.getFlowImg();
+
+        DTImageType4D::Pointer flow_img4d= DTImageType4D::New();
+        flow_img4d->SetRegions(reg);
+        flow_img4d->Allocate();
+        flow_img4d->SetOrigin(orig);
+        flow_img4d->SetDirection(dir);
+        flow_img4d->SetSpacing(spc);
+
+
+        itk::ImageRegionIteratorWithIndex<DTImageType> it(flow_img,flow_img->GetLargestPossibleRegion());
+        it.GoToBegin();
+        while(!it.IsAtEnd())
+        {
+            DTImageType::IndexType index= it.GetIndex();
+            DTType  dt_vec= it.Get();
+            DTImageType4D::IndexType ind4d;
+            ind4d[0]=index[0];
+            ind4d[1]=index[1];
+            ind4d[2]=index[2];
+
+            ind4d[3]=0;
+            flow_img4d->SetPixel(ind4d, dt_vec[0]*1000000.);
+            ind4d[3]=1;
+            flow_img4d->SetPixel(ind4d, dt_vec[3]*1000000.);
+            ind4d[3]=2;
+            flow_img4d->SetPixel(ind4d, dt_vec[5]*1000000.);
+            ind4d[3]=3;
+            flow_img4d->SetPixel(ind4d, dt_vec[1]*1000000.);
+            ind4d[3]=4;
+            flow_img4d->SetPixel(ind4d, dt_vec[2]*1000000.);
+            ind4d[3]=5;
+            flow_img4d->SetPixel(ind4d, dt_vec[4]*1000000.);
+            ++it;
+        }
+
+        std::string flow_name= full_base_name + ext+  std::string("_DT2.nii");
+        writeImageD<ImageType4D>(flow_img4d,flow_name);
+
     }
 
 

@@ -622,7 +622,6 @@ void FINALDATA::ReadOrigTransforms()
 template <typename ImageType>
 typename ImageType::Pointer FINALDATA::ChangeImageHeaderToDP(typename ImageType::Pointer img)
 {
-
     std::string rot_center= RegistrationSettings::get().getValue<std::string>(std::string("rot_eddy_center"));
 
     /*********************************************************************************
@@ -671,15 +670,48 @@ typename ImageType::Pointer FINALDATA::ChangeImageHeaderToDP(typename ImageType:
     }
     else
     {
-        //Make the rotation and eddy center the image center voxel.
-        new_orig[0]=   - ((int)(img->GetLargestPossibleRegion().GetSize()[0])-1)/2. * img->GetSpacing()[0];
-        new_orig[1]=   - ((int)(img->GetLargestPossibleRegion().GetSize()[1])-1)/2. * img->GetSpacing()[1];
-        new_orig[2]=   - ((int)(img->GetLargestPossibleRegion().GetSize()[2])-1)/2. * img->GetSpacing()[2];
+        if(rot_center=="center_voxel")
+        {
+            //Make the rotation and eddy center the image center voxel.
+            new_orig[0]=   - ((int)(img->GetLargestPossibleRegion().GetSize()[0])-1)/2. * img->GetSpacing()[0];
+            new_orig[1]=   - ((int)(img->GetLargestPossibleRegion().GetSize()[1])-1)/2. * img->GetSpacing()[1];
+            new_orig[2]=   - ((int)(img->GetLargestPossibleRegion().GetSize()[2])-1)/2. * img->GetSpacing()[2];
+        }
+        else
+        {
+            //center_slice
+            vnl_matrix<double> Sinv(3,3,0);
+            Sinv(0,0)= 1./img->GetSpacing()[0];
+            Sinv(1,1)= 1./img->GetSpacing()[1];
+            Sinv(2,2)= 1./img->GetSpacing()[2];
+            vnl_matrix<double> S(3,3,0);
+            S(0,0)= img->GetSpacing()[0];
+            S(1,1)= img->GetSpacing()[1];
+            S(2,2)= img->GetSpacing()[2];
+
+
+            vnl_vector<double> center_voxel_index(3,0);
+            center_voxel_index[0]= ((int)(img->GetLargestPossibleRegion().GetSize()[0])-1)/2.;
+            center_voxel_index[1]= ((int)(img->GetLargestPossibleRegion().GetSize()[1])-1)/2.;
+            center_voxel_index[2]= ((int)(img->GetLargestPossibleRegion().GetSize()[2])-1)/2.;
+
+            vnl_vector<double> center_voxel_point = img->GetDirection().GetVnlMatrix()*S*center_voxel_index + img->GetOrigin().GetVnlVector();
+
+            vnl_vector<double> center_point(3,0);
+            center_point[2]= center_voxel_point[2];
+
+            vnl_vector<double> indo= Sinv*img->GetDirection().GetTranspose() * (center_voxel_point- img->GetOrigin().GetVnlVector());   //this is the continuous index (i,j,k) of the isocenter
+            vnl_vector<double> new_orig_v= -S*indo;
+            new_orig[0]=new_orig_v[0];
+            new_orig[1]=new_orig_v[1];
+            new_orig[2]=new_orig_v[2];
+        }
 
     }
     nimg->SetOrigin(new_orig);
 
     return nimg;
+
 }
 
 
@@ -775,6 +807,8 @@ FINALDATA::CompositeTransformType::Pointer FINALDATA::GenerateCompositeTransform
 void FINALDATA::GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer> >  final_DWIs)
 {
     std::string data_combination_method = RegistrationSettings::get().getValue<std::string>("output_data_combination");
+
+    (*stream)<<std::endl<<"Writing final data..."<<std::endl;
 
     vnl_matrix<double> up_Bmatrix, down_Bmatrix;
     {
@@ -1602,31 +1636,14 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
 
         vnl_matrix<double> rot_Bmat;
+
         {
             //Compute rotated Bmatrix, overall version
             vnl_matrix_fixed<double,3,3> id_trans; id_trans.set_identity();
-            rot_Bmat= RotateBMatrix(Bmatrix,this->dwi_transforms[PE],id_trans);
+            rot_Bmat= RotateBMatrix(Bmatrix,this->dwi_transforms[PE],id_trans,id_trans);
             if(this->b0_t0_str_trans)
-                rot_Bmat= RotateBMatrix(rot_Bmat,this->b0_t0_str_trans->GetMatrix().GetVnlMatrix(),raw_data[0]->GetDirection().GetVnlMatrix());
-            vnl_matrix<double> flip_mat= template_structural->GetDirection().GetVnlMatrix() * raw_data[0]->GetDirection().GetVnlMatrix().transpose();
+                rot_Bmat= RotateBMatrix(rot_Bmat,this->b0_t0_str_trans->GetMatrix().GetVnlMatrix(), template_structural->GetDirection().GetVnlMatrix(),  raw_data[0]->GetDirection().GetVnlMatrix());
 
-            for(int v=0;v<rot_Bmat.rows();v++)
-            {
-                vnl_vector<double> rot_Bmat_vec= rot_Bmat.get_row(v);
-                vnl_matrix_fixed<double,3,3> rot_Bmat_vec_mat;
-                rot_Bmat_vec_mat(0,0)=rot_Bmat_vec[0];rot_Bmat_vec_mat(0,1)=rot_Bmat_vec[1]/2; rot_Bmat_vec_mat(0,2)=rot_Bmat_vec[2]/2;
-                rot_Bmat_vec_mat(1,0)=rot_Bmat_vec[1]/2;rot_Bmat_vec_mat(1,1)=rot_Bmat_vec[3]; rot_Bmat_vec_mat(1,2)=rot_Bmat_vec[4]/2;
-                rot_Bmat_vec_mat(2,0)=rot_Bmat_vec[2]/2;rot_Bmat_vec_mat(2,1)=rot_Bmat_vec[4]/2; rot_Bmat_vec_mat(2,2)=rot_Bmat_vec[5];
-
-                rot_Bmat_vec_mat= flip_mat * rot_Bmat_vec_mat * flip_mat.transpose();
-                rot_Bmat_vec[0]=rot_Bmat_vec_mat(0,0);
-                rot_Bmat_vec[1]=rot_Bmat_vec_mat(0,1)*2;
-                rot_Bmat_vec[2]=rot_Bmat_vec_mat(0,2)*2;
-                rot_Bmat_vec[3]=rot_Bmat_vec_mat(1,1);
-                rot_Bmat_vec[4]=rot_Bmat_vec_mat(1,2)*2;
-                rot_Bmat_vec[5]=rot_Bmat_vec_mat(2,2);
-                rot_Bmat.set_row(v,rot_Bmat_vec);
-            }
 
             fs::path up_path(up_name);
             std::string basename= fs::path(up_path).filename().string();
@@ -1635,6 +1652,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
             std::ofstream outfile(new_bmtxt_name);
             outfile<<rot_Bmat;
             outfile.close();
+
         }
 
 
@@ -1739,21 +1757,32 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
                     if(this->jsons[PE]["SmallDelta"]==json::value_t::null || this->jsons[PE]["BigDelta"]==json::value_t::null)
                     {
-                        //If the small and big deltas are unknown, just make a guesstimate
-                        //using the max bvalue and assumed gradient strength
-                        double gyro= 267.51532*1E6;
-                        double G= 40*1E-3;  //well most scanners are either 40 mT/m or 80mT/m.
-                        if(this->jsons[PE]["ManufacturersModelName"]!=json::value_t::null)
+                        float bd= RegistrationSettings::get().getValue<float>("big_delta");
+                        float sd= RegistrationSettings::get().getValue<float>("small_delta");
+
+                        if(bd!=0 && sd!=0)
                         {
-                            std::string scanner_model=this->jsons[PE]["ManufacturersModelName"];
-                            if(scanner_model.find("Prisma")!=std::string::npos)
-                                G= 80*1E-3;
+                            big_delta=bd;
+                            small_delta=sd;
                         }
-                        double temp= max_bval/gyro/gyro/G/G/2.*1E6;
-                        // assume that big_delta = 3 * small_delta
-                        // deltas are in miliseconds
-                        small_delta= pow(temp,1./3.)*1000.;
-                        big_delta= small_delta*3;
+                        else
+                        {
+                            //If the small and big deltas are unknown, just make a guesstimate
+                            //using the max bvalue and assumed gradient strength
+                            double gyro= 267.51532*1E6;
+                            double G= 40*1E-3;  //well most scanners are either 40 mT/m or 80mT/m.
+                            if(this->jsons[PE]["ManufacturersModelName"]!=json::value_t::null)
+                            {
+                                std::string scanner_model=this->jsons[PE]["ManufacturersModelName"];
+                                if(scanner_model.find("Prisma")!=std::string::npos)
+                                    G= 80*1E-3;
+                            }
+                            double temp= max_bval/gyro/gyro/G/G/2.*1E6;
+                            // assume that big_delta = 3 * small_delta
+                            // deltas are in miliseconds
+                            small_delta= pow(temp,1./3.)*1000.;
+                            big_delta= small_delta*3;
+                        }
                         this->jsons[PE]["BigDelta"]= big_delta;
                         this->jsons[PE]["SmallDelta"]= small_delta;
                     }
@@ -2411,11 +2440,12 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromCoeffs(int PE)
                     }
 
                     if(this->s2v_transformations[PE].size())
-                        curr_bmat_row= RotateBMatrix(curr_bmat_row,R.GetTranspose(),first_vol->GetDirection().GetVnlMatrix());
-                    curr_bmat_row= RotateBMatrix(curr_bmat_row,dwi_transforms[PE][vol]->GetMatrix().GetVnlMatrix(),id_trans);
+                        curr_bmat_row= RotateBMatrix(curr_bmat_row,R.GetTranspose(),first_vol->GetDirection().GetVnlMatrix(),first_vol->GetDirection().GetVnlMatrix());
+                    curr_bmat_row= RotateBMatrix(curr_bmat_row,dwi_transforms[PE][vol]->GetMatrix().GetVnlMatrix(),id_trans,id_trans);
                     if(this->b0_t0_str_trans)
-                        curr_bmat_row= RotateBMatrix(curr_bmat_row,this->b0_t0_str_trans->GetMatrix().GetVnlMatrix(),first_vol->GetDirection().GetVnlMatrix());
+                        curr_bmat_row= RotateBMatrix(curr_bmat_row,this->b0_t0_str_trans->GetMatrix().GetVnlMatrix(),this->template_structural->GetDirection().GetVnlMatrix(),first_vol->GetDirection().GetVnlMatrix());
 
+                    /*
                     vnl_vector<double> rot_Bmat_vec= curr_bmat_row.get_row(0);
                     vnl_matrix_fixed<double,3,3> rot_Bmat_vec_mat;
                     rot_Bmat_vec_mat(0,0)=rot_Bmat_vec[0];rot_Bmat_vec_mat(0,1)=rot_Bmat_vec[1]/2; rot_Bmat_vec_mat(0,2)=rot_Bmat_vec[2]/2;
@@ -2430,6 +2460,7 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromCoeffs(int PE)
                     rot_Bmat_vec[4]=rot_Bmat_vec_mat(1,2)*2;
                     rot_Bmat_vec[5]=rot_Bmat_vec_mat(2,2);
                     curr_bmat_row.set_row(0,rot_Bmat_vec);
+                    */
 
                     for(int vv=0;vv<6;vv++)
                         vbmat[6*vol+vv]->SetPixel(ind3,curr_bmat_row(0,vv));
@@ -2903,11 +2934,12 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromField(int PE)
                     }
 
                     if(this->s2v_transformations[PE].size())
-                        curr_bmat_row= RotateBMatrix(curr_bmat_row,R.GetTranspose(),first_vol->GetDirection().GetVnlMatrix());
-                    curr_bmat_row= RotateBMatrix(curr_bmat_row,dwi_transforms[PE][vol]->GetMatrix().GetVnlMatrix(),id_trans);
+                        curr_bmat_row= RotateBMatrix(curr_bmat_row,R.GetTranspose(),first_vol->GetDirection().GetVnlMatrix(),first_vol->GetDirection().GetVnlMatrix());
+                    curr_bmat_row= RotateBMatrix(curr_bmat_row,dwi_transforms[PE][vol]->GetMatrix().GetVnlMatrix(),id_trans,id_trans);
                     if(this->b0_t0_str_trans)
-                        curr_bmat_row= RotateBMatrix(curr_bmat_row,this->b0_t0_str_trans->GetMatrix().GetVnlMatrix(),first_vol->GetDirection().GetVnlMatrix());
+                        curr_bmat_row= RotateBMatrix(curr_bmat_row,this->b0_t0_str_trans->GetMatrix().GetVnlMatrix(),template_structural->GetDirection().GetVnlMatrix(),first_vol->GetDirection().GetVnlMatrix());
 
+                    /*
                     vnl_vector<double> rot_Bmat_vec= curr_bmat_row.get_row(0);
                     vnl_matrix_fixed<double,3,3> rot_Bmat_vec_mat;
                     rot_Bmat_vec_mat(0,0)=rot_Bmat_vec[0];rot_Bmat_vec_mat(0,1)=rot_Bmat_vec[1]/2; rot_Bmat_vec_mat(0,2)=rot_Bmat_vec[2]/2;
@@ -2922,6 +2954,7 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromField(int PE)
                     rot_Bmat_vec[4]=rot_Bmat_vec_mat(1,2)*2;
                     rot_Bmat_vec[5]=rot_Bmat_vec_mat(2,2);
                     curr_bmat_row.set_row(0,rot_Bmat_vec);
+                    */
 
                     for(int vv=0;vv<6;vv++)
                         vbmat[6*vol+vv]->SetPixel(ind3,curr_bmat_row(0,vv));

@@ -6,13 +6,14 @@
 #include "../utilities/math_utilities.h"
 #include <math.h>
 #include "../external_src/cmpfit-1.3a/mpfit.h"
+#include "itkImageDuplicator.h"
 
 
 void DTIModel::PerformFitting()
 {
-    if(fitting_mode!="WLLS" &&  fitting_mode!="NLLS" && fitting_mode!="N2" && fitting_mode!="RESTORE" && fitting_mode!="DIAG" )
+    if(fitting_mode!="WLLS" &&  fitting_mode!="NLLS" && fitting_mode!="N2" && fitting_mode!="RESTORE" && fitting_mode!="DIAG"  && fitting_mode!="NT2")
     {
-        (*stream)<<"DTI fitting mode not set correctly. Defaulting to WLLS"<<std::endl;
+        std::cout<<"DTI fitting mode not set correctly. Defaulting to WLLS"<<std::endl;
         fitting_mode="WLLS";
     }
 
@@ -35,6 +36,10 @@ void DTIModel::PerformFitting()
     if(fitting_mode=="RESTORE")
     {
         EstimateTensorRESTORE();
+    }
+    if(fitting_mode=="NT2")
+    {
+        EstimateTensorNT2();
     }
 }
 
@@ -144,14 +149,531 @@ int myNLLS2(int m, int n, double *p, double *deviates,   double **derivs, void *
 }
 
 
+int myNLLS_t2(int m, int n, double *p, double *deviates,   double **derivs, void *vars)
+{
+    int i;
+    // m points, n params
+
+    struct vars_struct *v = (struct vars_struct *) vars;
+    vnl_matrix<double> *Bmat= v->Bmat;
+    vnl_vector<double> *signal= v->signal;
+    vnl_vector<double> *weights=v->weights;
+
+    //  S =  p[0] * p[1]* exp(- B : p[2-7])  +   p[0] * (1-p[1])* exp(- B : p[8-13])
+
+    for (i=0; i<m; i++)
+    {
+        double expon1 = (*Bmat)[i][1]* p[2] + (*Bmat)[i][2]* p[3]+(*Bmat)[i][3]* p[4]+(*Bmat)[i][4]* p[5]+(*Bmat)[i][5]* p[6]+(*Bmat)[i][6]* p[7];
+        double expon2 = (*Bmat)[i][1]* p[8] + (*Bmat)[i][2]* p[9]+(*Bmat)[i][3]* p[10]+(*Bmat)[i][4]* p[11]+(*Bmat)[i][5]* p[12]+(*Bmat)[i][6]* p[13];
+
+        double atten_1=  exp(expon1);
+        double atten_2=  exp(expon2);
+
+        double est= p[0]*(p[1]*atten_1 + (1-p[1])*atten_2);
+
+        if(v->useWeights)
+            deviates[i] =  ((*signal)[i]- est) * (*weights)[i];
+        else
+            deviates[i] =(*signal)[i]- est;
+
+
+        if(derivs)
+        {
+            if(v->useWeights)
+            {
+                derivs[0][i]=  -(p[1]*atten_1  + (1-p[1])*atten_2)* (*weights)[i];
+                derivs[1][i]=  -(p[0]*(atten_1  -atten_2))* (*weights)[i];
+
+                derivs[2][i]=  -(p[0]*p[1]*((*Bmat)[i][1]* atten_1))* (*weights)[i];
+                derivs[3][i]=  -(p[0]*p[1]*((*Bmat)[i][2]* atten_1))* (*weights)[i];
+                derivs[4][i]=  -(p[0]*p[1]*((*Bmat)[i][3]* atten_1))* (*weights)[i];
+                derivs[5][i]=  -(p[0]*p[1]*((*Bmat)[i][4]* atten_1))* (*weights)[i];
+                derivs[6][i]=  -(p[0]*p[1]*((*Bmat)[i][5]* atten_1))* (*weights)[i];
+                derivs[7][i]=  -(p[0]*p[1]*((*Bmat)[i][6]* atten_1))* (*weights)[i];
+
+                derivs[8][i]=   -(p[0]*(1-p[1])*((*Bmat)[i][1]* atten_2))* (*weights)[i];
+                derivs[9][i]=   -(p[0]*(1-p[1])*((*Bmat)[i][2]* atten_2))* (*weights)[i];
+                derivs[10][i]=  -(p[0]*(1-p[1])*((*Bmat)[i][3]* atten_2))* (*weights)[i];
+                derivs[11][i]=  -(p[0]*(1-p[1])*((*Bmat)[i][4]* atten_2))* (*weights)[i];
+                derivs[12][i]=  -(p[0]*(1-p[1])*((*Bmat)[i][5]* atten_2))* (*weights)[i];
+                derivs[13][i]=  -(p[0]*(1-p[1])*((*Bmat)[i][6]* atten_2))* (*weights)[i];
+
+
+            }
+            else
+            {
+                derivs[0][i]=  -(p[1]*atten_1  + (1-p[1])*atten_2);
+                derivs[1][i]=  -(p[0]*(atten_1  -atten_2));
+
+                derivs[2][i]=  -(p[0]*p[1]*((*Bmat)[i][1]* atten_1));
+                derivs[3][i]=  -(p[0]*p[1]*((*Bmat)[i][2]* atten_1));
+                derivs[4][i]=  -(p[0]*p[1]*((*Bmat)[i][3]* atten_1));
+                derivs[5][i]=  -(p[0]*p[1]*((*Bmat)[i][4]* atten_1));
+                derivs[6][i]=  -(p[0]*p[1]*((*Bmat)[i][5]* atten_1));
+                derivs[7][i]=  -(p[0]*p[1]*((*Bmat)[i][6]* atten_1));
+
+                derivs[8][i]=   -(p[0]*(1-p[1])*((*Bmat)[i][1]* atten_2));
+                derivs[9][i]=   -(p[0]*(1-p[1])*((*Bmat)[i][2]* atten_2));
+                derivs[10][i]=  -(p[0]*(1-p[1])*((*Bmat)[i][3]* atten_2));
+                derivs[11][i]=  -(p[0]*(1-p[1])*((*Bmat)[i][4]* atten_2));
+                derivs[12][i]=  -(p[0]*(1-p[1])*((*Bmat)[i][5]* atten_2));
+                derivs[13][i]=  -(p[0]*(1-p[1])*((*Bmat)[i][6]* atten_2));
+
+            }
+
+        }
+
+     }
+    return 0;
+
+
+}
+
+
+
+void DTIModel::EstimateTensorNT2()
+{
+    EstimateTensorWLLS();
+
+    {
+        using DupType= itk::ImageDuplicator<DTImageType>;
+        DupType::Pointer dup= DupType::New();
+        dup->SetInputImage(this->output_img);
+        dup->Update();
+        this->flow_tensor_img=dup->GetOutput();
+        DTImageType::PixelType zer;
+        zer.Fill(0);
+        this->flow_tensor_img->FillBuffer(zer);
+    }
+
+
+    VF_img=ImageType3D::New();
+    VF_img->SetRegions(A0_img->GetLargestPossibleRegion());
+    VF_img->Allocate();
+    VF_img->SetSpacing(A0_img->GetSpacing());
+    VF_img->SetOrigin(A0_img->GetOrigin());
+    VF_img->SetDirection(A0_img->GetDirection());
+    VF_img->FillBuffer(0.);
+
+
+    constexpr float free_water_adc_value=3.;
+    double MAX_TR=-1;
+    itk::ImageRegionIteratorWithIndex<DTImageType> it(output_img,output_img->GetLargestPossibleRegion());
+    for(it.GoToBegin();!it.IsAtEnd();++it)
+    {
+        DTImageType::PixelType curr_tens= it.Get();
+        double MD=( curr_tens[0]+curr_tens[3]+curr_tens[5])/3.*1000;
+        if(MD>free_water_adc_value && MD > MAX_TR)
+            MAX_TR=MD;
+    }
+    if(MAX_TR<0)
+        MAX_TR=2*free_water_adc_value;
+
+   // double flow_diffusivity=MAX_TR*2;
+    double flow_diffusivity=5*free_water_adc_value;
+    double min_flow_diffusivity=3*free_water_adc_value;
+
+
+    DTImageType::PixelType flow_tens;
+    flow_tens[0]=flow_diffusivity/1000.;
+    flow_tens[3]=flow_diffusivity/1000.;
+    flow_tens[5]=flow_diffusivity/1000.;
+    flow_tens[1]=0;
+    flow_tens[2]=0;
+    flow_tens[4]=0;
+
+    DTImageType::PixelType free_tens;
+    free_tens[0]=free_water_adc_value/1000.;
+    free_tens[3]=free_water_adc_value/1000.;
+    free_tens[5]=free_water_adc_value/1000.;
+    free_tens[1]=0;
+    free_tens[2]=0;
+    free_tens[4]=0;
+
+
+    for(it.GoToBegin();!it.IsAtEnd();++it)
+    {
+        ImageType3D::IndexType index=it.GetIndex();
+
+        if(mask_img && mask_img->GetPixel(index)==0)
+        {
+            continue;
+        }
+
+        DTImageType::PixelType curr_tens= it.Get();
+        double MD=( curr_tens[0]+curr_tens[3]+curr_tens[5])/3.;
+        this->flow_tensor_img->SetPixel(index,flow_tens);
+        if(MD*1000 > free_water_adc_value)
+        {
+           // double V= (1000.*MD -flow_diffusivity)/(free_water_adc_value-flow_diffusivity);
+            //VF_img->SetPixel(index,V);
+
+            VF_img->SetPixel(index,0.2);
+
+            it.Set(free_tens);
+        }
+        else
+        {
+            DTImageType::PixelType pix= it.Get();
+            VF_img->SetPixel(index,0.99);
+        }
+    }
+
+
+    int Nvols=Bmatrix.rows();
+
+    std::vector<int> all_indices;
+    if(indices_fitting.size()>0)
+        all_indices= indices_fitting;
+    else
+    {
+        for(int ma=0;ma<Nvols;ma++)
+            all_indices.push_back(ma);
+    }
+
+
+    std::cout<<"Computing NT2 Dual Tensors ..."<<std::endl;
+
+    ImageType3D::SizeType size = dwi_data[0]->GetLargestPossibleRegion().GetSize();
+
+    mp_config_struct config;
+    config.maxiter=500;
+    config.ftol=1E-10;
+    config.xtol=1E-10;
+    config.gtol=1E-10;
+    config.epsfcn=MP_MACHEP0;
+    config.stepfactor=100;
+    config.covtol=1E-14;
+    config.maxfev=0;
+    config.nprint=1;
+    config.douserscale=0;
+    config.nofinitecheck=0;
+
+    CS_img=ImageType3D::New();
+    CS_img->SetRegions(A0_img->GetLargestPossibleRegion());
+    CS_img->Allocate();
+    CS_img->SetSpacing(A0_img->GetSpacing());
+    CS_img->SetOrigin(A0_img->GetOrigin());
+    CS_img->SetDirection(A0_img->GetDirection());
+    CS_img->FillBuffer(0.);
 
 
 
 
+    #pragma omp parallel for
+    for(int k=0;k<size[2];k++)
+    {
+        #ifndef NOTORTOISE
+        TORTOISE::EnableOMPThread();
+        #endif
+        ImageType3D::IndexType ind3;
+        ind3[2]=k;
+
+        double p[14];
+        mp_par pars[14];
+        memset(&pars[0], 0, sizeof(pars));
+
+        //  S =  p[0] * p[1]* exp(- B : p[2-7])  +   p[0] * (1-p[1])* exp(- B : p[8-13])
+
+
+   //   pars[0].parname="Am";
+        pars[0].limited[0]=1;
+        pars[0].limited[1]=0;
+        pars[0].limits[0]=0.0;
+        pars[0].limits[1]=0;
+        pars[0].side=0;
+
+  //    pars[1].parname="vf";  this is vf  for parenchymal tensor
+        pars[1].limited[0]=1;
+        pars[1].limited[1]=1;
+        pars[1].limits[0]=0.;
+        pars[1].limits[1]=1.;
+        pars[1].side=0;
+
+      //pars[2].parname="D1_XX";
+        pars[2].limited[0]=1;
+        pars[2].limited[1]=1;
+        pars[2].limits[0]=0.00001;
+        pars[2].limits[1]=free_water_adc_value;
+        pars[2].side=0;
+
+        //pars[3].parname="D1_XY";
+        pars[3].limited[0]=0;
+        pars[3].limited[1]=0;
+        pars[3].limits[0]=0;
+        pars[3].limits[1]=0;
+        pars[3].side=0;
+
+        //pars[4].parname="D1_XZ";
+        pars[4].limited[0]=0;
+        pars[4].limited[1]=0;
+        pars[4].limits[0]=0;
+        pars[4].limits[1]=0;
+        pars[4].side=0;
+
+       //pars[5].parname="D1_YY";
+        pars[5].limited[0]=1;
+        pars[5].limited[1]=1;
+        pars[5].limits[0]=0.00001;
+        pars[5].limits[1]=free_water_adc_value;
+        pars[5].side=0;
+
+        //pars[6].parname="D1_YZ";
+        pars[6].limited[0]=0;
+        pars[6].limited[1]=0;
+        pars[6].limits[0]=0;
+        pars[6].limits[1]=0;
+        pars[6].side=0;
+
+        //pars[5].parname="D1_ZZ";
+        pars[7].limited[0]=1;
+        pars[7].limited[1]=1;
+        pars[7].limits[0]=0.00001;
+        pars[7].limits[1]=free_water_adc_value;
+        pars[7].side=0;
 
 
 
+        //pars[2].parname="D2_XX";
+        pars[8].limited[0]=1;
+        pars[8].limited[1]=0;
+        pars[8].limits[0]=0.00001;
+       // pars[8].limits[0]=min_flow_diffusivity;
+        pars[8].limits[1]=8.*flow_diffusivity;
+        pars[8].side=0;
 
+        //pars[3].parname="D2_XY";
+        pars[9].limited[0]=0;
+        pars[9].limited[1]=0;
+        pars[9].limits[0]=0;
+        pars[9].limits[1]=0;
+        pars[9].side=0;
+
+        //pars[4].parname="D2_XZ";
+        pars[10].limited[0]=0;
+        pars[10].limited[1]=0;
+        pars[10].limits[0]=0;
+        pars[10].limits[1]=0;
+        pars[10].side=0;
+
+        //pars[5].parname="D2_YY";
+        pars[11].limited[0]=1;
+        pars[11].limited[1]=0;
+        //pars[11].limits[0]=min_flow_diffusivity;
+        pars[11].limits[0]=0.00001;
+        pars[11].limits[1]=8.*flow_diffusivity;
+        pars[11].side=0;
+
+        //pars[6].parname="D2_YZ";
+        pars[12].limited[0]=0;
+        pars[12].limited[1]=0;
+        pars[12].limits[0]=0;
+        pars[12].limits[1]=0;
+        pars[12].side=0;
+
+        //pars[5].parname="D2_ZZ";
+        pars[13].limited[0]=1;
+        pars[13].limited[1]=0;
+        pars[13].limits[0]=1.1*min_flow_diffusivity;
+       // pars[13].limits[0]=0.00001;
+        pars[13].limits[1]=8.*flow_diffusivity;
+        pars[13].side=0;
+
+
+        for(int j=0;j<size[1];j++)
+        {
+            ind3[1]=j;
+            for(int i=0;i<size[0];i++)
+            {
+                ind3[0]=i;
+
+                if(mask_img && mask_img->GetPixel(ind3)==0)
+                    continue;
+
+                std::vector<int> curr_all_indices;
+                if(this->weight_imgs.size())
+                {
+                    for(int v=0;v<all_indices.size();v++)
+                    {
+                        int vol_id= all_indices[v];
+                        if(this->weight_imgs[vol_id]->GetPixel(ind3)>0)
+                            curr_all_indices.push_back(vol_id);
+                    }
+                }
+                else
+                {
+                    curr_all_indices=all_indices;
+                }
+
+                vnl_vector<double> signal(curr_all_indices.size());
+                vnl_vector<double> weights(curr_all_indices.size(),1.);
+
+                vnl_matrix<double> curr_design_matrix(curr_all_indices.size(),7);
+                for(int vol=0;vol<curr_all_indices.size();vol++)
+                {
+                    int vol_id= curr_all_indices[vol];
+                    double nval = dwi_data[vol_id]->GetPixel(ind3);
+                    if(nval <=0)
+                    {
+                        std::vector<float> data_for_median;
+                        std::vector<float> noise_for_median;
+
+                        ImageType3D::IndexType newind;
+                        newind[2]=k;
+
+                        for(int i2= std::max(i-1,0);i2<=std::min(i+1,(int)size[0]-1);i2++)
+                        {
+                            newind[0]=i2;
+                            for(int j2= std::max(j-1,0);j2<=std::min(j+1,(int)size[1]-1);j2++)
+                            {
+                                newind[1]=j2;
+
+                                float newval= dwi_data[vol_id]->GetPixel(newind);
+                                if(newval >0)
+                                {
+                                    data_for_median.push_back(newval);
+                                }
+                            }
+                        }
+
+                        if(data_for_median.size())
+                        {
+                            nval=median(data_for_median);
+                        }
+                        else
+                        {
+                            nval= 1E-3;
+                        }
+                    }
+                    signal[vol] = nval;
+                    if(this->weight_imgs.size())
+                    {
+                        weights[vol] =this->weight_imgs[vol_id]->GetPixel(ind3);
+                    }
+
+                    curr_design_matrix(vol,0)=1;
+                    if(graddev_img.size())
+                    {
+                        vnl_matrix_fixed<double,3,3> L, B;
+                        L(0,0)= 1+graddev_img[0]->GetPixel(ind3); L(0,1)= graddev_img[1]->GetPixel(ind3); L(0,2)= graddev_img[2]->GetPixel(ind3);
+                        L(1,0)= graddev_img[3]->GetPixel(ind3); L(1,1)= 1+graddev_img[4]->GetPixel(ind3); L(1,2)= graddev_img[5]->GetPixel(ind3);
+                        L(2,0)= graddev_img[6]->GetPixel(ind3); L(2,1)= graddev_img[7]->GetPixel(ind3); L(2,2)= 1+graddev_img[8]->GetPixel(ind3);
+
+                        B(0,0)= Bmatrix(vol_id,0); B(0,1)= Bmatrix(vol_id,1)/2;  B(0,2)= Bmatrix(vol_id,2)/2;
+                        B(1,0)= Bmatrix(vol_id,1)/2; B(1,1)= Bmatrix(vol_id,3);  B(1,2)= Bmatrix(vol_id,4)/2;
+                        B(2,0)= Bmatrix(vol_id,2)/2; B(2,1)= Bmatrix(vol_id,4)/2;  B(2,2)= Bmatrix(vol_id,5);
+
+                        B= L * B * L.transpose();
+                        curr_design_matrix(vol,1)= -B(0,0)/1000;
+                        curr_design_matrix(vol,2)= -B(0,1)/1000;
+                        curr_design_matrix(vol,3)= -B(0,2)/1000;
+                        curr_design_matrix(vol,4)= -B(1,1)/1000;
+                        curr_design_matrix(vol,5)= -B(1,2)/1000;
+                        curr_design_matrix(vol,6)= -B(2,2)/1000;
+                    }
+                    else
+                    {
+                        if(voxelwise_Bmatrix.size())
+                        {
+                            curr_design_matrix(vol,1)= -voxelwise_Bmatrix[vol_id][0]->GetPixel(ind3)/1000.;
+                            curr_design_matrix(vol,2)= -voxelwise_Bmatrix[vol_id][1]->GetPixel(ind3)/1000.;
+                            curr_design_matrix(vol,3)= -voxelwise_Bmatrix[vol_id][2]->GetPixel(ind3)/1000.;
+                            curr_design_matrix(vol,4)= -voxelwise_Bmatrix[vol_id][3]->GetPixel(ind3)/1000.;
+                            curr_design_matrix(vol,5)= -voxelwise_Bmatrix[vol_id][4]->GetPixel(ind3)/1000.;
+                            curr_design_matrix(vol,6)= -voxelwise_Bmatrix[vol_id][5]->GetPixel(ind3)/1000.;
+                        }
+                        else
+                        {
+                            curr_design_matrix(vol,1)= -Bmatrix(vol_id,0)/1000.;
+                            curr_design_matrix(vol,2)= -Bmatrix(vol_id,1)/1000.;
+                            curr_design_matrix(vol,3)= -Bmatrix(vol_id,2)/1000.;
+                            curr_design_matrix(vol,4)= -Bmatrix(vol_id,3)/1000.;
+                            curr_design_matrix(vol,5)= -Bmatrix(vol_id,4)/1000.;
+                            curr_design_matrix(vol,6)= -Bmatrix(vol_id,5)/1000.;
+
+                        }
+                    }
+                } //for vol
+
+                DTImageType::PixelType dt_vec= output_img->GetPixel(ind3);
+                p[0]= A0_img->GetPixel(ind3);
+                p[1]= VF_img->GetPixel(ind3);
+
+                for(int pp=2;pp<8;pp++)
+                {
+                    p[pp]= dt_vec[pp-2]*1000.;
+                    if(pars[pp].limited[0])
+                    {
+                        if(p[pp] < pars[pp].limits[0])
+                            p[pp]=pars[pp].limits[0]+0.000001;
+                    }
+                    if(pars[pp].limited[1])
+                    {
+                        if(p[pp] > pars[pp].limits[1])
+                            p[pp]=pars[pp].limits[1]-0.000001;
+                    }
+                }
+                dt_vec=this->flow_tensor_img->GetPixel(ind3);
+                for(int pp=8;pp<14;pp++)
+                {
+                    p[pp]= dt_vec[pp-8]*1000.;
+                    if(pars[pp].limited[0])
+                    {
+                        if(p[pp] < pars[pp].limits[0])
+                            p[pp]=pars[pp].limits[0]+0.000001;
+                    }
+                    if(pars[pp].limited[1])
+                    {
+                        if(p[pp] > pars[pp].limits[1])
+                            p[pp]=pars[pp].limits[1]-0.000001;
+                    }
+                }
+
+
+                vars_struct my_struct;
+                my_struct.useWeights=true;
+
+                mp_result_struct my_results_struct;
+                vnl_vector<double> my_resids(curr_all_indices.size());
+                my_results_struct.resid= my_resids.data_block();
+                my_results_struct.xerror=nullptr;
+                my_results_struct.covar=nullptr;
+                my_struct.signal= &signal;
+                my_struct.weights=&weights;
+                my_struct.Bmat= &curr_design_matrix;
+
+
+                int status = mpfit(myNLLS_t2, curr_design_matrix.rows(), 14, p, pars, &config, (void *) &my_struct, &my_results_struct);
+
+                double degrees_of_freedom= curr_all_indices.size()-14;
+                CS_img->SetPixel(ind3,my_results_struct.bestnorm/degrees_of_freedom);
+
+                A0_img->SetPixel(ind3,p[0]);
+                VF_img->SetPixel(ind3,p[1]);
+
+                dt_vec[0]= p[2]/1000.;
+                dt_vec[1]= p[3]/1000.;
+                dt_vec[2]= p[4]/1000.;
+                dt_vec[3]= p[5]/1000.;
+                dt_vec[4]= p[6]/1000.;
+                dt_vec[5]= p[7]/1000.;
+                output_img->SetPixel(ind3,dt_vec);
+
+                dt_vec[0]= p[8]/1000.;
+                dt_vec[1]= p[9]/1000.;
+                dt_vec[2]= p[10]/1000.;
+                dt_vec[3]= p[11]/1000.;
+                dt_vec[4]= p[12]/1000.;
+                dt_vec[5]= p[13]/1000.;
+                this->flow_tensor_img->SetPixel(ind3,dt_vec);
+
+            } //for i
+        } //for j
+    } //for k
+
+
+
+}
 
 
 
@@ -413,12 +935,6 @@ void DTIModel::EstimateTensorRESTORE()
     } //for k
 */
 }
-
-
-
-
-
-
 
 
 

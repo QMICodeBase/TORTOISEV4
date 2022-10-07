@@ -106,7 +106,7 @@ void EstimateTensorWLLS_PARSER::InitializeCommandLineOptions()
         this->AddOption( option );
     }
     {
-        std::string description = std::string( "Regression mode. Default:NLLS" );
+        std::string description = std::string( "Regression mode. Default:WLLS" );
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "reg_mode");
         option->SetUsageOption(0,"WLLS: Weighted linear least squares");
@@ -114,6 +114,7 @@ void EstimateTensorWLLS_PARSER::InitializeCommandLineOptions()
         option->SetUsageOption(2,"RESTORE: Robust NLLS");
         option->SetUsageOption(3,"DIAG: Diagonal Only NLLS");
         option->SetUsageOption(4,"N2: Full diffusion tensor + free water NLLS");
+        option->SetUsageOption(5,"NT2: One full parenchymal diffusion tensor + one full flow tensor");
         option->SetDescription( description );
         this->AddOption( option );
     }
@@ -144,7 +145,7 @@ std::string EstimateTensorWLLS_PARSER::getRegressionMode()
     if(option->GetNumberOfFunctions())
         return option->GetFunction(0)->GetName();
     else
-       return std::string("NLLS");
+       return std::string("WLLS");
 
 }
 

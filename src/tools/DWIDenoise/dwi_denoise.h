@@ -107,14 +107,20 @@ ImageType4D::Pointer DWIDenoise(ImageType4D::Pointer input_img, ImageType3D::Poi
        k_end= std::min((int)sizes[2]/2 +3,(int)sizes[2]);
    }
 
-   auto stream = (TORTOISE::stream);
 
-   (*stream)<<"Denosing window radius: "<< extent[0]<<std::endl;
+   #ifdef NOTORTOISE
+       std::cout<<"Denosing window radius: "<< extent[0]<<std::endl;
+   #else
+       auto stream = (TORTOISE::stream);
+       (*stream)<<"Denosing window radius: "<< extent[0]<<std::endl;
+   #endif
 
     #pragma omp parallel for
     for(int k=k_start;k<k_end;k++)
     {
+        #ifndef NOTORTOISE
         TORTOISE::EnableOMPThread();
+        #endif
 
         Eigen::MatrixXf X(m,n);
 
@@ -244,7 +250,9 @@ ImageType4D::Pointer DWIDenoise(ImageType4D::Pointer input_img, ImageType3D::Poi
                 noise_img->SetPixel(ind3,sqrt(sigma2));
             }
         }
+        #ifndef NOTORTOISE
         TORTOISE::DisableOMPThread();
+        #endif
     }
 
     long long cnt=0;

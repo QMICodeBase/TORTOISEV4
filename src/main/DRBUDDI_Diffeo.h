@@ -11,6 +11,8 @@
 
 #ifdef USECUDA
     #include "cuda_image.h"
+#else
+    #include "itkImageDuplicator.h"
 #endif
 
 class DRBUDDI_Diffeo
@@ -42,38 +44,97 @@ class DRBUDDI_Diffeo
     ~DRBUDDI_Diffeo(){};
 
 #ifdef USECUDA
-    DisplacementFieldType::Pointer getDefFINV(){return def_FINV->CudaImageToITKField();}
-    DisplacementFieldType::Pointer getDefMINV(){return def_MINV->CudaImageToITKField();}
+    DisplacementFieldType::Pointer getDefFINV()
+    {
+        DisplacementFieldType::Pointer disp=def_FINV->CudaImageToITKField();
+        disp->SetDirection(orig_dir);
+        itk::ImageRegionIterator<DisplacementFieldType> it(disp,disp->GetLargestPossibleRegion());
+        for(it.GoToBegin();!it.IsAtEnd();++it)
+        {
+            DisplacementFieldType::PixelType pix= it.Get();
+            vnl_vector<double> vec=orig_dir.GetVnlMatrix()*new_dir.GetTranspose()* pix.GetVnlVector();
+            pix[0]=vec[0];
+            pix[1]=vec[1];
+            pix[2]=vec[2];
+            it.Set(pix);
+        }
+        return disp;
+
+    }
+
+    DisplacementFieldType::Pointer getDefMINV()
+    {
+        DisplacementFieldType::Pointer disp=def_MINV->CudaImageToITKField();
+        disp->SetDirection(orig_dir);
+        itk::ImageRegionIterator<DisplacementFieldType> it(disp,disp->GetLargestPossibleRegion());
+        for(it.GoToBegin();!it.IsAtEnd();++it)
+        {
+            DisplacementFieldType::PixelType pix= it.Get();
+            vnl_vector<double> vec=orig_dir.GetVnlMatrix()*new_dir.GetTranspose()* pix.GetVnlVector();
+            pix[0]=vec[0];
+            pix[1]=vec[1];
+            pix[2]=vec[2];
+            it.Set(pix);
+        }
+        return disp;
+    }
 
     void SetStructuralImages(std::vector<ImageType3D::Pointer> si)
     {
         for(int i=0;i<si.size();i++)
         {
             CurrentImageType::Pointer str_img=CUDAIMAGE::New();
+            si[i]->SetDirection(new_dir);
             str_img->SetImageFromITK(si[i]);
+            si[i]->SetDirection(orig_dir);
             structural_imgs.push_back(str_img);
         }
     }
 
     void SetB0UpImage(ImageType3D::Pointer img)
     {
+        orig_dir = img->GetDirection();
+        new_dir=orig_dir;
+        for(int r=0;r<3;r++)
+        {
+            for(int c=0;c<3;c++)
+            {
+                if(fabs(orig_dir(r,c))>0.5)
+                {
+                    if(orig_dir(r,c)>0)
+                        new_dir(r,c)=1;
+                    else
+                        new_dir(r,c)=-1;
+                }
+                else
+                    new_dir(r,c)=0;
+            }
+        }
+        img->SetDirection(new_dir);
         this->b0_up_img=CUDAIMAGE::New();
         this->b0_up_img->SetImageFromITK(img);
+        img->SetDirection(orig_dir);
     }
     void SetB0DownImage(ImageType3D::Pointer img)
     {
+        img->SetDirection(new_dir);
         this->b0_down_img=CUDAIMAGE::New();
         this->b0_down_img->SetImageFromITK(img);
+        img->SetDirection(orig_dir);
     }
     void SetFAUpImage(ImageType3D::Pointer img)
     {
+        img->SetDirection(new_dir);
         this->FA_up_img=CUDAIMAGE::New();
         this->FA_up_img->SetImageFromITK(img);
+        img->SetDirection(orig_dir);
     }
     void SetFADownImage(ImageType3D::Pointer img)
     {
+        img->SetDirection(new_dir);
         this->FA_down_img=CUDAIMAGE::New();
         this->FA_down_img->SetImageFromITK(img);
+        img->SetDirection(orig_dir);
     }
     void SetUpPEVector(vnl_vector<double> pe)
     {
@@ -84,14 +145,111 @@ class DRBUDDI_Diffeo
         down_phase_vector.x=pe[0];down_phase_vector.y=pe[1];down_phase_vector.z=pe[2];
     }
 #else
-    DisplacementFieldType::Pointer getDefFINV(){return def_FINV;}
-    DisplacementFieldType::Pointer getDefMINV(){return def_MINV;}
+    DisplacementFieldType::Pointer getDefFINV()
+    {
+        DisplacementFieldType::Pointer disp=def_FINV;
+        disp->SetDirection(orig_dir);
+        itk::ImageRegionIterator<DisplacementFieldType> it(disp,disp->GetLargestPossibleRegion());
+        for(it.GoToBegin();!it.IsAtEnd();++it)
+        {
+            DisplacementFieldType::PixelType pix= it.Get();
+            vnl_vector<double> vec=orig_dir.GetVnlMatrix()*new_dir.GetTranspose()* pix.GetVnlVector();
+            pix[0]=vec[0];
+            pix[1]=vec[1];
+            pix[2]=vec[2];
+            it.Set(pix);
+        }
+        return disp;
+    }
+    DisplacementFieldType::Pointer getDefMINV()
+    {
+        DisplacementFieldType::Pointer disp=def_MINV;
+        disp->SetDirection(orig_dir);
+        itk::ImageRegionIterator<DisplacementFieldType> it(disp,disp->GetLargestPossibleRegion());
+        for(it.GoToBegin();!it.IsAtEnd();++it)
+        {
+            DisplacementFieldType::PixelType pix= it.Get();
+            vnl_vector<double> vec=orig_dir.GetVnlMatrix()*new_dir.GetTranspose()* pix.GetVnlVector();
+            pix[0]=vec[0];
+            pix[1]=vec[1];
+            pix[2]=vec[2];
+            it.Set(pix);
+        }
+        return disp;
+    }
 
-    void SetB0UpImage(ImageType3D::Pointer img){b0_up_img=img;}
-    void SetB0DownImage(ImageType3D::Pointer img){b0_down_img=img;}
-    void SetFAUpImage(ImageType3D::Pointer img){ImageType3D::Pointer FA_up_img=img;}
-    void SetFADownImage(ImageType3D::Pointer img){ImageType3D::Pointer FA_down_img=img;}
-    void SetStructuralImages(std::vector<ImageType3D::Pointer> si){structural_imgs=si;}
+    void SetB0UpImage(ImageType3D::Pointer img2)
+    {
+        orig_dir = img2->GetDirection();
+        new_dir=orig_dir;
+        for(int r=0;r<3;r++)
+        {
+            for(int c=0;c<3;c++)
+            {
+                if(fabs(orig_dir(r,c))>0.5)
+                {
+                    if(orig_dir(r,c)>0)
+                        new_dir(r,c)=1;
+                    else
+                        new_dir(r,c)=-1;
+                }
+                else
+                    new_dir(r,c)=0;
+            }
+        }
+        typedef itk::ImageDuplicator<ImageType3D> DupType;
+        DupType::Pointer dup= DupType::New();
+        dup->SetInputImage(img2);
+        dup->Update();
+        ImageType3D::Pointer img= dup->GetOutput();
+        img->SetDirection(new_dir);
+
+        b0_up_img=img;
+    }
+    void SetB0DownImage(ImageType3D::Pointer img2)
+    {
+        typedef itk::ImageDuplicator<ImageType3D> DupType;
+        DupType::Pointer dup= DupType::New();
+        dup->SetInputImage(img2);
+        dup->Update();
+        ImageType3D::Pointer img= dup->GetOutput();
+        img->SetDirection(new_dir);
+        b0_down_img=img;
+    }
+    void SetFAUpImage(ImageType3D::Pointer img2)
+    {
+        typedef itk::ImageDuplicator<ImageType3D> DupType;
+        DupType::Pointer dup= DupType::New();
+        dup->SetInputImage(img2);
+        dup->Update();
+        ImageType3D::Pointer img= dup->GetOutput();
+        img->SetDirection(new_dir);
+        FA_up_img=img;
+    }
+    void SetFADownImage(ImageType3D::Pointer img2)
+    {
+        typedef itk::ImageDuplicator<ImageType3D> DupType;
+        DupType::Pointer dup= DupType::New();
+        dup->SetInputImage(img2);
+        dup->Update();
+        ImageType3D::Pointer img= dup->GetOutput();
+        img->SetDirection(new_dir);
+        FA_down_img=img;
+    }
+    void SetStructuralImages(std::vector<ImageType3D::Pointer> si)
+    {
+        structural_imgs=si;
+        for(int s=0;s<structural_imgs.size();s++ )
+        {
+            typedef itk::ImageDuplicator<ImageType3D> DupType;
+            DupType::Pointer dup= DupType::New();
+            dup->SetInputImage(si[s]);
+            dup->Update();
+            ImageType3D::Pointer img= dup->GetOutput();
+            img->SetDirection(new_dir);
+            structural_imgs[s]=img;
+        }
+    }
 
     void SetUpPEVector(vnl_vector<double> pe) {up_phase_vector=pe;}
     void SetDownPEVector(vnl_vector<double> pe) {down_phase_vector=pe;}
@@ -149,6 +307,8 @@ private:          //class member variables
     DRBUDDI_PARSERBASE *parser{nullptr};
 
     PhaseEncodingVectorType up_phase_vector, down_phase_vector;
+
+    ImageType3D::DirectionType orig_dir,new_dir;
 
 
 };

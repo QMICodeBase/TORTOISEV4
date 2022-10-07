@@ -45,6 +45,7 @@ public:
     cudaPitchedPtr getFloatdata(){return PitchedFloatData;};
 
     void SetFloatDataPointer( cudaPitchedPtr data){PitchedFloatData=data;};
+    ImageType3D::DirectionType GetDirection(){return dir;};
 
     void Allocate();
 

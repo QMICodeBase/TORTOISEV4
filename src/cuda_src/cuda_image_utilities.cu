@@ -762,6 +762,18 @@ UpdateInvertField_kernel( cudaPitchedPtr composed_field, cudaPitchedPtr scale_im
     }
 }
 
+void  NegateField_cuda(cudaPitchedPtr field, const int3 data_sz)
+{
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    
+    NegateImage_kernel<<< blockSize,gridSize>>>(field,data_sz,3);
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+  
+
+
+}
 
 void InvertField_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 data_spc,
                       float data_d00,  float data_d01,float data_d02,float data_d10,float data_d11,float data_d12,float data_d20,float data_d21,float data_d22,

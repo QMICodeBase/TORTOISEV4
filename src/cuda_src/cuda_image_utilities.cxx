@@ -61,7 +61,38 @@ CUDAIMAGE::Pointer ComposeFields(CUDAIMAGE::Pointer main_field, CUDAIMAGE::Point
 
 }
 
+ CUDAIMAGE::Pointer NegateField(CUDAIMAGE::Pointer field)
+ {
+    cudaPitchedPtr d_output={0};
 
+    cudaExtent extent =  make_cudaExtent(field->components_per_voxel*sizeof(float)*field->sz.x,field->sz.y,field->sz.z);
+    cudaMalloc3D(&d_output, extent);
+
+
+        cudaMemcpy3DParms copyParams = {0};
+        copyParams.srcPtr   = field->getFloatdata();
+        copyParams.dstPtr = d_output;
+        copyParams.extent   = extent;
+        copyParams.kind     = cudaMemcpyDeviceToDevice;
+        cudaMemcpy3D(&copyParams);
+
+
+        NegateField_cuda(d_output,  field->sz);
+
+
+
+    CUDAIMAGE::Pointer output = CUDAIMAGE::New();
+    output->sz=field->sz;
+    output->dir=field->dir;
+    output->orig=field->orig;
+    output->spc=field->spc;
+    output->components_per_voxel= field->components_per_voxel;
+    output->SetFloatDataPointer( d_output);
+    return output;
+
+
+ 
+ }
 
  CUDAIMAGE::Pointer InvertField(CUDAIMAGE::Pointer field,CUDAIMAGE::Pointer initial_estimate)
 {

@@ -230,11 +230,10 @@ int main( int argc , char * argv[] )
     }
 
 
-    ImageType3D::Pointer li_map= compute_li_map(image4D,A0_image);
+    ImageType3D::Pointer li_map=nullptr;
+    if(!parser->getUseFA())
+        li_map=compute_li_map(image4D,A0_image);
 
-
-    
-    
 
     
     typedef itk::RGBPixel< unsigned char > RGBPixelType;
@@ -308,7 +307,18 @@ int main( int argc , char * argv[] )
                 
                 vnl_symmetric_eigensystem<double>  eig(curr_tens);
 
-                double LI= li_map->GetPixel(ind);
+                double LI=0;
+                if(li_map)
+                    LI=li_map->GetPixel(ind);
+                else
+                {
+                    double mn = (eig.D(0,0)+ eig.D(1,1)+ eig.D(2,2))/3.;
+                    double nom = (eig.D(0,0)-mn)*(eig.D(0,0)-mn)+ (eig.D(1,1)-mn)*(eig.D(1,1)-mn)+(eig.D(2,2)-mn)*(eig.D(2,2)-mn);
+                    double denom= eig.D(0,0)*eig.D(0,0)+eig.D(1,1)*eig.D(1,1)+eig.D(2,2)*eig.D(2,2);
+
+                    if(denom!=0)
+                        LI= sqrt( 1.5*nom/denom);
+                }
 
 
                 double scal= (LI-color_lattmin)/(color_lattmax-color_lattmin);

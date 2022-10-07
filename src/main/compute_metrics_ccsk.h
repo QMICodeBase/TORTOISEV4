@@ -6,7 +6,7 @@
 
 #define LIMCCSK (1E-5)
 #define WIN_RAD 4
-//#define WIN_RAD_Z 2
+#define WIN_RAD_Z 2
 
 float  ComputeUpdateCCSK(ImageType3D::IndexType index, ImageType3D::Pointer up_img, ImageType3D::Pointer down_img,
                           ImageType3D::Pointer K_img, ImageType3D::Pointer str_img,
@@ -47,8 +47,8 @@ float  ComputeUpdateCCSK(ImageType3D::IndexType index, ImageType3D::Pointer up_i
     double sumc = 0.0;
     int N=0;
 
-    float valK_center=K_img->GetPixel(index);
-    float valS_center=str_img->GetPixel(index);;
+    double valK_center=K_img->GetPixel(index);
+    double valS_center=str_img->GetPixel(index);;
        
     
     ImageType3D::IndexType cind;
@@ -80,44 +80,44 @@ float  ComputeUpdateCCSK(ImageType3D::IndexType index, ImageType3D::Pointer up_i
     double Kmean = suma/N;
     double Smean= sumc/N;
 
-    float valK = valK_center-Kmean;
-    float valS = valS_center -Smean;
+    double valK = valK_center-Kmean;
+    double valS = valS_center -Smean;
 
-    float sKK = suma2 - Kmean*suma;
-    float sSS = sumc2 - Smean*sumc;
-    float sKS = sumac - Kmean*sumc;
+    double sKK = suma2 - Kmean*suma;
+    double sSS = sumc2 - Smean*sumc;
+    double sKS = sumac - Kmean*sumc;
 
 
-    float sSS_sKK = sSS * sKK;
+    double sSS_sKK = sSS * sKK;
 
-    float val=0;
+    double val=0;
     if(fabs(sSS_sKK) > LIMCCSK && fabs(sKK) > LIMCCSK )
     {
         val= -sKS*sKS/ sSS_sKK;
 
-        float first_term= -2*sKS/sSS_sKK *(valS - sKS/sKK*valK);
-        float fval = up_img->GetPixel(index);
-        float mval = down_img->GetPixel(index);
+        double first_term= -2*sKS/sSS_sKK *(valS - sKS/sKK*valK);
+        double fval = up_img->GetPixel(index);
+        double mval = down_img->GetPixel(index);
 
-        float sm_mval_fval=(mval+fval);
+        double sm_mval_fval=(mval+fval);
 
         if(sm_mval_fval*sm_mval_fval > LIMCCSK)
         {
             {
-                float grad_term =2* mval*mval/sm_mval_fval/sm_mval_fval;
+                double grad_term =first_term*2* mval*mval/sm_mval_fval/sm_mval_fval;
                 DisplacementFieldType::PixelType gradI2= ComputeImageGradient(up_img,index);
 
-                updateF[0]= first_term*grad_term * gradI2[0];
-                updateF[1]= first_term*grad_term * gradI2[1];
-                updateF[2]= first_term*grad_term * gradI2[2];
+                updateF[0]= grad_term * gradI2[0];
+                updateF[1]= grad_term * gradI2[1];
+                updateF[2]= grad_term * gradI2[2];
             }
             {
-                float grad_term= 2* fval*fval/sm_mval_fval/sm_mval_fval;
+                double grad_term= first_term*2* fval*fval/sm_mval_fval/sm_mval_fval;
                 DisplacementFieldType::PixelType gradJ2= ComputeImageGradient(down_img,index);
 
-                updateM[0]= first_term*grad_term * gradJ2[0];
-                updateM[1]= first_term*grad_term * gradJ2[1];
-                updateM[2]= first_term*grad_term * gradJ2[2];
+                updateM[0]= grad_term * gradJ2[0];
+                updateM[1]= grad_term * gradJ2[1];
+                updateM[2]= grad_term * gradJ2[2];
             }
         }
     }
@@ -165,16 +165,16 @@ float ComputeMetric_CCSK(const ImageType3D::Pointer up_img, const ImageType3D::P
     KImage->SetOrigin(up_img->GetOrigin());
     KImage->SetDirection(up_img->GetDirection());
     KImage->FillBuffer(0);
-                   
+
     
     itk::ImageRegionIteratorWithIndex<ImageType3D> it(KImage,KImage->GetLargestPossibleRegion());
     it.GoToBegin();
     while(!it.IsAtEnd())
     {
         ImageType3D::IndexType ind3= it.GetIndex();
-        float a= up_img->GetPixel(ind3);
-        float b= down_img->GetPixel(ind3);
-        float a_b= a+b;
+        double a= up_img->GetPixel(ind3);
+        double b= down_img->GetPixel(ind3);
+        double a_b= a+b;
         if(a_b>LIMCCSK)
             it.Set(2*a*b/a_b);
 

@@ -48,6 +48,8 @@ DRBUDDI::DRBUDDI(std::string uname,std::string dname,std::vector<std::string> st
     if(this->proc_folder=="")
         this->proc_folder="./";
 
+
+
 #ifdef DRBUDDIALONE
     this->stream= &(std::cout);
 #else
@@ -60,8 +62,10 @@ DRBUDDI::DRBUDDI(std::string uname,std::string dname,std::vector<std::string> st
 
 void DRBUDDI::Process()
 {
-    Step0_CreateImages();
-    Step1_RigidRegistration();
+    if(parser->getDRBUDDIStep()==0)
+        Step0_CreateImages();
+    if(parser->getDRBUDDIStep()<=1)
+        Step1_RigidRegistration();
     Step2_DiffeoRegistration();
     Step3_WriteOutput();
 }
@@ -347,6 +351,7 @@ void DRBUDDI::Step1_RigidRegistration()
                 if(it.Get()<0)
                     it.Set(0);
             }
+            writeImageD<ImageType3D>(this->FA_up_quad,proc_folder+"/blip_up_FA_quad.nii");
         }
         {
             ResampleImageFilterType::Pointer resampleFilter3 = ResampleImageFilterType::New();
@@ -363,6 +368,7 @@ void DRBUDDI::Step1_RigidRegistration()
                 if(it.Get()<0)
                     it.Set(0);
             }
+            writeImageD<ImageType3D>(this->FA_down_quad,proc_folder+"/blip_down_FA_quad.nii");
 
 
         }
@@ -415,6 +421,11 @@ void DRBUDDI::Step2_DiffeoRegistration()
     this->b0_down=readImageD<ImageType3D>(proc_folder+"/blip_down_b0.nii");
     this->b0_up_quad=readImageD<ImageType3D>(proc_folder+"/blip_up_b0_quad.nii");
     this->b0_down_quad=readImageD<ImageType3D>(proc_folder+"/blip_down_b0_quad.nii");
+    if(fs::exists(proc_folder+"/blip_up_FA_quad.nii"))
+        this->FA_up_quad=readImageD<ImageType3D>(proc_folder+"/blip_up_FA_quad.nii");
+    if(fs::exists(proc_folder+"/blip_down_FA_quad.nii"))
+        this->FA_down_quad=readImageD<ImageType3D>(proc_folder+"/blip_down_FA_quad.nii");
+
 
     int Nstr= parser->getNumberOfStructurals();
     for(int str=0;str<Nstr;str++)
@@ -480,7 +491,7 @@ void DRBUDDI::Step3_WriteOutput()
         DisplacementFieldTransformType::Pointer trans = DisplacementFieldTransformType::New();
         trans->SetDisplacementField(this->def_FINV);
         ResampleImageFilterType::Pointer resampleFilter3 = ResampleImageFilterType::New();
-        resampleFilter3->SetOutputParametersFromImage(this->b0_up_quad);;
+        resampleFilter3->SetOutputParametersFromImage(this->b0_up_quad);
         resampleFilter3->SetInput(this->b0_up_quad);
         resampleFilter3->SetTransform(trans);
         resampleFilter3->Update();
@@ -518,10 +529,10 @@ void DRBUDDI::Step3_WriteOutput()
     writeImageD<ImageType3D>(b0_up_corrected,proc_folder+"/b0_corrected_final.nii");
 
 
-    ImageType3D::Pointer b0_up_corrected_JAC= JacobianTransformImage(b0_up_quad,def_FINV, b0_up_quad);
-    writeImageD<ImageType3D>(b0_up_corrected_JAC,proc_folder+"/blip_up_b0_corrected_JAC.nii");
-    ImageType3D::Pointer b0_down_corrected_JAC= JacobianTransformImage(b0_down_quad,def_MINV, b0_up_quad);
-    writeImageD<ImageType3D>(b0_down_corrected_JAC,proc_folder+"/blip_down_b0_corrected_JAC.nii");
+   // ImageType3D::Pointer b0_up_corrected_JAC= JacobianTransformImage(b0_up_quad,def_FINV, b0_up_quad);
+   // writeImageD<ImageType3D>(b0_up_corrected_JAC,proc_folder+"/blip_up_b0_corrected_JAC.nii");
+   // ImageType3D::Pointer b0_down_corrected_JAC= JacobianTransformImage(b0_down_quad,def_MINV, b0_up_quad);
+   // writeImageD<ImageType3D>(b0_down_corrected_JAC,proc_folder+"/blip_down_b0_corrected_JAC.nii");
 
 
 }

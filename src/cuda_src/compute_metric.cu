@@ -703,7 +703,7 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
 
 
     cudaPitchedPtr metric_image={0};
-    cudaExtent extent =  make_cudaExtent(1*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
+    cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
     cudaMemset3D(metric_image,0,extent);
 
@@ -1062,7 +1062,6 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 }
 
 
-
 void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 		   int3 data_sz, float3 data_spc, 
 		   float d00,float d01,float d02,float d10,float d11,float d12,float d20,float d21,float d22,
@@ -1082,7 +1081,7 @@ void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
 
     cudaPitchedPtr metric_image={0};
-    cudaExtent extent =  make_cudaExtent(1*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
+    cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
     cudaMemset3D(metric_image,0,extent);
 
@@ -1375,7 +1374,8 @@ void ComputeMetric_CCSK_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cud
     gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
 
     cudaPitchedPtr metric_image={0};
-    cudaExtent extent =  make_cudaExtent(1*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
+    //cudaExtent extent =  make_cudaExtent(1*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
+    cudaExtent extent =  make_cudaExtent(1*up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
     cudaMemset3D(metric_image,0,extent);
 
@@ -1595,7 +1595,7 @@ void ComputeMetric_CC_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
 
     cudaPitchedPtr metric_image={0};
-    cudaExtent extent =  make_cudaExtent(1*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
+    cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
     cudaMemset3D(metric_image,0,extent);
 

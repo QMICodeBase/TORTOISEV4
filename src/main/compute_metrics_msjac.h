@@ -10,7 +10,7 @@
 
 
 
-double mf(double det)
+inline double mf(double det)
 {
     double logd = log(det);
     double ly = logd / (sqrt(1+0.2*logd*logd));
@@ -19,7 +19,7 @@ double mf(double det)
 }
 
 
-double dmf(double x)
+inline double dmf(double x)
 {
     double y= mf(x);
     double lx= log(x);

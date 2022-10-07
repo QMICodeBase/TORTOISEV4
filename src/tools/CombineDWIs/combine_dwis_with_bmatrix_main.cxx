@@ -25,8 +25,11 @@ int main(int argc, char *argv[])
     }
 
     fs::path output_path(output_name);
-    if(!fs::exists(output_path.parent_path()))
-            fs::create_directories(output_path.parent_path());
+    std::string pp=output_path.parent_path().string();
+    if(pp=="")
+        pp="./";
+    if(!fs::exists(pp))
+            fs::create_directories(pp);
 
     int tot_Nvols=0;
     for(int ni=0;ni<Nimgs;ni++)

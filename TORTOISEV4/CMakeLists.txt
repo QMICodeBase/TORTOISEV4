@@ -3,11 +3,12 @@ cmake_minimum_required(VERSION 3.20)
 PROJECT(TORTOISEV4  )
 
 SET(USEOPENMP 1)
-
+  # SET(CMAKE_BUILD_TYPE Debug)
+  #  SET(ISDEBUG 1)
 
 
 if ( NOT DEFINED USECUDA)
-    SET(USECUDA 0)
+    SET(USECUDA 1)
 endif()
 if ( NOT DEFINED USE_VTK)
     SET(USE_VTK 0)
@@ -41,6 +42,8 @@ message(${CMAKE_BINARY_DIR})
 set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin/)
 set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin/lib/ )
 set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin/lib/ )
+
+
 
 
 IF(USEOPENMP)
@@ -173,8 +176,9 @@ ENDIF(USECUDA)
     target_link_libraries(CreateMask ${ITK_LIBRARIES}  ${Boost_LIBRARIES} ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a )
 
 
+
 add_executable(EstimateTensor   ../src/tools/EstimateTensor/estimate_tensor_wlls_main.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateTensor/estimate_tensor_wlls_parser.cxx  ${SOURCES})
-target_link_libraries(EstimateTensor ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+target_link_libraries(EstimateTensor ${ITK_LIBRARIES} ${Boost_LIBRARIES} ${LIBS})
 target_compile_definitions(EstimateTensor PUBLIC -DNOTORTOISE)
 
 
@@ -227,15 +231,6 @@ target_link_libraries(IsDirectionPositiveDet ${ITK_LIBRARIES} ${Boost_LIBRARIES}
 
 
 
-
-
-
-
-
-
-
-
-
 add_executable(ExtractImage ../src/tools/ExtractImage/extract_image.cxx  ../src/tools/ExtractImage/extract_image_parser.cxx ${SOURCES} )
 target_link_libraries(ExtractImage ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
@@ -254,6 +249,7 @@ target_link_libraries(SynthesizeDWIsFromMAPMRI ${ITK_LIBRARIES} ${Boost_LIBRARIE
 
 add_executable(DWIDenoise ../src/tools/DWIDenoise/dwi_denoise.cxx ${SOURCES} )
 target_link_libraries(DWIDenoise ${ITK_LIBRARIES} ${Boost_LIBRARIES} Eigen3::Eigen)
+target_compile_definitions(DWIDenoise PUBLIC -DNOTORTOISE)
 
 
 #add_executable(ConvertParametersToDefFields ../src/tools/ConvertParametersToDefFields/convert_parameters_to_def_fields_parser.cxx ../src/tools/ConvertParametersToDefFields/convert_parameters_to_def_fields.cxx ${SOURCES})

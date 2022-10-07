@@ -138,26 +138,39 @@ void DIFFPREP::GetSmallBigDelta(float &small_delta,float &big_delta)
     vnl_vector<double> bvals = Bmatrix.get_column(0) + Bmatrix.get_column(3)+ Bmatrix.get_column(5);
     double max_bval= bvals.max_value();
 
+
+    float bd= RegistrationSettings::get().getValue<float>("big_delta");
+    float sd= RegistrationSettings::get().getValue<float>("small_delta");
+
     if(my_json["BigDelta"]==json::value_t::null || my_json["SmallDelta"]==json::value_t::null)
     {
         //If the small and big deltas are unknown, just make a guesstimate
         //using the max bvalue and assumed gradient strength
 
-        double gyro= 267.51532*1E6;
-        double G= 40*1E-3;  //well most scanners are either 40 mT/m or 80mT/m.
-        if(my_json["ManufacturersModelName"]!=json::value_t::null)
+        if(bd!=0 && sd!=0)
         {
-            std::string scanner_model=my_json["ManufacturersModelName"];
-            if(scanner_model.find("Prisma")!=std::string::npos)
-                G= 80*1E-3;
+            big_delta=bd;
+            small_delta=sd;
+        }
+        else
+        {
+            double gyro= 267.51532*1E6;
+            double G= 40*1E-3;  //well most scanners are either 40 mT/m or 80mT/m.
+            if(my_json["ManufacturersModelName"]!=json::value_t::null)
+            {
+                std::string scanner_model=my_json["ManufacturersModelName"];
+                if(scanner_model.find("Prisma")!=std::string::npos)
+                    G= 80*1E-3;
+            }
+
+            double temp= max_bval/gyro/gyro/G/G/2.*1E6;
+
+            // assume that big_delta = 3 * small_delta
+            // deltas are in miliseconds
+            small_delta= pow(temp,1./3.)*1000.;
+            big_delta= small_delta*3;
         }
 
-        double temp= max_bval/gyro/gyro/G/G/2.*1E6;
-
-        // assume that big_delta = 3 * small_delta
-        // deltas are in miliseconds
-        small_delta= pow(temp,1./3.)*1000.;
-        big_delta= small_delta*3;
         my_json["BigDelta"]= big_delta;
         my_json["SmallDelta"]= small_delta;
 
@@ -228,10 +241,42 @@ typename ImageType::Pointer DIFFPREP::ChangeImageHeaderToDP(typename ImageType::
     }
     else
     {
-        //Make the rotation and eddy center the image center voxel.
-        new_orig[0]=   - ((int)(img->GetLargestPossibleRegion().GetSize()[0])-1)/2. * img->GetSpacing()[0];
-        new_orig[1]=   - ((int)(img->GetLargestPossibleRegion().GetSize()[1])-1)/2. * img->GetSpacing()[1];
-        new_orig[2]=   - ((int)(img->GetLargestPossibleRegion().GetSize()[2])-1)/2. * img->GetSpacing()[2];
+        if(rot_center=="center_voxel")
+        {
+            //Make the rotation and eddy center the image center voxel.
+            new_orig[0]=   - ((int)(img->GetLargestPossibleRegion().GetSize()[0])-1)/2. * img->GetSpacing()[0];
+            new_orig[1]=   - ((int)(img->GetLargestPossibleRegion().GetSize()[1])-1)/2. * img->GetSpacing()[1];
+            new_orig[2]=   - ((int)(img->GetLargestPossibleRegion().GetSize()[2])-1)/2. * img->GetSpacing()[2];
+        }
+        else
+        {
+            //center_slice
+            vnl_matrix<double> Sinv(3,3,0);
+            Sinv(0,0)= 1./img->GetSpacing()[0];
+            Sinv(1,1)= 1./img->GetSpacing()[1];
+            Sinv(2,2)= 1./img->GetSpacing()[2];
+            vnl_matrix<double> S(3,3,0);
+            S(0,0)= img->GetSpacing()[0];
+            S(1,1)= img->GetSpacing()[1];
+            S(2,2)= img->GetSpacing()[2];
+
+
+            vnl_vector<double> center_voxel_index(3,0);
+            center_voxel_index[0]= ((int)(img->GetLargestPossibleRegion().GetSize()[0])-1)/2.;
+            center_voxel_index[1]= ((int)(img->GetLargestPossibleRegion().GetSize()[1])-1)/2.;
+            center_voxel_index[2]= ((int)(img->GetLargestPossibleRegion().GetSize()[2])-1)/2.;
+
+            vnl_vector<double> center_voxel_point = img->GetDirection().GetVnlMatrix()*S*center_voxel_index + img->GetOrigin().GetVnlVector();
+
+            vnl_vector<double> center_point(3,0);
+            center_point[2]= center_voxel_point[2];
+
+            vnl_vector<double> indo= Sinv*img->GetDirection().GetTranspose() * (center_voxel_point- img->GetOrigin().GetVnlVector());   //this is the continuous index (i,j,k) of the isocenter
+            vnl_vector<double> new_orig_v= -S*indo;
+            new_orig[0]=new_orig_v[0];
+            new_orig[1]=new_orig_v[1];
+            new_orig[2]=new_orig_v[2];
+        }
 
     }
     nimg->SetOrigin(new_orig);
@@ -445,6 +490,7 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
     ImageType3D::Pointer target_zero=ChangeImageHeaderToDP<ImageType3D>(target_imgs[0]);
 
      (*stream)<<"Done registering vol: " <<std::flush;
+
 
 #ifdef USECUDA
     #pragma omp parallel for schedule(dynamic)
@@ -1102,7 +1148,6 @@ void DIFFPREP::MotionAndEddy()
 
 
 
-
     ///////////////////////////// FIRST PASS ///////////////////////////////////////////
      if(iterative)
          (*stream)<<"Performing FIRST PASS of iterative correction..."<<std::endl<<std::endl;
@@ -1540,7 +1585,7 @@ void DIFFPREP::WriteOutputFiles()
     trans_text_file.close();
 
 
-    if(this->eddy_s2v_replaced_synth_dwis.size())
+    if(this->eddy_s2v_replaced_synth_dwis.size() && outlier_replacement)
     {
         ImageType3D::SizeType sz= this->eddy_s2v_replaced_synth_dwis[0]->GetLargestPossibleRegion().GetSize();
 
@@ -1772,7 +1817,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::TransformRepolData(std::string nii_f
     {
         if(correction_mode!="off")
         {
-            #pragma omp parallel for
+        //    #pragma omp parallel for
             for(int vol=0;vol<Nvols;vol++)
             {
                 TORTOISE::EnableOMPThread();
@@ -1975,7 +2020,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::TransformRepolData(std::string nii_f
     vnl_matrix_fixed<double,3,3> id_dir;
     id_dir.set_identity();
 
-    rot_Bmatrix= RotateBMatrix(this->Bmatrix,this->dwi_transforms,id_dir);
+    rot_Bmatrix= RotateBMatrix(this->Bmatrix,this->dwi_transforms,id_dir,id_dir);
     return final_data;
 }
 

@@ -16,6 +16,9 @@
 */
 
 
+ CUDAIMAGE::Pointer NegateField(CUDAIMAGE::Pointer field);
+ void  NegateField_cuda(cudaPitchedPtr field, const int3 data_sz);
+
 void ScaleUpdateField(CUDAIMAGE::Pointer  field,float scale_factor);
 void ScaleUpdateField_cuda(cudaPitchedPtr data, int3 data_sz,float3 data_res,float scale_factor);
 

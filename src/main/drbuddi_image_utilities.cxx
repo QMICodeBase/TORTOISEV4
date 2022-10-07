@@ -108,7 +108,7 @@ ImageType3D::Pointer WarpImage(ImageType3D::Pointer img, DisplacementFieldType::
 {
     DisplacementFieldTransformType::Pointer trans= DisplacementFieldTransformType::New();
     trans->SetDisplacementField(field);
-    
+
     using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
     ResampleImageFilterType::Pointer resampleFilter2 = ResampleImageFilterType::New();
     resampleFilter2->SetOutputParametersFromImage(img);
@@ -123,17 +123,20 @@ ImageType3D::Pointer WarpImage(ImageType3D::Pointer img, DisplacementFieldType::
 DisplacementFieldType::PixelType ComputeImageGradient(ImageType3D::Pointer img,  ImageType3D::IndexType &index)
 {
     DisplacementFieldType::PixelType grad,grad2;
-    ImageType3D::SpacingType spc=img->GetSpacing();
-    ImageType3D::DirectionType dir=img->GetDirection();
+    grad[0]=0;
+    grad[1]=0;
+    grad[2]=0;
 
     if(index[0]==0 || index[0]== img->GetLargestPossibleRegion().GetSize()[0]-1 || index[1]==0 || index[1]== img->GetLargestPossibleRegion().GetSize()[1]-1 || index[2]==0 || index[2]== img->GetLargestPossibleRegion().GetSize()[2]-1 )
         return grad;
+
+    const ImageType3D::SpacingType &spc=img->GetSpacing();
+    const ImageType3D::DirectionType &dir=img->GetDirection();
 
     ImageType3D::IndexType nIndex=index;
         
     for(int d=0;d<3;d++)
     {
-        grad[d]=0;
         nIndex[d]++;
         grad[d]= img->GetPixel(nIndex);
         nIndex[d]-=2;
@@ -306,7 +309,7 @@ void ContrainDefFields(DisplacementFieldType::Pointer  field1, DisplacementField
 }
 
 DisplacementFieldType::Pointer ComposeFields(DisplacementFieldType::Pointer  field,DisplacementFieldType::Pointer  updateField)
-{
+{   
     using ComposerType = itk::ComposeDisplacementFieldsImageFilter<DisplacementFieldType>;
 
     typename ComposerType::Pointer fixedComposer = ComposerType::New();
