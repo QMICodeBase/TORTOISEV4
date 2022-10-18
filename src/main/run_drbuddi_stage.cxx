@@ -420,17 +420,6 @@ void DRBUDDIStage::PreprocessImagesAndFields()
 
     }
 
-    #ifdef USECUDA
-    for(int m=0;m<this->settings->metrics.size();m++)
-    {
-        if(resampled_smoothed_up_images[m]->getFloatdata().ptr !=nullptr)
-            resampled_smoothed_up_images[m]->CreateTexture();
-
-        if(resampled_smoothed_down_images[m]->getFloatdata().ptr !=nullptr)
-            resampled_smoothed_down_images[m]->CreateTexture();
-    }
-    #endif
-
 
 }
 
@@ -464,7 +453,52 @@ void DRBUDDIStage::RunDRBUDDIStage()
     m_clock.Start();
 
 
-    float first_MSJac_met=1E10;
+
+    std::vector<std::vector<CurrentImageType::Pointer> > up_img_gradient, down_img_gradient;
+    up_img_gradient.resize(Nmetrics);
+    down_img_gradient.resize(Nmetrics);
+    for(int m=0;m<Nmetrics;m++)
+    {
+        {
+            std::vector<CurrentImageType::Pointer> tempf = ComputeImageGradientImg(this->resampled_smoothed_up_images[m]);
+
+            CurrentImageType::Pointer tempx = tempf[0];
+            CurrentImageType::Pointer tempy = tempf[1];
+            CurrentImageType::Pointer tempz = tempf[2];
+            up_img_gradient[m].push_back(tempx);
+            up_img_gradient[m].push_back(tempy);
+            up_img_gradient[m].push_back(tempz);
+        }
+        {
+            std::vector<CurrentImageType::Pointer> tempf = ComputeImageGradientImg(this->resampled_smoothed_down_images[m]);
+            CurrentImageType::Pointer tempx = tempf[0];
+            CurrentImageType::Pointer tempy = tempf[1];
+            CurrentImageType::Pointer tempz = tempf[2];
+            down_img_gradient[m].push_back(tempx);
+            down_img_gradient[m].push_back(tempy);
+            down_img_gradient[m].push_back(tempz);
+        }
+    }
+
+    #ifdef USECUDA
+    for(int m=0;m<this->settings->metrics.size();m++)
+    {
+        for(int g=0;g<up_img_gradient[m].size();g++)
+        {
+            up_img_gradient[m][g]->CreateTexture();
+            down_img_gradient[m][g]->CreateTexture();
+        }
+
+
+        if(resampled_smoothed_up_images[m]->getFloatdata().ptr !=nullptr)
+            resampled_smoothed_up_images[m]->CreateTexture();
+
+        if(resampled_smoothed_down_images[m]->getFloatdata().ptr !=nullptr)
+            resampled_smoothed_down_images[m]->CreateTexture();
+    }
+    #endif
+
+
     int iter=0;
     bool converged=false;
     float curr_convergence =1;
@@ -516,6 +550,8 @@ void DRBUDDIStage::RunDRBUDDIStage()
         Goper.CreateDirectional();
 
 
+
+
         std::vector<float> metric_values;
         metric_values.resize(Nmetrics);
         for(int met=0; met< Nmetrics;met++)
@@ -523,35 +559,109 @@ void DRBUDDIStage::RunDRBUDDIStage()
             CurrentImageType::Pointer warped_up_img = WarpImage(this->resampled_smoothed_up_images[met],this->def_FINV);
             CurrentImageType::Pointer warped_down_img = WarpImage(this->resampled_smoothed_down_images[met],this->def_MINV);
 
-            float metric_value;
+            float metric_value=0;            
             CurrentFieldType::Pointer  updateFieldF_temp=nullptr,updateFieldM_temp=nullptr;
 
             if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCSK)
             {
                 metric_value = ComputeMetric_CCSK(warped_up_img,warped_down_img, this->resampled_smoothed_str_images[met],updateFieldF_temp,updateFieldM_temp );
             }
-            if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCJac)
-            {
 
-            }
             if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCJacS)
             {
-                metric_value = ComputeMetric_CCJacS(warped_up_img,warped_down_img,this->resampled_smoothed_str_images[met],
-                                                  this->def_FINV, this->def_MINV   ,
-                                                   updateFieldF_temp,updateFieldM_temp, this->up_phase_vector,
-                                                   Goper );                                
+                /*
+                if(this->settings->restrct && this->settings->constrain)
+                {
+                    CurrentFieldType::Pointer  updateFieldFINV_temp=nullptr,updateFieldMINV_temp=nullptr;
+                    metric_value = ComputeMetric_CCJacSSingle(warped_up_img,warped_down_img,this->resampled_smoothed_str_images[met],
+                                                              up_img_gradient[met],  down_img_gradient[met],
+                                                              this->def_FINV,
+                                                              updateFieldFINV_temp, this->up_phase_vector,
+                                                              Goper );
+
+                    CurrentFieldType::Pointer tempF = CurrentFieldType::New();
+                    #ifdef USECUDA
+                        tempF->sz = this->def_FINV->sz;
+                        tempF->dir = this->def_FINV->dir;
+                        tempF->orig = this->def_FINV->orig;
+                        tempF->spc = this->def_FINV->spc;
+                        tempF->components_per_voxel = this->def_FINV->components_per_voxel;
+                        tempF->Allocate();
+                    #else
+                        tempF->SetRegions(updateFieldFINV_temp->GetLargestPossibleRegion());
+                        tempF->Allocate();
+                        tempF->SetSpacing(updateFieldFINV_temp->GetSpacing());
+                        tempF->SetDirection(updateFieldFINV_temp->GetDirection());
+                        tempF->SetOrigin(updateFieldFINV_temp->GetOrigin());
+                        CurrentFieldType::PixelType zer; zer.Fill(0);
+                        tempF->FillBuffer(zer);
+                    #endif
+
+                    AddToUpdateField(tempF,updateFieldFINV_temp,1);
+                    updateFieldFINV_temp=tempF;
+                    updateFieldMINV_temp=NegateField(updateFieldFINV_temp);
+                    updateFieldF_temp =InvertField(updateFieldFINV_temp);
+                    updateFieldM_temp =InvertField(updateFieldMINV_temp);
+                }
+                else
+                */
+                {
+                    metric_value = ComputeMetric_CCJacS(warped_up_img,warped_down_img,this->resampled_smoothed_str_images[met],
+                                                              this->def_FINV, this->def_MINV,
+                                                              updateFieldF_temp,  updateFieldM_temp,
+                                                              this->up_phase_vector,
+                                                              Goper );
+                }
 
             }
             if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::MSJac)
             {
-                metric_value = ComputeMetric_MSJac(warped_up_img,warped_down_img,
-                                                  this->def_FINV, this->def_MINV   ,
-                                                   updateFieldF_temp,updateFieldM_temp, this->up_phase_vector,
-                                                   Goper );
-                if(iter==1)
+
+                /*
+                if(this->settings->restrct && this->settings->constrain)
                 {
-                    first_MSJac_met=metric_value;
+
+                    CurrentFieldType::Pointer  updateFieldFINV_temp=nullptr,updateFieldMINV_temp=nullptr;
+                    metric_value = ComputeMetric_MSJacSingle(warped_up_img,warped_down_img,
+                                                       up_img_gradient[met],  down_img_gradient[met],
+                                                       this->def_FINV ,
+                                                       updateFieldFINV_temp, this->up_phase_vector,
+                                                       Goper );
+
+                    CurrentFieldType::Pointer tempF = CurrentFieldType::New();
+                    #ifdef USECUDA
+                        tempF->sz = this->def_FINV->sz;
+                        tempF->dir = this->def_FINV->dir;
+                        tempF->orig = this->def_FINV->orig;
+                        tempF->spc = this->def_FINV->spc;
+                        tempF->components_per_voxel = this->def_FINV->components_per_voxel;
+                        tempF->Allocate();
+                    #else
+                        tempF->SetRegions(updateFieldFINV_temp->GetLargestPossibleRegion());
+                        tempF->Allocate();
+                        tempF->SetSpacing(updateFieldFINV_temp->GetSpacing());
+                        tempF->SetDirection(updateFieldFINV_temp->GetDirection());
+                        tempF->SetOrigin(updateFieldFINV_temp->GetOrigin());
+                        CurrentFieldType::PixelType zer; zer.Fill(0);
+                        tempF->FillBuffer(zer);
+                    #endif
+
+                    AddToUpdateField(tempF,updateFieldFINV_temp,1);
+                    updateFieldFINV_temp=tempF;
+                    updateFieldMINV_temp=NegateField(updateFieldFINV_temp);
+                    updateFieldF_temp =InvertField(updateFieldFINV_temp);
+                    updateFieldM_temp =InvertField(updateFieldMINV_temp);
                 }
+                else
+                */
+                {
+                    metric_value = ComputeMetric_MSJac(warped_up_img,warped_down_img,
+                                                   this->def_FINV , this->def_MINV ,
+                                                   updateFieldF_temp,  updateFieldM_temp,
+                                                   this->up_phase_vector,
+                                                   Goper );
+                }
+
             }
             if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CC)
             {
@@ -559,6 +669,8 @@ void DRBUDDIStage::RunDRBUDDIStage()
             }
             metric_values[met]=metric_value;
             all_ConvergenceMonitoring[met]->AddEnergyValue( metric_value );
+
+
 
             if(Nmetrics>1)
             {
@@ -583,115 +695,9 @@ void DRBUDDIStage::RunDRBUDDIStage()
         }
 
 
-
-        if(estimate_lr_per_iter)
-        {
-            int CCSK_id=-1;
-            int MSJac_id=-1;
-            int CCJac_id=-1;
-            for(int met=0;met<Nmetrics;met++)
-            {
-                if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCJacS)
-                {
-                    CCJac_id=met;
-                }
-                if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCSK)
-                {
-                    CCSK_id=met;
-                }
-                if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::MSJac)
-                {
-                    MSJac_id=met;
-                }
-            }
-
-            float mult=4;
-            float lr=0.01/mult;
-            float prev=1E10;
-            float curr=1E9;
-
-            while(curr<prev)
-            {
-                lr*=mult;
-                if(lr>8)
-                    break;
-                ScaleUpdateField(updateFieldF,lr);
-                ScaleUpdateField(updateFieldM,lr);
-
-                CurrentFieldType::Pointer f2midtmp=nullptr,f2midtmp_inv=nullptr;
-                CurrentFieldType::Pointer m2midtmp=nullptr,m2midtmp_inv=nullptr;
-
-
-                f2midtmp  = ComposeFields(this->def_F,updateFieldF);
-                f2midtmp = GaussianSmoothImage(f2midtmp,this->settings->total_gaussian_sigma);
-                CurrentFieldType::Pointer f2midtotal_inv= InvertField(f2midtmp, this->def_FINV );
-
-                m2midtmp  = ComposeFields(this->def_M,updateFieldM);
-                m2midtmp = GaussianSmoothImage(m2midtmp,this->settings->total_gaussian_sigma);
-                CurrentFieldType::Pointer m2midtotal_inv= InvertField(m2midtmp, this->def_MINV );
-
-                if(this->settings->constrain)
-                {
-                    ContrainDefFields(f2midtotal_inv,m2midtotal_inv);
-                }
-
-                CurrentImageType::Pointer warped_up_img = nullptr;
-                CurrentImageType::Pointer warped_down_img = nullptr;
-                CurrentFieldType::Pointer  updateFieldF_temp=nullptr,updateFieldM_temp=nullptr;
-
-
-
-                prev=curr;
-                float curr1=0,curr2=0,curr3=0;
-
-                if(MSJac_id!=-1)
-                {
-                    if (warped_up_img==nullptr)
-                    {
-                        warped_up_img = WarpImage(this->resampled_smoothed_up_images[MSJac_id],f2midtotal_inv);
-                        warped_down_img = WarpImage(this->resampled_smoothed_down_images[MSJac_id],m2midtotal_inv);
-                    }
-
-                    if(CCJac_id==-1 && CCSK_id==-1)
-                    {
-                        curr1 = ComputeMetric_MSJac(warped_up_img,warped_down_img,              f2midtotal_inv, m2midtotal_inv   ,
-                                                       updateFieldF_temp,updateFieldM_temp, this->up_phase_vector,
-                                                       Goper );
-                        curr1=curr1/first_MSJac_met -1;
-                    }
-                }
-                if(CCJac_id!=-1)
-                {
-                    if (warped_up_img==nullptr)
-                    {
-                        warped_up_img = WarpImage(this->resampled_smoothed_up_images[CCJac_id],f2midtotal_inv);
-                        warped_down_img = WarpImage(this->resampled_smoothed_down_images[CCJac_id],m2midtotal_inv);
-                    }
-                    curr2 = ComputeMetric_CCJacS(warped_up_img,warped_down_img,this->resampled_smoothed_str_images[CCJac_id],
-                                                      f2midtotal_inv, m2midtotal_inv   ,
-                                                       updateFieldF_temp,updateFieldM_temp, this->up_phase_vector,
-                                                       Goper );
-                }
-                if(CCSK_id!=-1)
-                {
-                    if (warped_up_img==nullptr)
-                    {
-                        warped_up_img = WarpImage(this->resampled_smoothed_up_images[CCSK_id],f2midtotal_inv);
-                        warped_down_img = WarpImage(this->resampled_smoothed_down_images[CCSK_id],m2midtotal_inv);
-                    }
-                    curr3 = ComputeMetric_CCSK(warped_up_img,warped_down_img, this->resampled_smoothed_str_images[CCSK_id],updateFieldF_temp,updateFieldM_temp );
-                }
-                curr=curr1+curr2+curr3;
-
-            }
-            lr/=mult;
-            this->settings->learning_rate=lr;
-        }
-
-
-
         ScaleUpdateField(updateFieldF,this->settings->learning_rate);
         ScaleUpdateField(updateFieldM,this->settings->learning_rate);
+
 
 
         {
@@ -702,16 +708,14 @@ void DRBUDDIStage::RunDRBUDDIStage()
             f2midtmp  = ComposeFields(this->def_F,updateFieldF);
             f2midtmp = GaussianSmoothImage(f2midtmp,this->settings->total_gaussian_sigma);
             CurrentFieldType::Pointer f2midtotal_inv= InvertField(f2midtmp, this->def_FINV );
-            //CurrentFieldType::Pointer f2midtotal = InvertField(f2midtotal_inv, f2midtmp );
 
             m2midtmp  = ComposeFields(this->def_M,updateFieldM);
             m2midtmp = GaussianSmoothImage(m2midtmp,this->settings->total_gaussian_sigma);
             CurrentFieldType::Pointer m2midtotal_inv= InvertField(m2midtmp, this->def_MINV );
-            //CurrentFieldType::Pointer m2midtotal = InvertField(m2midtotal_inv, m2midtmp );
 
             if(this->settings->constrain)
             {
-                ContrainDefFields(f2midtotal_inv,m2midtotal_inv);                
+                ContrainDefFields(f2midtotal_inv,m2midtotal_inv);
             }
             CurrentFieldType::Pointer f2midtotal = InvertField(f2midtotal_inv, m2midtotal_inv );
             CurrentFieldType::Pointer m2midtotal = InvertField(m2midtotal_inv, f2midtotal_inv );
@@ -721,6 +725,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
             this->def_MINV=m2midtotal_inv;
             this->def_M=m2midtotal;
         }
+
 
         double average_convergence=0;
         double prev_conv= curr_convergence;
@@ -739,6 +744,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
         {
             converged = true;
         }
+
 
         m_clock.Stop();
         const itk::RealTimeClock::TimeStampType now = m_clock.GetTotal();

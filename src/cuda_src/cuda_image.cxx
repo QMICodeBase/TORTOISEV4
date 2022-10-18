@@ -32,6 +32,7 @@ CUDAIMAGE::Pointer CUDAIMAGE::New()
 }
 
 
+
 void CUDAIMAGE::SetImageFromITK(ImageType3D::Pointer itk_image, bool create_texture)
 {
     this->dir = itk_image->GetDirection();
@@ -279,6 +280,7 @@ CUDAIMAGE::DisplacementFieldType::Pointer CUDAIMAGE::CudaImageToITKField()
     return itk_image;
 
 }
+
 
 
 #endif

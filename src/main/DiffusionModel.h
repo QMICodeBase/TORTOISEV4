@@ -32,6 +32,7 @@ public:
     ImageType3D::Pointer GetA0Image(){return A0_img;}
     typename OutputImageType::Pointer GetOutput(){return output_img;}
     void SetOutput(typename OutputImageType::Pointer oi){output_img=oi;}
+    void SetFreeWaterDiffusivity(float fwd){free_water_diffusivity=fwd;}
 
 
     virtual void PerformFitting(){};
@@ -56,6 +57,7 @@ protected:
 
     ImageType3D::Pointer A0_img{nullptr};
     typename OutputImageType::Pointer output_img{nullptr};
+    float free_water_diffusivity;
 
 
     TORTOISE::TeeStream *stream;

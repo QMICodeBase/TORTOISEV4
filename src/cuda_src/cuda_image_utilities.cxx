@@ -5,9 +5,9 @@
 
 
 
-void AddToUpdateField(CUDAIMAGE::Pointer updateField,CUDAIMAGE::Pointer  updateField_temp,float weight)
+void AddToUpdateField(CUDAIMAGE::Pointer updateField,CUDAIMAGE::Pointer  updateField_temp,float weight,bool normalize)
 {
-    AddToUpdateField_cuda(updateField->getFloatdata(), updateField_temp->getFloatdata(),weight, updateField->sz,updateField->components_per_voxel );
+    AddToUpdateField_cuda(updateField->getFloatdata(), updateField_temp->getFloatdata(),weight, updateField->sz,updateField->components_per_voxel ,normalize);
 }
 
 
@@ -89,10 +89,7 @@ CUDAIMAGE::Pointer ComposeFields(CUDAIMAGE::Pointer main_field, CUDAIMAGE::Point
     output->components_per_voxel= field->components_per_voxel;
     output->SetFloatDataPointer( d_output);
     return output;
-
-
- 
- }
+}
 
  CUDAIMAGE::Pointer InvertField(CUDAIMAGE::Pointer field,CUDAIMAGE::Pointer initial_estimate)
 {
@@ -162,6 +159,56 @@ CUDAIMAGE::Pointer ComposeFields(CUDAIMAGE::Pointer main_field, CUDAIMAGE::Point
 
 
 
+std::vector<CUDAIMAGE::Pointer> ComputeImageGradientImg(CUDAIMAGE::Pointer img)
+ {
+    cudaPitchedPtr d_output_x={0};
+    cudaPitchedPtr d_output_y={0};
+    cudaPitchedPtr d_output_z={0};
+
+    cudaExtent extent =  make_cudaExtent(1*sizeof(float)*img->sz.x,img->sz.y,img->sz.z);
+    cudaMalloc3D(&d_output_x, extent);
+    cudaMemset3D(d_output_x,0,extent);
+    cudaMalloc3D(&d_output_y, extent);
+    cudaMemset3D(d_output_y,0,extent);
+    cudaMalloc3D(&d_output_z, extent);
+    cudaMemset3D(d_output_z,0,extent);
+
+
+    ComputeImageGradient_cuda(img->getFloatdata(), img->sz,img->spc,
+                              img->dir(0,0),img->dir(0,1),img->dir(0,2),img->dir(1,0),img->dir(1,1),img->dir(1,2),img->dir(2,0),img->dir(2,1),img->dir(2,2),
+                              d_output_x,d_output_y,d_output_z);
+
+    CUDAIMAGE::Pointer outputx = CUDAIMAGE::New();
+    outputx->sz=img->sz;
+    outputx->dir=img->dir;
+    outputx->orig=img->orig;
+    outputx->spc=img->spc;
+    outputx->components_per_voxel= 1;
+    outputx->SetFloatDataPointer( d_output_x);
+
+    CUDAIMAGE::Pointer outputy = CUDAIMAGE::New();
+    outputy->sz=img->sz;
+    outputy->dir=img->dir;
+    outputy->orig=img->orig;
+    outputy->spc=img->spc;
+    outputy->components_per_voxel= 1;
+    outputy->SetFloatDataPointer( d_output_y);
+
+    CUDAIMAGE::Pointer outputz = CUDAIMAGE::New();
+    outputz->sz=img->sz;
+    outputz->dir=img->dir;
+    outputz->orig=img->orig;
+    outputz->spc=img->spc;
+    outputz->components_per_voxel= 1;
+    outputz->SetFloatDataPointer( d_output_z);
+
+    std::vector<CUDAIMAGE::Pointer> output;
+    output.push_back(outputx);
+    output.push_back(outputy);
+    output.push_back(outputz);
+    return output;
+
+}
 
 
 #endif

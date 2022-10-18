@@ -21,6 +21,7 @@ public:
     bool getUseVoxelwiseBmat();
     std::string getInclusionImg();
     std::string getRegressionMode();
+    float getFreeWaterDiffusivity();
 
     bool getWriteCSImg();
 

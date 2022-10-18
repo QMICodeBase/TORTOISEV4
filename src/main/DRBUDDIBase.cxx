@@ -331,9 +331,16 @@ void DRBUDDIBase::CreateCorrectionImage(std::string nii_filename,ImageType3D::Po
      std::vector<ImageType3DBool::Pointer> final_inclusion_imgs;
      std::vector<ImageType3D::Pointer> final_data;
      final_data.resize(Nvols);     
-     for(int v=0;v<Nvols;v++)
+     if(Nvols==1)
      {
-         final_data[v]=read_3D_volume_from_4D(nii_filename,v);     
+         final_data[0]=readImageD<ImageType3D>(nii_filename);
+     }
+     else
+     {
+         for(int v=0;v<Nvols;v++)
+         {
+             final_data[v]=read_3D_volume_from_4D(nii_filename,v);
+         }
      }
 
      if(fs::exists(inc_name))

@@ -12,6 +12,7 @@ ImageType3D::Pointer PreprocessImage( ImageType3D::Pointer  inputImage,ImageType
 ImageType3D::Pointer WarpImage(ImageType3D::Pointer img, DisplacementFieldType::Pointer field);
 
 DisplacementFieldType::PixelType ComputeImageGradient(ImageType3D::Pointer img,ImageType3D::IndexType &index);
+std::vector<ImageType3D::Pointer> ComputeImageGradientImg(ImageType3D::Pointer img);
 
 void AddToUpdateField(DisplacementFieldType::Pointer updateField,DisplacementFieldType::Pointer  updateField_temp,double weight);
 
@@ -20,6 +21,7 @@ void ScaleUpdateField(DisplacementFieldType::Pointer  field,float scale_factor);
 void RestrictPhase(DisplacementFieldType::Pointer  field,vnl_vector<double> phase_vector);
 
 DisplacementFieldType::Pointer InvertField( const DisplacementFieldType * field, const DisplacementFieldType * inverseFieldEstimate=nullptr );
+DisplacementFieldType::Pointer NegateField( const DisplacementFieldType::Pointer field);
 
 void ContrainDefFields(DisplacementFieldType::Pointer  field1, DisplacementFieldType::Pointer  field2);
 

@@ -189,6 +189,7 @@ int main(int argc, char *argv[])
     dti_estimator.SetMaskImage(mask_image);
     dti_estimator.SetVolIndicesForFitting(bindices);
     dti_estimator.SetFittingMode(regresion_mode);
+    dti_estimator.SetFreeWaterDiffusivity(parser->getFreeWaterDiffusivity());
     dti_estimator.PerformFitting();
 
 

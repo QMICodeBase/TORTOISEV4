@@ -7,7 +7,6 @@
 #include "cuda_utils.h"
 
 
-
 #define LIMCCSK (1E-5)
 #define LIMCC (1E-10)
 #define LIMCCJAC (1E-5)
@@ -15,8 +14,8 @@
 #define WIN_RAD 4
 #define WIN_RAD_Z 2
 
-#define WIN_RAD_JAC 3
-#define WIN_RAD_JAC_Z 1
+#define WIN_RAD_JAC 4
+#define WIN_RAD_JAC_Z 2
 
 
 
@@ -29,6 +28,7 @@
 
 #define BLOCKSIZE 32
 #define PER_GROUP 1
+#define PER_SLICE 1
 
 extern __constant__ int d_sz[3];
 extern __constant__ float d_dir[9];
@@ -188,8 +188,9 @@ __device__ float ComputeSingleJacobianMatrixAtIndex(cudaPitchedPtr field ,int i,
     temp2[1] = d_dir[3]*temp[0] + d_dir[4]*temp[1] + d_dir[5]*temp[2];
     temp2[2] = d_dir[6]*temp[0] + d_dir[7]*temp[1] + d_dir[8]*temp[2];
 
-    return 1+ temp2[phase_xyz];
-    //return 1 +grad;
+    return  temp2[phase_xyz];
+   // return 1+ temp2[phase_xyz];
+
 }
 
 
@@ -219,11 +220,11 @@ computeDetImg( cudaPitchedPtr img,cudaPitchedPtr field,cudaPitchedPtr detimg, in
             float * row_I= (float *)(slice_I+ IcolPitch);
 
 
-            float det2= ComputeSingleJacobianMatrixAtIndex(field,i,j,k,1,phase,phase_xyz);
-            if(det2 <=0)
-                det2=1E-5;
-            float det= mf(det2);
-            row_detI[i]= det * row_I[i];
+            float det= ComputeSingleJacobianMatrixAtIndex(field,i,j,k,1,phase,phase_xyz);
+            if(det <=-1)
+                det=-1+1E-5;
+
+            row_detI[i]= (1+det) * row_I[i];
         }
     }
 }
@@ -372,6 +373,609 @@ computeFiniteDiffStructs( cudaPitchedPtr det_img,cudaPitchedPtr str_img,
 
 
 __global__ void
+ComputeMetric_CCJacSSingle_kernel( cudaPitchedPtr b0_img,  cudaPitchedPtr str_img,
+                                 cudaTextureObject_t grad_img_x, cudaTextureObject_t grad_img_y, cudaTextureObject_t grad_img_z,
+                                 cudaPitchedPtr field,
+                            cudaPitchedPtr updateFieldINV,
+                            cudaPitchedPtr metric_image,
+                            int phase, int phase_xyz,
+                            int kernel_sz,
+                            cudaPitchedPtr sKS, cudaPitchedPtr sSS, cudaPitchedPtr sKK, cudaPitchedPtr valS, cudaPitchedPtr valK)
+{
+    uint ii = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint k = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int i=PER_GROUP*ii;i<PER_GROUP*ii+PER_GROUP;i++)
+    {
+        if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2])
+        {
+            float update[3]={0,0,0};
+
+            if(i>=1 && j>=1 && k>=1 && i<=d_sz[0]-2  && j<=d_sz[1]-2  && k<=d_sz[2]-2)
+            {
+                //int mid_ind=(kernel_sz-1)/2;
+                //float b= c_Kernel[  mid_ind ];
+                //float a=0;
+                //if((kernel_sz-1)/2 > 0)
+               //     a=c_Kernel[  mid_ind -1];
+
+             //   float a_b= a/b;
+                float a_b=0;
+
+
+
+                ////////////////////////   at x ///////////////////////////////////////////
+                {
+                    size_t mpitch= metric_image.pitch;
+                    size_t mslicePitch= mpitch*d_sz[1]*k;
+                    size_t mcolPitch= j*mpitch;
+                    char *m_ptr= (char *)(metric_image.ptr);
+                    char * slice_m= m_ptr+  mslicePitch;
+                    float * row_M= (float *)(slice_m+ mcolPitch);
+
+
+                    size_t sKSpitch= sKS.pitch;
+                    size_t sKSslicePitch= sKSpitch*d_sz[1]*k;
+                    size_t sKScolPitch= j*sKSpitch;
+                    char *sKS_ptr= (char *)(sKS.ptr);
+                    char * slice_sKS= sKS_ptr+  sKSslicePitch;
+                    float * row_sKS= (float *)(slice_sKS+ sKScolPitch);
+
+                    size_t sSSpitch= sSS.pitch;
+                    size_t sSSslicePitch= sSSpitch*d_sz[1]*k;
+                    size_t sSScolPitch= j*sSSpitch;
+                    char *sSS_ptr= (char *)(sSS.ptr);
+                    char * slice_sSS= sSS_ptr+  sSSslicePitch;
+                    float * row_sSS= (float *)(slice_sSS+ sSScolPitch);
+
+                    size_t sKKpitch= sKK.pitch;
+                    size_t sKKslicePitch= sKKpitch*d_sz[1]*k;
+                    size_t sKKcolPitch= j*sKKpitch;
+                    char *sKK_ptr= (char *)(sKK.ptr);
+                    char * slice_sKK= sKK_ptr+  sKKslicePitch;
+                    float * row_sKK= (float *)(slice_sKK+ sKKcolPitch);
+
+                    size_t valSpitch= valS.pitch;
+                    size_t valSslicePitch= valSpitch*d_sz[1]*k;
+                    size_t valScolPitch= j*valSpitch;
+                    char *valS_ptr= (char *)(valS.ptr);
+                    char * slice_valS= valS_ptr+  valSslicePitch;
+                    float * row_valS= (float *)(slice_valS+ valScolPitch);
+
+                    size_t valKpitch= valK.pitch;
+                    size_t valKslicePitch= valKpitch*d_sz[1]*k;
+                    size_t valKcolPitch= j*valKpitch;
+                    char *valK_ptr= (char *)(valK.ptr);
+                    char * slice_valK= valK_ptr+  valKslicePitch;
+                    float * row_valK= (float *)(slice_valK+ valKcolPitch);
+
+                    size_t fpitch= field.pitch;
+                    size_t fslicePitch= fpitch*d_sz[1]*k;
+                    size_t fcolPitch= j*fpitch;
+                    char *f_ptr= (char *)(field.ptr);
+                    char * slice_f= f_ptr+  fslicePitch;
+                    float * row_f= (float *)(slice_f+ fcolPitch);
+
+
+
+                    float sSS_val=row_sSS[i];
+                    float sKS_val=row_sKS[i];
+                    float sKK_val=row_sKK[i];
+                    float valS_val=row_valS[i];
+                    float valK_val=row_valK[i];
+
+                    float sSS_sKK = sSS_val * sKK_val;
+
+                    if(fabs(sSS_sKK) > LIMCCJAC && fabs(sKK_val) > LIMCCJAC )
+                    {
+                        row_M[i]+= -sKS_val*sKS_val/ sSS_sKK;
+
+                        float x= (d_dir[0]*i  + d_dir[1]*j + d_dir[2]*k)* d_spc[0] ;
+                        float y= (d_dir[3]*i  + d_dir[4]*j + d_dir[5]*k)* d_spc[1] ;
+                        float z= (d_dir[6]*i  + d_dir[7]*j + d_dir[8]*k)* d_spc[2] ;
+
+                        float xw= x + row_f[3*i];
+                        float yw= y + row_f[3*i+1];
+                        float zw= z + row_f[3*i+2];
+
+                        float iw = (d_dir[0]*xw  + d_dir[3]*yw  + d_dir[6]*zw)/ d_spc[0] ;
+                        float jw = (d_dir[1]*xw  + d_dir[4]*yw  + d_dir[7]*zw)/ d_spc[1] ;
+                        float kw = (d_dir[2]*xw  + d_dir[5]*yw  + d_dir[8]*zw)/ d_spc[2] ;
+
+                        float grad_x =tex3D<float>(grad_img_x, iw+0.5, jw +0.5, kw+0.5);
+                        float grad_y =tex3D<float>(grad_img_y, iw+0.5, jw +0.5, kw+0.5);
+                        float grad_z =tex3D<float>(grad_img_z, iw+0.5, jw +0.5, kw+0.5);
+
+
+                        float first_term= -2*sKS_val/ sSS_sKK;
+
+                        float det = ComputeSingleJacobianMatrixAtIndex(field,i,j,k,1,phase,phase_xyz);
+                        if(det <=-1)
+                           det=-1+1E-5;
+
+
+                        float M1[3]= {grad_x *(1+det),grad_y *(1+det),grad_z*(1+det)};
+                        float M2= 0;
+                        M1[phase_xyz]+=M2;
+
+                       float second_term= (valS_val - sKS_val/ sKK_val *valK_val);
+                       update[0] = first_term * second_term *M1[0] ;
+                       update[1] = first_term * second_term *M1[1] ;
+                       update[2] = first_term * second_term *M1[2] ;
+
+                   }
+                }  // at x
+
+
+                ////////////////////////   at x+1 ///////////////////////////////////////////
+
+                {
+                    int h=1;
+                    int nindex[3]={(int)i,(int)j,(int)k};
+                    nindex[phase]+=h;
+
+
+                    if(nindex[0]>=h && nindex[1]>=h && nindex[2]>=h && nindex[0]<=d_sz[0]-h-1 && nindex[1]<=d_sz[1]-h-1 && nindex[2]<=d_sz[2]-h-1)
+                    {
+                        size_t sKSpitch= sKS.pitch;
+                        size_t sKSslicePitch= sKSpitch*d_sz[1]*nindex[2];
+                        size_t sKScolPitch= nindex[1]*sKSpitch;
+                        char *sKS_ptr= (char *)(sKS.ptr);
+                        char * slice_sKS= sKS_ptr+  sKSslicePitch;
+                        float * row_sKS= (float *)(slice_sKS+ sKScolPitch);
+
+                        size_t sSSpitch= sSS.pitch;
+                        size_t sSSslicePitch= sSSpitch*d_sz[1]*nindex[2];
+                        size_t sSScolPitch= nindex[1]*sSSpitch;
+                        char *sSS_ptr= (char *)(sSS.ptr);
+                        char * slice_sSS= sSS_ptr+  sSSslicePitch;
+                        float * row_sSS= (float *)(slice_sSS+ sSScolPitch);
+
+                        size_t sKKpitch= sKK.pitch;
+                        size_t sKKslicePitch= sKKpitch*d_sz[1]*nindex[2];
+                        size_t sKKcolPitch= nindex[1]*sKKpitch;
+                        char *sKK_ptr= (char *)(sKK.ptr);
+                        char * slice_sKK= sKK_ptr+  sKKslicePitch;
+                        float * row_sKK= (float *)(slice_sKK+ sKKcolPitch);
+
+                        size_t valSpitch= valS.pitch;
+                        size_t valSslicePitch= valSpitch*d_sz[1]*nindex[2];
+                        size_t valScolPitch= nindex[1]*valSpitch;
+                        char *valS_ptr= (char *)(valS.ptr);
+                        char * slice_valS= valS_ptr+  valSslicePitch;
+                        float * row_valS= (float *)(slice_valS+ valScolPitch);
+
+                        size_t valKpitch= valK.pitch;
+                        size_t valKslicePitch= valKpitch*d_sz[1]*nindex[2];
+                        size_t valKcolPitch= nindex[1]*valKpitch;
+                        char *valK_ptr= (char *)(valK.ptr);
+                        char * slice_valK= valK_ptr+  valKslicePitch;
+                        float * row_valK= (float *)(slice_valK+ valKcolPitch);
+
+
+                        size_t bimgpitch= b0_img.pitch;
+                        size_t bimgslicePitch= bimgpitch*d_sz[1]*nindex[2];
+                        size_t bimgcolPitch= nindex[1]*bimgpitch;
+                        char *bimg_ptr= (char *)(b0_img.ptr);
+                        char * slice_bimg= bimg_ptr+  bimgslicePitch;
+                        float * row_bimg= (float *)(slice_bimg+ bimgcolPitch);
+
+                        size_t fpitch= field.pitch;
+                        size_t fslicePitch= fpitch*d_sz[1]*nindex[2];
+                        size_t fcolPitch= nindex[1]*fpitch;
+                        char *f_ptr= (char *)(field.ptr);
+                        char * slice_f= f_ptr+  fslicePitch;
+                        float * row_f= (float *)(slice_f+ fcolPitch);
+
+
+                        float valb_center=row_bimg[nindex[0]];
+                        float sSS_val=row_sSS[nindex[0]];
+                        float sKS_val=row_sKS[nindex[0]];
+                        float sKK_val=row_sKK[nindex[0]];
+                        float valS_val=row_valS[nindex[0]];
+                        float valK_val=row_valK[nindex[0]];
+
+                        float sSS_sKK = sSS_val * sKK_val;
+
+
+                        if(fabs(sSS_sKK) > LIMCCJAC && fabs(sKK_val) > LIMCCJAC )
+                        {
+                          float first_term= -2*sKS_val/ sSS_sKK;
+
+                          float det = ComputeSingleJacobianMatrixAtIndex(field,nindex[0],nindex[1],nindex[2],1,phase,phase_xyz);
+                          if(det <=-1)
+                              det=-1+1E-5;
+
+
+                          float x= (d_dir[0]*nindex[0]  + d_dir[1]*nindex[1] + d_dir[2]*nindex[2])* d_spc[0] ;
+                          float y= (d_dir[3]*nindex[0]  + d_dir[4]*nindex[1] + d_dir[5]*nindex[2])* d_spc[1] ;
+                          float z= (d_dir[6]*nindex[0]  + d_dir[7]*nindex[1] + d_dir[8]*nindex[2])* d_spc[2] ;
+
+                          float xw= x + row_f[3*nindex[0]];
+                          float yw= y + row_f[3*nindex[0]+1];
+                          float zw= z + row_f[3*nindex[0]+2];
+
+                          float iw = (d_dir[0]*xw  + d_dir[3]*yw  + d_dir[6]*zw)/ d_spc[0] ;
+                          float jw = (d_dir[1]*xw  + d_dir[4]*yw  + d_dir[7]*zw)/ d_spc[1] ;
+                          float kw = (d_dir[2]*xw  + d_dir[5]*yw  + d_dir[8]*zw)/ d_spc[2] ;
+
+                          float grad_x =tex3D<float>(grad_img_x, iw+0.5, jw +0.5, kw+0.5);
+                          float grad_y =tex3D<float>(grad_img_y, iw+0.5, jw +0.5, kw+0.5);
+                          float grad_z =tex3D<float>(grad_img_z, iw+0.5, jw +0.5, kw+0.5);
+
+
+
+                          float M1[3]= {grad_x *(1+det)*a_b,grad_y *(1+det)*a_b,grad_z*(1+det)*a_b};
+                          float M2= d_new_phase[phase_xyz]* valb_center* -0.5/d_spc[phase]/h ;;
+                          M1[phase_xyz]+=M2;
+
+                          float second_term= (valS_val - sKS_val/ sKK_val *valK_val);
+                          update[0] += first_term * second_term *M1[0] ;
+                          update[1] += first_term * second_term *M1[1] ;
+                          update[2] += first_term * second_term *M1[2] ;
+                      }
+                    }
+                } //x+1
+
+
+                ////////////////////////   at x-1 ///////////////////////////////////////////
+
+                {
+                    int h=1;
+                    int nindex[3]={(int)i,(int)j,(int)k};
+                    nindex[phase]-=h;
+
+
+                    if(nindex[0]>=h && nindex[1]>=h && nindex[2]>=h && nindex[0]<=d_sz[0]-h-1 && nindex[1]<=d_sz[1]-h-1 && nindex[2]<=d_sz[2]-h-1)
+                    {
+                        size_t sKSpitch= sKS.pitch;
+                        size_t sKSslicePitch= sKSpitch*d_sz[1]*nindex[2];
+                        size_t sKScolPitch= nindex[1]*sKSpitch;
+                        char *sKS_ptr= (char *)(sKS.ptr);
+                        char * slice_sKS= sKS_ptr+  sKSslicePitch;
+                        float * row_sKS= (float *)(slice_sKS+ sKScolPitch);
+
+                        size_t sSSpitch= sSS.pitch;
+                        size_t sSSslicePitch= sSSpitch*d_sz[1]*nindex[2];
+                        size_t sSScolPitch= nindex[1]*sSSpitch;
+                        char *sSS_ptr= (char *)(sSS.ptr);
+                        char * slice_sSS= sSS_ptr+  sSSslicePitch;
+                        float * row_sSS= (float *)(slice_sSS+ sSScolPitch);
+
+                        size_t sKKpitch= sKK.pitch;
+                        size_t sKKslicePitch= sKKpitch*d_sz[1]*nindex[2];
+                        size_t sKKcolPitch= nindex[1]*sKKpitch;
+                        char *sKK_ptr= (char *)(sKK.ptr);
+                        char * slice_sKK= sKK_ptr+  sKKslicePitch;
+                        float * row_sKK= (float *)(slice_sKK+ sKKcolPitch);
+
+                        size_t valSpitch= valS.pitch;
+                        size_t valSslicePitch= valSpitch*d_sz[1]*nindex[2];
+                        size_t valScolPitch= nindex[1]*valSpitch;
+                        char *valS_ptr= (char *)(valS.ptr);
+                        char * slice_valS= valS_ptr+  valSslicePitch;
+                        float * row_valS= (float *)(slice_valS+ valScolPitch);
+
+                        size_t valKpitch= valK.pitch;
+                        size_t valKslicePitch= valKpitch*d_sz[1]*nindex[2];
+                        size_t valKcolPitch= nindex[1]*valKpitch;
+                        char *valK_ptr= (char *)(valK.ptr);
+                        char * slice_valK= valK_ptr+  valKslicePitch;
+                        float * row_valK= (float *)(slice_valK+ valKcolPitch);
+
+                        size_t bimgpitch= b0_img.pitch;
+                        size_t bimgslicePitch= bimgpitch*d_sz[1]*nindex[2];
+                        size_t bimgcolPitch= nindex[1]*bimgpitch;
+                        char *bimg_ptr= (char *)(b0_img.ptr);
+                        char * slice_bimg= bimg_ptr+  bimgslicePitch;
+                        float * row_bimg= (float *)(slice_bimg+ bimgcolPitch);
+
+                        size_t fpitch= field.pitch;
+                        size_t fslicePitch= fpitch*d_sz[1]*nindex[2];
+                        size_t fcolPitch= nindex[1]*fpitch;
+                        char *f_ptr= (char *)(field.ptr);
+                        char * slice_f= f_ptr+  fslicePitch;
+                        float * row_f= (float *)(slice_f+ fcolPitch);
+
+
+                        float valb_center=row_bimg[nindex[0]];
+                        float sSS_val=row_sSS[nindex[0]];
+                        float sKS_val=row_sKS[nindex[0]];
+                        float sKK_val=row_sKK[nindex[0]];
+                        float valS_val=row_valS[nindex[0]];
+                        float valK_val=row_valK[nindex[0]];
+
+                       float sSS_sKK = sSS_val * sKK_val;
+
+                       if(fabs(sSS_sKK) > LIMCCJAC && fabs(sKK_val) > LIMCCJAC )
+                       {
+                         float first_term= -2*sKS_val/ sSS_sKK;
+
+                         float det = ComputeSingleJacobianMatrixAtIndex(field,nindex[0],nindex[1],nindex[2],1,phase,phase_xyz);
+                         if(det <=-1)
+                             det=-1+1E-5;
+
+
+                         float x= (d_dir[0]*nindex[0]  + d_dir[1]*nindex[1] + d_dir[2]*nindex[2])* d_spc[0] ;
+                         float y= (d_dir[3]*nindex[0]  + d_dir[4]*nindex[1] + d_dir[5]*nindex[2])* d_spc[1] ;
+                         float z= (d_dir[6]*nindex[0]  + d_dir[7]*nindex[1] + d_dir[8]*nindex[2])* d_spc[2] ;
+
+                         float xw= x + row_f[3*nindex[0]];
+                         float yw= y + row_f[3*nindex[0]+1];
+                         float zw= z + row_f[3*nindex[0]+2];
+
+                         float iw = (d_dir[0]*xw  + d_dir[3]*yw  + d_dir[6]*zw)/ d_spc[0] ;
+                         float jw = (d_dir[1]*xw  + d_dir[4]*yw  + d_dir[7]*zw)/ d_spc[1] ;
+                         float kw = (d_dir[2]*xw  + d_dir[5]*yw  + d_dir[8]*zw)/ d_spc[2] ;
+
+                         float grad_x =tex3D<float>(grad_img_x, iw+0.5, jw +0.5, kw+0.5);
+                         float grad_y =tex3D<float>(grad_img_y, iw+0.5, jw +0.5, kw+0.5);
+                         float grad_z =tex3D<float>(grad_img_z, iw+0.5, jw +0.5, kw+0.5);
+
+
+
+                         float M1[3]= {grad_x *(1+det)*a_b,grad_y *(1+det)*a_b,grad_z*(1+det)*a_b};
+                         float M2= d_new_phase[phase_xyz]* valb_center* 0.5/d_spc[phase]/h ;;
+                         M1[phase_xyz]+=M2;
+
+                         float second_term= (valS_val - sKS_val/ sKK_val *valK_val);
+                         update[0] += first_term * second_term *M1[0] ;
+                         update[1] += first_term * second_term *M1[1] ;
+                         update[2] += first_term * second_term *M1[2] ;
+                     }
+
+                    }
+                } //x-1
+
+
+                size_t ufpitch= updateFieldINV.pitch;
+                size_t ufslicePitch= ufpitch*d_sz[1]*k;
+                size_t ufcolPitch= j*ufpitch;
+                char *uf_ptr= (char *)(updateFieldINV.ptr);
+                char * slice_uf= uf_ptr+  ufslicePitch;
+                float * row_uf= (float *)(slice_uf+ ufcolPitch);
+
+                row_uf[3*i]= -update[0];
+                row_uf[3*i+1]=- update[1];
+                row_uf[3*i+2]= -update[2];
+            }
+        }
+     }
+}
+
+
+__global__ void
+NegateImage2_kernel(cudaPitchedPtr image,  const int3 d_sz, const int Ncomponents)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+            {
+                size_t opitch= image.pitch;
+                size_t oslicePitch= opitch*d_sz.y*k;
+                size_t ocolPitch= j*opitch;
+
+                char *u_ptr= (char *)(image.ptr);
+                char * slice_u= u_ptr+  oslicePitch;
+                float * row_data= (float *)(slice_u+ ocolPitch);
+
+
+                for(int m=0;m<Ncomponents;m++)
+                    row_data[Ncomponents*i+m]=-row_data[Ncomponents*i+m];
+           }
+    }
+}
+
+__global__ void
+AddToUpdateField2_kernel(cudaPitchedPtr total_data, cudaPitchedPtr to_add_data , float weight, int3 d_sz, int Ncomponents)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+        if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+        {
+            size_t opitch= total_data.pitch;
+            size_t oslicePitch= opitch*d_sz.y*k;
+            size_t ocolPitch= j*opitch;
+
+            char *o_ptr= (char *)(total_data.ptr);
+            char * slice_o= o_ptr+  oslicePitch;
+            float * row_out= (float *)(slice_o+ ocolPitch);
+
+
+            char *a_ptr= (char *)(to_add_data.ptr);
+            char * slice_a= a_ptr+  oslicePitch;
+            float * row_add= (float *)(slice_a+ ocolPitch);
+
+            for(int mm=0;mm<Ncomponents;mm++)
+                row_out[Ncomponents*i + mm]=   row_out[Ncomponents*i + mm] + row_add[Ncomponents*i + mm]*weight;
+        }
+    }
+
+}
+
+
+
+void ComputeMetric_CCJacSSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cudaPitchedPtr str_img,
+                                    cudaTextureObject_t up_grad_img_x, cudaTextureObject_t up_grad_img_y, cudaTextureObject_t up_grad_img_z,
+                                    cudaTextureObject_t down_grad_img_x, cudaTextureObject_t down_grad_img_y, cudaTextureObject_t down_grad_img_z,
+                                    int3 data_sz, float3 data_spc,
+                                    float d00,float d01,float d02,float d10,float d11,float d12,float d20,float d21,float d22,
+                                    cudaPitchedPtr def_FINV,
+                                    cudaPitchedPtr updateFieldFINV,
+                                    float3 phase_vector,int kernel_sz, float* h_kernel, float &metric_value)
+{
+
+    float h_d_dir[]= {d00,d01,d02,d10,d11,d12,d20,d21,d22};
+    gpuErrchk(cudaMemcpyToSymbol(d_dir, &h_d_dir, 9 * sizeof(float)));
+    float h_d_spc[]= {data_spc.x,data_spc.y,data_spc.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_spc, &h_d_spc, 3 * sizeof(float)));
+    int h_d_sz[]= {data_sz.x,data_sz.y,data_sz.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
+
+    gpuErrchk(cudaMemcpyToSymbol(c_Kernel, h_kernel, kernel_sz * sizeof(float)));
+
+
+    cudaPitchedPtr metric_image={0};
+    cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
+    cudaMalloc3D(&metric_image, extent);
+    cudaMemset3D(metric_image,0,extent);
+
+
+    float new_phase[3];
+    new_phase[0]= d00*phase_vector.x + d01*phase_vector.y +d02*phase_vector.z ;
+    new_phase[1]= d10*phase_vector.x + d11*phase_vector.y +d12*phase_vector.z ;
+    new_phase[2]= d20*phase_vector.x + d21*phase_vector.y +d22*phase_vector.z ;
+    gpuErrchk(cudaMemcpyToSymbol(d_new_phase, &new_phase, 3 * sizeof(float)));
+
+    int phase_xyz,phase;
+    if( (fabs(phase_vector.x) > fabs(phase_vector.y))  && (fabs(phase_vector.x) > fabs(phase_vector.z)))
+        phase=0;
+    else if( (fabs(phase_vector.y) > fabs(phase_vector.x))  && (fabs(phase_vector.y) > fabs(phase_vector.z)))
+        phase=1;
+    else phase=2;
+
+    if( (fabs(new_phase[0]) > fabs(new_phase[1]))  && (fabs(new_phase[0]) > fabs(new_phase[2])))
+        phase_xyz=0;
+    else if( (fabs(new_phase[1]) > fabs(new_phase[0]))  && (fabs(new_phase[1]) > fabs(new_phase[2])))
+        phase_xyz=1;
+    else phase_xyz=2;
+
+
+
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+
+    cudaPitchedPtr sSS={0};
+    cudaMalloc3D(&sSS, extent);    cudaMemset3D(sSS,0,extent);
+    cudaPitchedPtr valS={0};
+    cudaMalloc3D(&valS, extent);    cudaMemset3D(valS,0,extent);
+
+
+    {
+        cudaPitchedPtr sKS={0};
+        cudaMalloc3D(&sKS, extent);    cudaMemset3D(sKS,0,extent);
+        cudaPitchedPtr sKK={0};
+        cudaMalloc3D(&sKK, extent);    cudaMemset3D(sKK,0,extent);
+        cudaPitchedPtr valK={0};
+        cudaMalloc3D(&valK, extent);    cudaMemset3D(valK,0,extent);
+
+        cudaPitchedPtr detimg={0};
+        cudaMalloc3D(&detimg, extent);    cudaMemset3D(detimg,0,extent);
+        computeDetImg<<< blockSize,gridSize>>>( up_img,def_FINV,detimg,phase,phase_xyz);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+
+        computeFiniteDiffStructs<<< blockSize,gridSize>>>( detimg, str_img, sKS,sSS,sKK,valS,valK);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+
+        ComputeMetric_CCJacSSingle_kernel<<< blockSize,gridSize>>>( up_img, str_img, up_grad_img_x,up_grad_img_y,up_grad_img_z,def_FINV, updateFieldFINV, metric_image, phase, phase_xyz, kernel_sz ,sKS,sSS,sKK,valS,valK);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+        cudaFree(valK.ptr);
+        cudaFree(sKK.ptr);
+        cudaFree(sKS.ptr);
+        cudaFree(detimg.ptr);
+    }
+
+    {
+        cudaPitchedPtr sKS={0};
+        cudaMalloc3D(&sKS, extent);    cudaMemset3D(sKS,0,extent);
+        cudaPitchedPtr sKK={0};
+        cudaMalloc3D(&sKK, extent);    cudaMemset3D(sKK,0,extent);
+        cudaPitchedPtr valK={0};
+        cudaMalloc3D(&valK, extent);    cudaMemset3D(valK,0,extent);
+        cudaMemset3D(valS,0,extent);
+        cudaMemset3D(sSS,0,extent);
+
+
+        cudaPitchedPtr def_MINV={0};
+        cudaExtent extentF =  make_cudaExtent(3*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
+        cudaMalloc3D(&def_MINV, extentF);
+
+        cudaPitchedPtr updateFieldMINV={0};
+        cudaMalloc3D(&updateFieldMINV, extentF);
+        cudaMemset3D(updateFieldMINV,0,extentF);
+
+
+        cudaMemcpy3DParms copyParams = {0};
+        copyParams.srcPtr   = def_FINV;
+        copyParams.dstPtr =   def_MINV;
+        copyParams.extent   = extentF;
+        copyParams.kind     = cudaMemcpyDeviceToDevice;
+        cudaMemcpy3D(&copyParams);
+
+
+        NegateImage2_kernel<<< blockSize,gridSize>>>(def_MINV,data_sz,3);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+
+        cudaPitchedPtr detimg={0};
+        cudaMalloc3D(&detimg, extent);    cudaMemset3D(detimg,0,extent);
+        computeDetImg<<< blockSize,gridSize>>>( down_img,def_MINV,detimg,phase,phase_xyz);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+        computeFiniteDiffStructs<<< blockSize,gridSize>>>( detimg, str_img,  sKS,sSS,sKK,valS,valK);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+        ComputeMetric_CCJacSSingle_kernel<<< blockSize,gridSize>>>( down_img, str_img, down_grad_img_x,down_grad_img_y,down_grad_img_z, def_MINV, updateFieldMINV, metric_image, phase, phase_xyz, kernel_sz ,sKS,sSS,sKK,valS,valK);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+
+        AddToUpdateField2_kernel<<< blockSize,gridSize>>>(  updateFieldFINV,updateFieldMINV,-1,data_sz,3);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+
+        cudaFree(updateFieldMINV.ptr);
+        cudaFree(def_MINV.ptr);
+        cudaFree(valK.ptr);
+        cudaFree(sKK.ptr);
+        cudaFree(sKS.ptr);
+        cudaFree(detimg.ptr);
+    }
+
+    cudaFree(sSS.ptr);
+    cudaFree(valS.ptr);
+
+
+
+    float* dev_out;
+    float out;
+    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+    ScalarFindSum<<<gSize, bSize>>>((float *)metric_image.ptr, metric_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+    cudaDeviceSynchronize();
+    ScalarFindSum<<<1, bSize>>>(dev_out, gSize, dev_out);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+    cudaFree(dev_out);
+    metric_value=out/data_sz.x/data_sz.y/data_sz.z;
+
+    cudaFree(metric_image.ptr);
+
+}
+
+
+
+__global__ void
 ComputeMetric_CCJacS_kernel( cudaPitchedPtr b0_img,  cudaPitchedPtr str_img,
                             cudaPitchedPtr field,
                             cudaPitchedPtr updateField,
@@ -463,7 +1067,7 @@ ComputeMetric_CCJacS_kernel( cudaPitchedPtr b0_img,  cudaPitchedPtr str_img,
 
                        float first_term= -2*sKS_val/ sSS_sKK;
 
-                       float detF2 = ComputeSingleJacobianMatrixAtIndex(field,i,j,k,1,phase,phase_xyz);
+                       float detF2 = ComputeSingleJacobianMatrixAtIndex(field,i,j,k,1,phase,phase_xyz)+1;
                        if(detF2 <=0)
                            detF2=1E-5;
                        float detF= mf(detF2);
@@ -551,7 +1155,7 @@ ComputeMetric_CCJacS_kernel( cudaPitchedPtr b0_img,  cudaPitchedPtr str_img,
                        {
                           float first_term= -2*sKS_val/ sSS_sKK;
 
-                          float detF2 = ComputeSingleJacobianMatrixAtIndex(field,nindex[0],nindex[1],nindex[2],1,phase,phase_xyz);
+                          float detF2 = ComputeSingleJacobianMatrixAtIndex(field,nindex[0],nindex[1],nindex[2],1,phase,phase_xyz)+1;
                           if(detF2 <=0)
                               detF2=1E-5;
                           float detF= mf(detF2);
@@ -641,7 +1245,7 @@ ComputeMetric_CCJacS_kernel( cudaPitchedPtr b0_img,  cudaPitchedPtr str_img,
                        {
                           float first_term= -2*sKS_val/ sSS_sKK;
 
-                          float detF2 = ComputeSingleJacobianMatrixAtIndex(field,nindex[0],nindex[1],nindex[2],1,phase,phase_xyz);
+                          float detF2 = ComputeSingleJacobianMatrixAtIndex(field,nindex[0],nindex[1],nindex[2],1,phase,phase_xyz)+1;
                           if(detF2 <=0)
                               detF2=1E-5;
                           float detF= mf(detF2);
@@ -863,12 +1467,13 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                     a=c_Kernel[  mid_ind -1];
 
                 float a_b= a/b;
+                a_b=0;
 
 
                 ////////////////////////   at x ///////////////////////////////////////////
                 {
-                    float detf = ComputeSingleJacobianMatrixAtIndex(def_FINV,i,j,k,1,phase,phase_xyz);
-                    float detm = ComputeSingleJacobianMatrixAtIndex(def_MINV,i,j,k,1,phase,phase_xyz);
+                    float detf = ComputeSingleJacobianMatrixAtIndex(def_FINV,i,j,k,1,phase,phase_xyz)+1;
+                    float detm = ComputeSingleJacobianMatrixAtIndex(def_MINV,i,j,k,1,phase,phase_xyz)+1;
 
 
                     if(detf <=0)
@@ -929,9 +1534,10 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                                 a= c_Kernel[mid_ind-h];
                             else
                                 a=0;
+                            a_b=0;
 
-                            float detf2 = ComputeSingleJacobianMatrixAtIndex(def_FINV,nindex[0],nindex[1],nindex[2],h,phase,phase_xyz);
-                            float detm2 = ComputeSingleJacobianMatrixAtIndex(def_MINV,nindex[0],nindex[1],nindex[2],h,phase,phase_xyz);
+                            float detf2 = ComputeSingleJacobianMatrixAtIndex(def_FINV,nindex[0],nindex[1],nindex[2],h,phase,phase_xyz)+1;
+                            float detm2 = ComputeSingleJacobianMatrixAtIndex(def_MINV,nindex[0],nindex[1],nindex[2],h,phase,phase_xyz)+1;
 
                             if(detf2 <=0)
                                 detf2=1E-5;
@@ -990,9 +1596,10 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                                 a= c_Kernel[mid_ind-h];
                             else
                                 a=0;
+                            a_b=0;
 
-                            float detf2 = ComputeSingleJacobianMatrixAtIndex(def_FINV,nindex[0],nindex[1],nindex[2],h,phase,phase_xyz);
-                            float detm2 = ComputeSingleJacobianMatrixAtIndex(def_MINV,nindex[0],nindex[1],nindex[2],h,phase,phase_xyz);
+                            float detf2 = ComputeSingleJacobianMatrixAtIndex(def_FINV,nindex[0],nindex[1],nindex[2],h,phase,phase_xyz)+1;
+                            float detm2 = ComputeSingleJacobianMatrixAtIndex(def_MINV,nindex[0],nindex[1],nindex[2],h,phase,phase_xyz)+1;
 
                             if(detf2 <=0)
                                 detf2=1E-5;
@@ -1133,6 +1740,394 @@ void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 }		   
 
 
+
+
+
+__global__ void
+ComputeMetric_MSJacSingle_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
+                                  cudaTextureObject_t up_grad_img_x, cudaTextureObject_t up_grad_img_y, cudaTextureObject_t up_grad_img_z,
+                                  cudaTextureObject_t down_grad_img_x, cudaTextureObject_t down_grad_img_y, cudaTextureObject_t down_grad_img_z,
+                            cudaPitchedPtr def_FINV,
+                            cudaPitchedPtr updateFieldFINV,
+                            cudaPitchedPtr metric_image,
+                            int phase, int phase_xyz,
+                            int kernel_sz )
+{
+    uint ii = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint k = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int i=PER_GROUP*ii;i<PER_GROUP*ii+PER_GROUP;i++)
+    {
+        if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2])
+        {
+
+            float update[3]={0,0,0};
+
+            if(i>=1 && j>=1 && k>=1 && i<=d_sz[0]-2  && j<=d_sz[1]-2  && k<=d_sz[2]-2)
+            {
+                int mid_ind=(kernel_sz-1)/2;
+                float b= c_Kernel[  mid_ind ];
+
+                ////////////////////////   at x ///////////////////////////////////////////
+                {
+                    size_t upitch= up_img.pitch;
+                    size_t uslicePitch= upitch*d_sz[1]*k;
+                    size_t ucolPitch= j*upitch;
+                    char *u_ptr= (char *)(up_img.ptr);
+                    char * slice_u= u_ptr+  uslicePitch;
+                    float * row_up= (float *)(slice_u+ ucolPitch);
+
+                    size_t dpitch= down_img.pitch;
+                    size_t dslicePitch= dpitch*d_sz[1]*k;
+                    size_t dcolPitch= j*dpitch;
+                    char *d_ptr= (char *)(down_img.ptr);
+                    char * slice_d= d_ptr+  dslicePitch;
+                    float * row_down= (float *)(slice_d+ dcolPitch);
+
+                    size_t mpitch= metric_image.pitch;
+                    size_t mslicePitch= mpitch*d_sz[1]*k;
+                    size_t mcolPitch= j*mpitch;
+                    char *m_ptr= (char *)(metric_image.ptr);
+                    char * slice_m= m_ptr+  mslicePitch;
+                    float * row_metric= (float *)(slice_m+ mcolPitch);
+
+                    size_t fpitch= def_FINV.pitch;
+                    size_t fslicePitch= fpitch*d_sz[1]*k;
+                    size_t fcolPitch= j*fpitch;
+                    char *f_ptr= (char *)(def_FINV.ptr);
+                    char * slice_f= f_ptr+  fslicePitch;
+                    float * row_f= (float *)(slice_f+ fcolPitch);
+
+                    float valf = row_up[i];
+                    float valm = row_down[i];
+                    float det = ComputeSingleJacobianMatrixAtIndex(def_FINV,i,j,k,1,phase,phase_xyz);
+                    if(det<=-1)
+                        det=-1+1E-5;
+
+
+                    float K= valf*(1+det)-valm*(1-det);
+                    row_metric[i]= K*K;
+
+                    float x= (d_dir[0]*i  + d_dir[1]*j + d_dir[2]*k)* d_spc[0] ;
+                    float y= (d_dir[3]*i  + d_dir[4]*j + d_dir[5]*k)* d_spc[1] ;
+                    float z= (d_dir[6]*i  + d_dir[7]*j + d_dir[8]*k)* d_spc[2] ;
+
+                    float up_grad_x=0,up_grad_y=0,up_grad_z=0;
+                    float down_grad_x=0,down_grad_y=0,down_grad_z=0;
+
+                    {
+                        float xw= x + row_f[3*i];
+                        float yw= y + row_f[3*i+1];
+                        float zw= z + row_f[3*i+2];
+
+                        float iw = (d_dir[0]*xw  + d_dir[3]*yw  + d_dir[6]*zw)/ d_spc[0] ;
+                        float jw = (d_dir[1]*xw  + d_dir[4]*yw  + d_dir[7]*zw)/ d_spc[1] ;
+                        float kw = (d_dir[2]*xw  + d_dir[5]*yw  + d_dir[8]*zw)/ d_spc[2] ;
+
+                        up_grad_x =tex3D<float>(up_grad_img_x, iw+0.5, jw +0.5, kw+0.5);
+                        up_grad_y =tex3D<float>(up_grad_img_y, iw+0.5, jw +0.5, kw+0.5);
+                        up_grad_z =tex3D<float>(up_grad_img_z, iw+0.5, jw +0.5, kw+0.5);
+                    }
+                    {
+                        float xw= x - row_f[3*i];
+                        float yw= y - row_f[3*i+1];
+                        float zw= z - row_f[3*i+2];
+
+                        float iw = (d_dir[0]*xw  + d_dir[3]*yw  + d_dir[6]*zw)/ d_spc[0] ;
+                        float jw = (d_dir[1]*xw  + d_dir[4]*yw  + d_dir[7]*zw)/ d_spc[1] ;
+                        float kw = (d_dir[2]*xw  + d_dir[5]*yw  + d_dir[8]*zw)/ d_spc[2] ;
+
+                        down_grad_x =tex3D<float>(down_grad_img_x, iw+0.5, jw +0.5, kw+0.5);
+                        down_grad_y =tex3D<float>(down_grad_img_y, iw+0.5, jw +0.5, kw+0.5);
+                        down_grad_z =tex3D<float>(down_grad_img_z, iw+0.5, jw +0.5, kw+0.5);
+                    }
+
+
+                    update[0]= 2*K*(  (up_grad_x*(1+det)) -  (down_grad_x*(1-det)) );
+                    update[1]= 2*K*(  (up_grad_y*(1+det)) -  (down_grad_y*(1-det)) );
+                    update[2]= 2*K*(  (up_grad_z*(1+det)) -  (down_grad_z*(1-det)) );
+
+
+                }
+
+
+                ////////////////////////   at x+1 ///////////////////////////////////////////
+                {
+                    for(int h=1;h<2;h++)
+                    {
+                        int nindex[3]={(int)i,(int)j,(int)k};
+                        nindex[phase]+=h;
+
+                        if(nindex[0]>=h && nindex[1]>=h && nindex[2]>=h && nindex[0]<=d_sz[0]-h-1 && nindex[1]<=d_sz[1]-h-1 && nindex[2]<=d_sz[2]-h-1)
+                        {
+                            float a=0;
+                            if(mid_ind-h >=0 )
+                                a=c_Kernel[  mid_ind -h];
+                            float a_b= a/b;
+                            a_b=0;
+
+
+                            size_t upitch= up_img.pitch;
+                            size_t uslicePitch= upitch*d_sz[1]*nindex[2];
+                            size_t ucolPitch= nindex[1]*upitch;
+                            char *u_ptr= (char *)(up_img.ptr);
+                            char * slice_u= u_ptr+  uslicePitch;
+                            float * row_up= (float *)(slice_u+ ucolPitch);
+
+                            size_t dpitch= down_img.pitch;
+                            size_t dslicePitch= dpitch*d_sz[1]*nindex[2];
+                            size_t dcolPitch= nindex[1]*dpitch;
+                            char *d_ptr= (char *)(down_img.ptr);
+                            char * slice_d= d_ptr+  dslicePitch;
+                            float * row_down= (float *)(slice_d+ dcolPitch);
+
+                            size_t fpitch= def_FINV.pitch;
+                            size_t fslicePitch= fpitch*d_sz[1]*nindex[2];
+                            size_t fcolPitch= nindex[1]*fpitch;
+                            char *f_ptr= (char *)(def_FINV.ptr);
+                            char * slice_f= f_ptr+  fslicePitch;
+                            float * row_f= (float *)(slice_f+ fcolPitch);
+
+                            float valf = row_up[nindex[0]];
+                            float valm = row_down[nindex[0]];
+                            float det = ComputeSingleJacobianMatrixAtIndex(def_FINV,nindex[0],nindex[1],nindex[2],1,phase,phase_xyz);
+                            if(det<=-1)
+                                det=-1+1E-5;
+
+                            float K = valf*(1+det)-valm*(1-det);
+
+
+                            float x= (d_dir[0]*nindex[0]  + d_dir[1]*nindex[1] + d_dir[2]*nindex[2])* d_spc[0] ;
+                            float y= (d_dir[3]*nindex[0]  + d_dir[4]*nindex[1] + d_dir[5]*nindex[2])* d_spc[1] ;
+                            float z= (d_dir[6]*nindex[0]  + d_dir[7]*nindex[1] + d_dir[8]*nindex[2])* d_spc[2] ;
+
+                            float up_grad_x=0,up_grad_y=0,up_grad_z=0;
+                            float down_grad_x=0,down_grad_y=0,down_grad_z=0;
+
+                            {
+                                float xw= x + row_f[3*nindex[0]];
+                                float yw= y + row_f[3*nindex[0]+1];
+                                float zw= z + row_f[3*nindex[0]+2];
+
+                                float iw = (d_dir[0]*xw  + d_dir[3]*yw  + d_dir[6]*zw)/ d_spc[0] ;
+                                float jw = (d_dir[1]*xw  + d_dir[4]*yw  + d_dir[7]*zw)/ d_spc[1] ;
+                                float kw = (d_dir[2]*xw  + d_dir[5]*yw  + d_dir[8]*zw)/ d_spc[2] ;
+
+                                up_grad_x =tex3D<float>(up_grad_img_x, iw+0.5, jw +0.5, kw+0.5);
+                                up_grad_y =tex3D<float>(up_grad_img_y, iw+0.5, jw +0.5, kw+0.5);
+                                up_grad_z =tex3D<float>(up_grad_img_z, iw+0.5, jw +0.5, kw+0.5);
+                            }
+                            {
+                                float xw= x - row_f[3*nindex[0]];
+                                float yw= y - row_f[3*nindex[0]+1];
+                                float zw= z - row_f[3*nindex[0]+2];
+
+                                float iw = (d_dir[0]*xw  + d_dir[3]*yw  + d_dir[6]*zw)/ d_spc[0] ;
+                                float jw = (d_dir[1]*xw  + d_dir[4]*yw  + d_dir[7]*zw)/ d_spc[1] ;
+                                float kw = (d_dir[2]*xw  + d_dir[5]*yw  + d_dir[8]*zw)/ d_spc[2] ;
+
+                                down_grad_x =tex3D<float>(down_grad_img_x, iw+0.5, jw +0.5, kw+0.5);
+                                down_grad_y =tex3D<float>(down_grad_img_y, iw+0.5, jw +0.5, kw+0.5);
+                                down_grad_z =tex3D<float>(down_grad_img_z, iw+0.5, jw +0.5, kw+0.5);
+                            }
+
+                            float gradI[3]={up_grad_x,up_grad_y,up_grad_z};
+                            float gradJ[3]={down_grad_x,down_grad_y,down_grad_z};
+
+                            update[phase_xyz]+= 2 * K * (   (gradI[phase_xyz]*a_b*(1+det) + d_new_phase[phase_xyz]*valf*-0.5/d_spc[phase]/h)
+                                                            -(  gradJ[phase_xyz]*a_b*(1-det) - d_new_phase[phase_xyz]*valm*-0.5/d_spc[phase]/h) );
+
+
+                        }
+                    }
+                }    // x+1
+
+
+
+                ////////////////////////   at x-1 ///////////////////////////////////////////
+                {
+                    for(int h=1;h<2;h++)
+                    {
+                        int nindex[3]={(int)i,(int)j,(int)k};
+                        nindex[phase]-=h;
+
+                        if(nindex[0]>=h && nindex[1]>=h && nindex[2]>=h && nindex[0]<=d_sz[0]-h-1 && nindex[1]<=d_sz[1]-h-1 && nindex[2]<=d_sz[2]-h-1)
+                        {
+                            float a=0;
+                            if(mid_ind-h >=0 )
+                                a=c_Kernel[  mid_ind -h];
+                            float a_b= a/b;
+                            a_b=0;
+
+
+                            size_t upitch= up_img.pitch;
+                            size_t uslicePitch= upitch*d_sz[1]*nindex[2];
+                            size_t ucolPitch= nindex[1]*upitch;
+                            char *u_ptr= (char *)(up_img.ptr);
+                            char * slice_u= u_ptr+  uslicePitch;
+                            float * row_up= (float *)(slice_u+ ucolPitch);
+
+                            size_t dpitch= down_img.pitch;
+                            size_t dslicePitch= dpitch*d_sz[1]*nindex[2];
+                            size_t dcolPitch= nindex[1]*dpitch;
+                            char *d_ptr= (char *)(down_img.ptr);
+                            char * slice_d= d_ptr+  dslicePitch;
+                            float * row_down= (float *)(slice_d+ dcolPitch);
+
+                            size_t fpitch= def_FINV.pitch;
+                            size_t fslicePitch= fpitch*d_sz[1]*nindex[2];
+                            size_t fcolPitch= nindex[1]*fpitch;
+                            char *f_ptr= (char *)(def_FINV.ptr);
+                            char * slice_f= f_ptr+  fslicePitch;
+                            float * row_f= (float *)(slice_f+ fcolPitch);
+
+                            float valf = row_up[nindex[0]];
+                            float valm = row_down[nindex[0]];
+                            float det = ComputeSingleJacobianMatrixAtIndex(def_FINV,nindex[0],nindex[1],nindex[2],1,phase,phase_xyz);
+                            if(det<=-1)
+                                det=-1+1E-5;
+
+                            float K = valf*(1+det)-valm*(1-det);
+
+
+
+                            float x= (d_dir[0]*nindex[0]  + d_dir[1]*nindex[1] + d_dir[2]*nindex[2])* d_spc[0] ;
+                            float y= (d_dir[3]*nindex[0]  + d_dir[4]*nindex[1] + d_dir[5]*nindex[2])* d_spc[1] ;
+                            float z= (d_dir[6]*nindex[0]  + d_dir[7]*nindex[1] + d_dir[8]*nindex[2])* d_spc[2] ;
+
+                            float up_grad_x=0,up_grad_y=0,up_grad_z=0;
+                            float down_grad_x=0,down_grad_y=0,down_grad_z=0;
+
+                            {
+                                float xw= x + row_f[3*nindex[0]];
+                                float yw= y + row_f[3*nindex[0]+1];
+                                float zw= z + row_f[3*nindex[0]+2];
+
+                                float iw = (d_dir[0]*xw  + d_dir[3]*yw  + d_dir[6]*zw)/ d_spc[0] ;
+                                float jw = (d_dir[1]*xw  + d_dir[4]*yw  + d_dir[7]*zw)/ d_spc[1] ;
+                                float kw = (d_dir[2]*xw  + d_dir[5]*yw  + d_dir[8]*zw)/ d_spc[2] ;
+
+                                up_grad_x =tex3D<float>(up_grad_img_x, iw+0.5, jw +0.5, kw+0.5);
+                                up_grad_y =tex3D<float>(up_grad_img_y, iw+0.5, jw +0.5, kw+0.5);
+                                up_grad_z =tex3D<float>(up_grad_img_z, iw+0.5, jw +0.5, kw+0.5);
+                            }
+                            {
+                                float xw= x - row_f[3*nindex[0]];
+                                float yw= y - row_f[3*nindex[0]+1];
+                                float zw= z - row_f[3*nindex[0]+2];
+
+                                float iw = (d_dir[0]*xw  + d_dir[3]*yw  + d_dir[6]*zw)/ d_spc[0] ;
+                                float jw = (d_dir[1]*xw  + d_dir[4]*yw  + d_dir[7]*zw)/ d_spc[1] ;
+                                float kw = (d_dir[2]*xw  + d_dir[5]*yw  + d_dir[8]*zw)/ d_spc[2] ;
+
+                                down_grad_x =tex3D<float>(down_grad_img_x, iw+0.5, jw +0.5, kw+0.5);
+                                down_grad_y =tex3D<float>(down_grad_img_y, iw+0.5, jw +0.5, kw+0.5);
+                                down_grad_z =tex3D<float>(down_grad_img_z, iw+0.5, jw +0.5, kw+0.5);
+                            }
+
+                            float gradI[3]={up_grad_x,up_grad_y,up_grad_z};
+                            float gradJ[3]={down_grad_x,down_grad_y,down_grad_z};
+
+
+                            update[phase_xyz]+= 2 * K * (   (gradI[phase_xyz]*a_b*(1+det) + d_new_phase[phase_xyz]*valf*0.5/d_spc[phase]/h)
+                                                            -(gradJ[phase_xyz]*a_b*(1-det) - d_new_phase[phase_xyz]*valm*0.5/d_spc[phase]/h) );
+                        }
+                    }
+                }    // x+1
+
+
+
+                size_t upitch= updateFieldFINV.pitch;
+                size_t uslicePitch= upitch*d_sz[1]*k;
+                size_t ucolPitch= j*upitch;
+                char *u_ptr= (char *)(updateFieldFINV.ptr);
+                char * slice_u= u_ptr+  uslicePitch;
+                float * row_uf= (float *)(slice_u+ ucolPitch);
+
+                row_uf[3*i]=-update[0];
+                row_uf[3*i+1]= -update[1];
+                row_uf[3*i+2]= -update[2];
+            }
+        }
+     }
+}
+
+
+
+
+void ComputeMetric_MSJacSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
+                                    cudaTextureObject_t up_grad_img_x, cudaTextureObject_t up_grad_img_y, cudaTextureObject_t up_grad_img_z,
+                                    cudaTextureObject_t down_grad_img_x, cudaTextureObject_t down_grad_img_y, cudaTextureObject_t down_grad_img_z,
+     int3 data_sz, float3 data_spc,
+     float d00,float d01,float d02,float d10,float d11,float d12,float d20,float d21,float d22,
+     cudaPitchedPtr def_FINV,
+        cudaPitchedPtr updateFieldFINV,
+                   float3 phase_vector,int kernel_sz, float* h_kernel, float &metric_value)
+{
+
+    float h_d_dir[]= {d00,d01,d02,d10,d11,d12,d20,d21,d22};
+    gpuErrchk(cudaMemcpyToSymbol(d_dir, &h_d_dir, 9 * sizeof(float)));
+    float h_d_spc[]= {data_spc.x,data_spc.y,data_spc.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_spc, &h_d_spc, 3 * sizeof(float)));
+    int h_d_sz[]= {data_sz.x,data_sz.y,data_sz.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
+
+    gpuErrchk(cudaMemcpyToSymbol(c_Kernel, h_kernel, kernel_sz * sizeof(float)));
+
+
+    cudaPitchedPtr metric_image={0};
+    cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
+    cudaMalloc3D(&metric_image, extent);
+    cudaMemset3D(metric_image,0,extent);
+
+
+    float new_phase[3];
+    new_phase[0]= d00*phase_vector.x + d01*phase_vector.y +d02*phase_vector.z ;
+    new_phase[1]= d10*phase_vector.x + d11*phase_vector.y +d12*phase_vector.z ;
+    new_phase[2]= d20*phase_vector.x + d21*phase_vector.y +d22*phase_vector.z ;
+    gpuErrchk(cudaMemcpyToSymbol(d_new_phase, &new_phase, 3 * sizeof(float)));
+
+    int phase_xyz,phase;
+    if( (fabs(phase_vector.x) > fabs(phase_vector.y))  && (fabs(phase_vector.x) > fabs(phase_vector.z)))
+        phase=0;
+    else if( (fabs(phase_vector.y) > fabs(phase_vector.x))  && (fabs(phase_vector.y) > fabs(phase_vector.z)))
+        phase=1;
+    else phase=2;
+
+    if( (fabs(new_phase[0]) > fabs(new_phase[1]))  && (fabs(new_phase[0]) > fabs(new_phase[2])))
+        phase_xyz=0;
+    else if( (fabs(new_phase[1]) > fabs(new_phase[0]))  && (fabs(new_phase[1]) > fabs(new_phase[2])))
+        phase_xyz=1;
+    else phase_xyz=2;
+
+
+
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+
+    ComputeMetric_MSJacSingle_kernel<<< blockSize,gridSize>>>( up_img, down_img, up_grad_img_x,up_grad_img_y,up_grad_img_z,down_grad_img_x,down_grad_img_y,down_grad_img_z,def_FINV,updateFieldFINV,  metric_image, phase, phase_xyz, kernel_sz );
+
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+
+    float* dev_out;
+    float out;
+    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+    ScalarFindSum<<<gSize, bSize>>>((float *)metric_image.ptr, metric_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+    cudaDeviceSynchronize();
+    ScalarFindSum<<<1, bSize>>>(dev_out, gSize, dev_out);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+    cudaFree(dev_out);
+    metric_value=out/data_sz.x/data_sz.y/data_sz.z;
+
+    cudaFree(metric_image.ptr);
+
+}
 
 
 __global__ void

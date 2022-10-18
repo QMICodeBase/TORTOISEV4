@@ -1237,10 +1237,15 @@ void DTIModel::EstimateTensorN2()
     VF_img->SetDirection(A0_img->GetDirection());
     VF_img->FillBuffer(0.);
 
+    float free_water_adc_value=this->free_water_diffusivity/1000.;
+    constexpr float fraction_of_free_water_adc_value=0.8;
+
+    float factor =  free_water_adc_value/3.;
+
     DTImageType::PixelType new_tens;
-    new_tens[0]=0.0008;
-    new_tens[3]=0.0008;
-    new_tens[5]=0.0008;
+    new_tens[0]=0.0008*factor;
+    new_tens[3]=0.0008*factor;
+    new_tens[5]=0.0008*factor;
     new_tens[1]=0;
     new_tens[2]=0;
     new_tens[4]=0;
@@ -1309,8 +1314,7 @@ void DTIModel::EstimateTensorN2()
     CS_img->FillBuffer(0.);
 
 
-    constexpr float free_water_adc_value=3.;
-    constexpr float fraction_of_free_water_adc_value=0.8;
+
 
     #pragma omp parallel for
     for(int k=0;k<size[2];k++)
@@ -1532,22 +1536,22 @@ void DTIModel::EstimateTensorN2()
                 double degrees_of_freedom= curr_all_indices.size()-7;
                 CS_img->SetPixel(ind3,my_results_struct.bestnorm/degrees_of_freedom);
 
-                dt_vec[0]= p[1]/1000.;
-                dt_vec[1]= p[2]/1000.;
-                dt_vec[2]= p[3]/1000.;
-                dt_vec[3]= p[4]/1000.;
-                dt_vec[4]= p[5]/1000.;
-                dt_vec[5]= p[6]/1000.;
+                dt_vec[0]= p[0]/1000.;
+                dt_vec[1]= p[1]/1000.;
+                dt_vec[2]= p[2]/1000.;
+                dt_vec[3]= p[3]/1000.;
+                dt_vec[4]= p[4]/1000.;
+                dt_vec[5]= p[5]/1000.;
 
-                if(p[1]> 3.2 || p[4] > 3.2 || p[6]>3.2)  //FLOW ARTIFACT
+                if(p[0]> 3.2 || p[3] > 3.2 || p[5]>3.2)  //FLOW ARTIFACT
                 {
                     dt_vec= output_img->GetPixel(ind3);
                 }
 
-                 if(p[2]>1.1 || p[3]> 1.1 || p[5]>1.1)  //FLOW ARTIFACT
-                 {
-                     dt_vec= output_img->GetPixel(ind3);
-                 }
+                if(p[1]>1.1 || p[2]> 1.1 || p[4]>1.1)  //FLOW ARTIFACT
+                {
+                    dt_vec= output_img->GetPixel(ind3);
+                }
 
                  output_img->SetPixel(ind3,dt_vec);
                  A0_img->SetPixel(ind3,p[6]);

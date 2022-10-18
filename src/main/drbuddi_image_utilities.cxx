@@ -151,6 +151,35 @@ DisplacementFieldType::PixelType ComputeImageGradient(ImageType3D::Pointer img, 
     return grad2; 
 }
 
+std::vector<ImageType3D::Pointer> ComputeImageGradientImg(ImageType3D::Pointer img)
+{
+    std::vector<ImageType3D::Pointer> grad_imgs; grad_imgs.resize(3);
+
+    for(int i=0;i<3;i++)
+    {
+        grad_imgs[i] = ImageType3D::New();
+        grad_imgs[i]->SetRegions(img->GetLargestPossibleRegion());
+        grad_imgs[i]->Allocate();
+        grad_imgs[i]->SetSpacing(img->GetSpacing());
+        grad_imgs[i]->SetDirection(img->GetDirection());
+        grad_imgs[i]->SetOrigin(img->GetOrigin());
+    }
+
+
+
+    itk::ImageRegionIteratorWithIndex<ImageType3D> it(img,img->GetLargestPossibleRegion());
+    for(it.GoToBegin();!it.IsAtEnd();++it)
+    {
+        ImageType3D::IndexType ind3= it.GetIndex();
+        DisplacementFieldType::PixelType grad = ComputeImageGradient(img,ind3);
+        grad_imgs[0]->SetPixel(ind3,grad[0]);
+        grad_imgs[1]->SetPixel(ind3,grad[1]);
+        grad_imgs[2]->SetPixel(ind3,grad[2]);
+    }
+    return grad_imgs;
+}
+
+
 void AddToUpdateField(DisplacementFieldType::Pointer updateField,DisplacementFieldType::Pointer  updateField_temp,double weight)
 {       
     DisplacementFieldType::SizeType sz= updateField_temp->GetLargestPossibleRegion().GetSize();
@@ -278,6 +307,24 @@ void RestrictPhase(DisplacementFieldType::Pointer  field, vnl_vector<double> pha
             }
         }
     }
+}
+
+DisplacementFieldType::Pointer NegateField( const DisplacementFieldType::Pointer field)
+{
+    DisplacementFieldType::Pointer nfield = DisplacementFieldType::New();
+    nfield->SetRegions(field->GetLargestPossibleRegion());
+    nfield->Allocate();
+    nfield->SetSpacing(field->GetSpacing());
+    nfield->SetDirection(field->GetDirection());
+    nfield->SetOrigin(field->GetOrigin());
+
+    itk::ImageRegionIteratorWithIndex<DisplacementFieldType> it(nfield,nfield->GetLargestPossibleRegion());
+    for(it.GoToBegin();!it.IsAtEnd();++it)
+    {
+        DisplacementFieldType::IndexType ind3= it.GetIndex();
+        it.Set(-1.* field->GetPixel(ind3));
+    }
+    return nfield;
 }
 
 DisplacementFieldType::Pointer InvertField( const DisplacementFieldType * field, const DisplacementFieldType * inverseFieldEstimate )

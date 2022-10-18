@@ -263,13 +263,13 @@ AddToUpdateField_kernel(cudaPitchedPtr total_data, cudaPitchedPtr to_add_data , 
 }
 
 
-void AddToUpdateField_cuda(cudaPitchedPtr total_data, cudaPitchedPtr to_add_data,float weight, const int3 data_sz,int Ncomponents  )
+void AddToUpdateField_cuda(cudaPitchedPtr total_data, cudaPitchedPtr to_add_data,float weight, const int3 data_sz,int Ncomponents , bool normalize )
 {
 
-    float magnitude;
+    float magnitude=1;
 
+    if(normalize)
     {
-
         float* dev_out;
         cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
 
@@ -964,13 +964,135 @@ void PreprocessImage_cuda(cudaPitchedPtr img,
     PreprocessImage_kernel<<< blockSize,gridSize>>>( img,data_sz,min,max , low_val,up_val,output );
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
+}
+
+__device__ float3 ComputeImageGradientf(cudaPitchedPtr img,int i, int j, int k)
+{
+    float3 grad;
+    grad.x=0;
+    grad.y=0;
+    grad.z=0;    
+
+    if(i==0 || i== d_sz[0]-1 || j==0 || j== d_sz[1]-1 || k==0 || k== d_sz[2]-1 )
+        return grad;
+
+    size_t pitch= img.pitch;
+    char *ptr= (char *)(img.ptr);
+
+    {
+        size_t slicePitch= pitch*d_sz[1]*k;
+        char * slice= ptr+  slicePitch;
+        {
+            size_t colPitch= j*pitch;
+            float * row= (float *)(slice+ colPitch);
+            grad.x= 0.5*(row[i+1]-row[i-1])/d_spc[0];
+        }
+        {
+            size_t colPitch= (j+1)*pitch;
+            float * row= (float *)(slice+ colPitch);
+            grad.y= row[i];
+
+            colPitch= (j-1)*pitch;
+            row= (float *)(slice+ colPitch);
+            grad.y= 0.5*(grad.y- row[i])/d_spc[1];
+        }
+    }
 
 
+    {
+        size_t slicePitch= pitch*d_sz[1]*(k+1);
+        char * slice= ptr+  slicePitch;
+        size_t colPitch= j*pitch;
+        float * row= (float *)(slice+ colPitch);
+        grad.z= row[i];
+
+        slicePitch= pitch*d_sz[1]*(k-1);
+        slice= ptr+  slicePitch;
+        row= (float *)(slice+ colPitch);
+        grad.z= 0.5*(grad.z -row[i])/d_spc[2];
+    }
+
+    float3 grad2;
+
+    grad2.x= d_dir[0]*grad.x + d_dir[1]*grad.y + d_dir[2]*grad.z;
+    grad2.y= d_dir[3]*grad.x + d_dir[4]*grad.y + d_dir[5]*grad.z;
+    grad2.z= d_dir[6]*grad.x + d_dir[7]*grad.y + d_dir[8]*grad.z;
+
+    return grad2;
 }
 
 
 
 
+__global__ void
+ComputeImageGradient_kernel(cudaPitchedPtr img,  const int3 d_sz,
+                           cudaPitchedPtr outputx,cudaPitchedPtr outputy,cudaPitchedPtr outputz)
+
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+            {
+                size_t xpitch= outputx.pitch;
+                size_t xslicePitch= xpitch*d_sz.y*k;
+                size_t xcolPitch= j*xpitch;
+                char *xoutput_ptr= (char *)(outputx.ptr);
+                char * slice_x= xoutput_ptr+  xslicePitch;
+                float * row_outputx= (float *)(slice_x+ xcolPitch);
+
+                size_t ypitch= outputy.pitch;
+                size_t yslicePitch= ypitch*d_sz.y*k;
+                size_t ycolPitch= j*ypitch;
+                char *youtput_ptr= (char *)(outputy.ptr);
+                char * slice_y= youtput_ptr+  yslicePitch;
+                float * row_outputy= (float *)(slice_y+ ycolPitch);
+
+                size_t zpitch= outputz.pitch;
+                size_t zslicePitch= zpitch*d_sz.y*k;
+                size_t zcolPitch= j*zpitch;
+                char *zoutput_ptr= (char *)(outputz.ptr);
+                char * slice_z= zoutput_ptr+  zslicePitch;
+                float * row_outputz= (float *)(slice_z+zcolPitch);
+
+
+                 
+                float3 grad = ComputeImageGradientf(img, i,  j, k);
+
+                row_outputx[i]=  grad.x;
+                row_outputy[i]=  grad.y;
+                row_outputz[i]=  grad.z;
+
+           }
+    }
+}
+
+
+
+void ComputeImageGradient_cuda(cudaPitchedPtr img,
+                      int3 data_sz, float3 data_spc,
+                               float data_d00,  float data_d01,float data_d02,float data_d10,float data_d11,float data_d12,float data_d20,float data_d21,float data_d22,
+                      cudaPitchedPtr outputx,cudaPitchedPtr outputy, cudaPitchedPtr outputz)
+{
+    int h_d_sz[]= {data_sz.x,data_sz.y,data_sz.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
+
+    float h_d_spc[]= {data_spc.x,data_spc.y,data_spc.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_spc, &h_d_spc, 3 * sizeof(float)));
+
+    float h_d_dir[]= {data_d00,data_d01,data_d02,data_d10,data_d11,data_d12,data_d20,data_d21,data_d22};
+    gpuErrchk(cudaMemcpyToSymbol(d_dir, &h_d_dir, 9 * sizeof(float)));
+    
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+
+    ComputeImageGradient_kernel<<< blockSize,gridSize>>>( img,data_sz,outputx,outputy,outputz );
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+}
 
 
 

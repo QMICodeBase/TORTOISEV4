@@ -529,10 +529,10 @@ void DRBUDDI::Step3_WriteOutput()
     writeImageD<ImageType3D>(b0_up_corrected,proc_folder+"/b0_corrected_final.nii");
 
 
-   // ImageType3D::Pointer b0_up_corrected_JAC= JacobianTransformImage(b0_up_quad,def_FINV, b0_up_quad);
-   // writeImageD<ImageType3D>(b0_up_corrected_JAC,proc_folder+"/blip_up_b0_corrected_JAC.nii");
-   // ImageType3D::Pointer b0_down_corrected_JAC= JacobianTransformImage(b0_down_quad,def_MINV, b0_up_quad);
-   // writeImageD<ImageType3D>(b0_down_corrected_JAC,proc_folder+"/blip_down_b0_corrected_JAC.nii");
+    ImageType3D::Pointer b0_up_corrected_JAC= JacobianTransformImage(b0_up_quad,def_FINV, b0_up_quad);
+    writeImageD<ImageType3D>(b0_up_corrected_JAC,proc_folder+"/blip_up_b0_corrected_JAC.nii");
+    ImageType3D::Pointer b0_down_corrected_JAC= JacobianTransformImage(b0_down_quad,def_MINV, b0_up_quad);
+    writeImageD<ImageType3D>(b0_down_corrected_JAC,proc_folder+"/blip_down_b0_corrected_JAC.nii");
 
 
 }

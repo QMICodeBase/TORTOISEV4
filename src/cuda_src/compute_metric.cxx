@@ -6,6 +6,50 @@
 
 
 
+
+float ComputeMetric_CCJacSSingle(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img, const CUDAIMAGE::Pointer str_img,
+                                 std::vector<CUDAIMAGE::Pointer>  up_grad_img, std::vector<CUDAIMAGE::Pointer>  down_grad_img,
+                                 const CUDAIMAGE::Pointer def_FINV,
+                                 CUDAIMAGE::Pointer &updateFieldFINV,
+                                 float3 phase_vector,itk::GaussianOperator<float,3> &oper)
+{
+    updateFieldFINV = CUDAIMAGE::New();
+    updateFieldFINV->sz=up_img->sz;
+    updateFieldFINV->dir=up_img->dir;
+    updateFieldFINV->orig=up_img->orig;
+    updateFieldFINV->spc=up_img->spc;
+    updateFieldFINV->components_per_voxel= 3;
+    updateFieldFINV->Allocate();
+
+
+    auto aa= oper.GetBufferReference();
+    int kernel_sz= aa.size();
+
+    float *h_kernel = new float[kernel_sz];
+    for(int m=0;m<kernel_sz;m++)
+          h_kernel[m]= aa[m];
+
+
+
+    float metric_value;
+
+    ComputeMetric_CCJacSSingle_cuda(up_img->getFloatdata(), down_img->getFloatdata(), str_img->getFloatdata(),
+                             up_grad_img[0]->GetTexture(), up_grad_img[1]->GetTexture(), up_grad_img[2]->GetTexture(),
+                             down_grad_img[0]->GetTexture(), down_grad_img[1]->GetTexture(), down_grad_img[2]->GetTexture(),
+                             up_img->sz, up_img->spc,
+                             up_img->dir(0,0),up_img->dir(0,1),up_img->dir(0,2),up_img->dir(1,0),up_img->dir(1,1),up_img->dir(1,2),up_img->dir(2,0),up_img->dir(2,1),up_img->dir(2,2),
+                             def_FINV->getFloatdata(),
+                             updateFieldFINV->getFloatdata(),
+                             phase_vector, kernel_sz,h_kernel, metric_value
+                             );
+
+    delete[] h_kernel;
+
+    return metric_value;
+
+}
+
+
 float ComputeMetric_CCJacS(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img, const CUDAIMAGE::Pointer str_img,
                           const CUDAIMAGE::Pointer def_FINV, const CUDAIMAGE::Pointer def_MINV   ,
                           CUDAIMAGE::Pointer &updateFieldF, CUDAIMAGE::Pointer &updateFieldM,
@@ -51,6 +95,50 @@ float ComputeMetric_CCJacS(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Poi
     return metric_value;
 
 }
+
+
+float ComputeMetric_MSJacSingle(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img,
+                                std::vector<CUDAIMAGE::Pointer>  up_grad_img,  std::vector<CUDAIMAGE::Pointer> down_grad_img,
+                          const CUDAIMAGE::Pointer def_FINV,
+                          CUDAIMAGE::Pointer &updateFieldFINV,
+                          float3 phase_vector,itk::GaussianOperator<float,3> &oper)
+{
+    updateFieldFINV = CUDAIMAGE::New();
+    updateFieldFINV->sz=up_img->sz;
+    updateFieldFINV->dir=up_img->dir;
+    updateFieldFINV->orig=up_img->orig;
+    updateFieldFINV->spc=up_img->spc;
+    updateFieldFINV->components_per_voxel= 3;
+    updateFieldFINV->Allocate();
+
+
+    auto aa= oper.GetBufferReference();
+    int kernel_sz= aa.size();
+
+    float *h_kernel = new float[kernel_sz];
+    for(int m=0;m<kernel_sz;m++)
+          h_kernel[m]= aa[m];
+
+
+
+    float metric_value;
+
+    ComputeMetric_MSJacSingle_cuda(up_img->getFloatdata(), down_img->getFloatdata(),
+                             up_grad_img[0]->GetTexture(), up_grad_img[1]->GetTexture(), up_grad_img[2]->GetTexture(),
+                             down_grad_img[0]->GetTexture(), down_grad_img[1]->GetTexture(), down_grad_img[2]->GetTexture(),
+                             up_img->sz, up_img->spc,
+                             up_img->dir(0,0),up_img->dir(0,1),up_img->dir(0,2),up_img->dir(1,0),up_img->dir(1,1),up_img->dir(1,2),up_img->dir(2,0),up_img->dir(2,1),up_img->dir(2,2),
+                             def_FINV->getFloatdata(),
+                             updateFieldFINV->getFloatdata(),
+                             phase_vector, kernel_sz,h_kernel, metric_value
+                             );
+
+    delete[] h_kernel;
+
+    return metric_value;
+
+}
+
 
 
 float ComputeMetric_MSJac(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img, 

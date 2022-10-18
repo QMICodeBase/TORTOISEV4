@@ -35,61 +35,40 @@ warp_image_kernel(cudaTextureObject_t tex, int3 sz, float3 res,
 
     for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
     {
+        if(i<sz.x && j <sz.y && k<sz.z)
+        {
+            size_t opitch= output.pitch;
+            size_t oslicePitch= opitch*sz.y*k;
+            size_t ocolPitch= j*opitch;
+
+            char *o_ptr= (char *)(output.ptr);
+            char * slice_o= o_ptr+  oslicePitch;
+            float * row_out= (float *)(slice_o+ ocolPitch);
+
+            size_t fpitch= field_ptr.pitch;
+            size_t fslicePitch= fpitch*sz.y*k;
+            size_t fcolPitch= j*fpitch;
+
+            char *f_ptr= (char *)(field_ptr.ptr);
+            char * slice_f= f_ptr+  fslicePitch;
+            float * row_f= (float *)(slice_f+ fcolPitch);
 
 
-    if(i<sz.x && j <sz.y && k<sz.z)
-    {
-        size_t opitch= output.pitch;
-        size_t oslicePitch= opitch*sz.y*k;
-        size_t ocolPitch= j*opitch;
-
-        char *o_ptr= (char *)(output.ptr);
-        char * slice_o= o_ptr+  oslicePitch;
-        float * row_out= (float *)(slice_o+ ocolPitch);
-
-        size_t fpitch= field_ptr.pitch;
-        size_t fslicePitch= fpitch*sz.y*k;
-        size_t fcolPitch= j*fpitch;
-
-        char *f_ptr= (char *)(field_ptr.ptr);
-        char * slice_f= f_ptr+  fslicePitch;
-        float * row_f= (float *)(slice_f+ fcolPitch);
+            float x= (dir[0]*i  + dir[1]*j + dir[2]*k)* res.x ;
+            float y= (dir[3]*i  + dir[4]*j + dir[5]*k)* res.y ;
+            float z= (dir[6]*i  + dir[7]*j + dir[8]*k)* res.z ;
 
 
-        float x= (dir[0]*i  + dir[1]*j + dir[2]*k)* res.x ;
-        float y= (dir[3]*i  + dir[4]*j + dir[5]*k)* res.y ;
-        float z= (dir[6]*i  + dir[7]*j + dir[8]*k)* res.z ;
+            float xw= x + row_f[3*i];
+            float yw= y + row_f[3*i+1];
+            float zw= z + row_f[3*i+2];
 
+            float iw = (dir[0]*xw  + dir[3]*yw  + dir[6]*zw)/ res.x ;
+            float jw = (dir[1]*xw  + dir[4]*yw  + dir[7]*zw)/ res.y ;
+            float kw = (dir[2]*xw  + dir[5]*yw  + dir[8]*zw)/ res.z ;
 
-        float xw= x + row_f[3*i];
-        float yw= y + row_f[3*i+1];
-        float zw= z + row_f[3*i+2];
-
-        float iw = (dir[0]*xw  + dir[3]*yw  + dir[6]*zw)/ res.x ;
-        float jw = (dir[1]*xw  + dir[4]*yw  + dir[7]*zw)/ res.y ;
-        float kw = (dir[2]*xw  + dir[5]*yw  + dir[8]*zw)/ res.z ;
-
-        row_out[i] =tex3D<float>(tex, iw+0.5, jw +0.5, kw+0.5);
-    }
-
-
-/*
-            if(threadId==100)
-            {
-                printf("%d %d %d \n",blockIdx.x,blockIdx.y,blockIdx.z);
-                printf("%d %d %d \n\n",threadIdx.x,threadIdx.y,threadIdx.z);
-
-                printf("i: %d j:%d k:%d\n",i,j,k);
-                printf("x: %f y:%f z:%f\n",x,y,z);
-                printf("xw: %f yw:%f zw:%f\n",xw,yw,zw);
-                printf("iw: %f jw:%f kw:%f\n",iw,jw,kw);
-               // printf("iwc: %f jwc:%f kwc:%f\n",iwc,jwc,kwc);
-                printf("v:%f id:%d \n",v,id);
-            }
-*/
-
-
-
+            row_out[i] =tex3D<float>(tex, iw+0.5, jw +0.5, kw+0.5);
+        }
     }
 
 }

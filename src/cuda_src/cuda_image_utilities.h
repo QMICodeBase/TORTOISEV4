@@ -16,15 +16,22 @@
 */
 
 
- CUDAIMAGE::Pointer NegateField(CUDAIMAGE::Pointer field);
- void  NegateField_cuda(cudaPitchedPtr field, const int3 data_sz);
+std::vector<CUDAIMAGE::Pointer> ComputeImageGradientImg(CUDAIMAGE::Pointer img);
+void  ComputeImageGradient_cuda(cudaPitchedPtr img, const int3 data_sz, const float3 data_spc,
+                                float data_d00,  float data_d01,float data_d02,float data_d10,float data_d11,float data_d12,float data_d20,float data_d21,float data_d22,
+                                cudaPitchedPtr outputx,cudaPitchedPtr outputy,cudaPitchedPtr outputz);
+
+
+
+CUDAIMAGE::Pointer NegateField(CUDAIMAGE::Pointer field);
+void  NegateField_cuda(cudaPitchedPtr field, const int3 data_sz);
 
 void ScaleUpdateField(CUDAIMAGE::Pointer  field,float scale_factor);
 void ScaleUpdateField_cuda(cudaPitchedPtr data, int3 data_sz,float3 data_res,float scale_factor);
 
 
-void AddToUpdateField(CUDAIMAGE::Pointer updateField,CUDAIMAGE::Pointer  updateField_temp,float weight);
-void AddToUpdateField_cuda(cudaPitchedPtr total_data, cudaPitchedPtr to_add_data,float weight, int3 data_sz,int Ncomponents  );
+void AddToUpdateField(CUDAIMAGE::Pointer updateField,CUDAIMAGE::Pointer  updateField_temp,float weight,bool normalize=true);
+void AddToUpdateField_cuda(cudaPitchedPtr total_data, cudaPitchedPtr to_add_data,float weight, int3 data_sz,int Ncomponents,bool normalize=true  );
 
 
 void RestrictPhase(CUDAIMAGE::Pointer  field, float3 phase);

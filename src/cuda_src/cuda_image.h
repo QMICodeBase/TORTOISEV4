@@ -36,7 +36,7 @@ public:
 
     void DuplicateFromCUDAImage(CUDAIMAGE::Pointer cp_img);
     void SetImageFromITK(ImageType3D::Pointer itk_image, bool create_texture=false);
-    void SetImageFromITK(DisplacementFieldType::Pointer itk_field);
+    void SetImageFromITK(DisplacementFieldType::Pointer itk_field);    
 
     ImageType3D::Pointer CudaImageToITKImage();
     DisplacementFieldType::Pointer CudaImageToITKField();

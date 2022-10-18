@@ -118,6 +118,14 @@ void EstimateTensorWLLS_PARSER::InitializeCommandLineOptions()
         option->SetDescription( description );
         this->AddOption( option );
     }
+    {
+        std::string description = std::string( "Free water diffusivity in (\mu m)^2/s for N2 fitting. Default: 3000" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "free_water_diffusivity");
+        option->SetShortName( 'f');
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
 
     {
         std::string description = std::string( "Write the Chi-squred image? Default:0" );
@@ -127,6 +135,16 @@ void EstimateTensorWLLS_PARSER::InitializeCommandLineOptions()
         this->AddOption( option );
     }
 
+
+}
+
+float EstimateTensorWLLS_PARSER::getFreeWaterDiffusivity()
+{
+    OptionType::Pointer option = this->GetOption( "free_water_diffusivity");
+    if(option->GetNumberOfFunctions())
+        return atof(option->GetFunction(0)->GetName().c_str());
+    else
+       return 3000.;
 
 }
 

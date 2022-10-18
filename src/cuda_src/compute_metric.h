@@ -22,6 +22,28 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
 
 
 
+float ComputeMetric_CCJacSSingle(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img, const CUDAIMAGE::Pointer str_img,
+                                 std::vector<CUDAIMAGE::Pointer>  up_grad_img, std::vector<CUDAIMAGE::Pointer>  down_grad_img,
+                                 const CUDAIMAGE::Pointer def_FINV,
+                                 CUDAIMAGE::Pointer &updateFieldFINV,
+                                 float3 phase_vector,itk::GaussianOperator<float,3> &oper);
+
+
+void ComputeMetric_CCJacSSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cudaPitchedPtr str_img,
+                                    cudaTextureObject_t up_grad_img_x, cudaTextureObject_t up_grad_img_y, cudaTextureObject_t up_grad_img_z,
+                                    cudaTextureObject_t down_grad_img_x, cudaTextureObject_t down_grad_img_y, cudaTextureObject_t down_grad_img_z,
+                                    int3 data_sz, float3 data_spc,
+                                    float d00,float d01,float d02,float d10,float d11,float d12,float d20,float d21,float d22,
+                                    cudaPitchedPtr def_FINV,
+                                    cudaPitchedPtr updateFieldFINV,
+                                   float3 phase_vector,
+                                     int kernel_sz, float* h_kernel, float &metric_value
+);
+
+
+
+
+
 
 float ComputeMetric_MSJac(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img, 
                           const CUDAIMAGE::Pointer def_FINV, const CUDAIMAGE::Pointer def_MINV   ,
@@ -37,6 +59,27 @@ void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
    		   cudaPitchedPtr updateFieldF, cudaPitchedPtr updateFieldM,
                    float3 phase_vector,int kernel_sz, float* h_kernel, float &metric_value
 );
+
+
+
+
+float ComputeMetric_MSJacSingle(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img,
+                                std::vector<CUDAIMAGE::Pointer>  up_grad_img, std::vector<CUDAIMAGE::Pointer>  down_grad_img,
+                          const CUDAIMAGE::Pointer def_FINV,
+                          CUDAIMAGE::Pointer &updateFieldFINV,
+                          float3 phase_vector,itk::GaussianOperator<float,3> &oper);
+
+
+void ComputeMetric_MSJacSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
+                                    cudaTextureObject_t up_grad_img_x, cudaTextureObject_t up_grad_img_y, cudaTextureObject_t up_grad_img_z,
+                                    cudaTextureObject_t down_grad_img_x, cudaTextureObject_t down_grad_img_y, cudaTextureObject_t down_grad_img_z,
+     int3 data_sz, float3 data_spc,
+     float d00,float d01,float d02,float d10,float d11,float d12,float d20,float d21,float d22,
+     cudaPitchedPtr def_FINV,
+     cudaPitchedPtr updateFieldFINV,
+     float3 phase_vector,int kernel_sz, float* h_kernel, float &metric_value
+);
+
 
 
 
