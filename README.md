@@ -115,11 +115,11 @@ cd ..
 #### 5) ITK installation
 
 ```
-wget https://github.com/InsightSoftwareConsortium/ITK/releases/download/v5.3rc02/InsightToolkit-5.3rc03.tar.gz
-tar -xvf InsightToolkit-5.3rc03.tar.gz
-mkdir InsightToolkit-5.3rc02_build
-cd InsightToolkit-5.3rc02_build
-cmake ../InsightToolkit-5.3rc02
+wget https://github.com/InsightSoftwareConsortium/ITK/releases/download/v5.3rc04/InsightToolkit-5.3rc04.tar.gz
+tar -xvf InsightToolkit-5.3rc04.tar.gz
+mkdir InsightToolkit-5.3rc04_build
+cd InsightToolkit-5.3rc04_build
+cmake ../InsightToolkit-5.3rc04
 make -j 16
 cd ..
 ```
