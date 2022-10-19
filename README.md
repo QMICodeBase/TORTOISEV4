@@ -146,17 +146,17 @@ cd TORTOISEV4/TORTOISEV4
 ```
 For nonCUDA version:
 ```
-cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc02_build 
+cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build 
 ```
 
 For CUDA version:
 ```
-cmake . -D USECUDA=1 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc02_build 
+cmake . -D USECUDA=1 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build 
 ```
 
 For ComputeGlyphMaps executable version:
 ```
-cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc02_build -D VTK_DIR=../../libraries/VTK-8.0.1_build
+cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build -D VTK_DIR=../../libraries/VTK-8.0.1_build
 ```
 
 Then,
