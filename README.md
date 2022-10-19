@@ -92,6 +92,7 @@ For debian systems:
 ```
 sudo apt-get update -y
 sudo apt-get install -y fftw3
+sudo apt-get install libfftw3-dev
 ```
 
 #### 3) Eigen installation 
