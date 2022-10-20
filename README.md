@@ -93,6 +93,7 @@ For debian systems:
 sudo apt-get update -y
 sudo apt-get install -y fftw3
 sudo apt-get install libfftw3-dev
+sudo apt install zlib1g-dev
 ```
 
 #### 3) Eigen installation 
@@ -147,17 +148,17 @@ cd TORTOISEV4/TORTOISEV4
 ```
 For nonCUDA version:
 ```
-cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build 
+cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build  -DITK_USE_SYSTEM_ZLIB=ON
 ```
 
 For CUDA version:
 ```
-cmake . -D USECUDA=1 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build 
+cmake . -D USECUDA=1 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build -DITK_USE_SYSTEM_ZLIB=ON 
 ```
 
 For ComputeGlyphMaps executable version:
 ```
-cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build -D VTK_DIR=../../libraries/VTK-8.0.1_build
+cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build -D VTK_DIR=../../libraries/VTK-8.0.1_build -DITK_USE_SYSTEM_ZLIB=ON
 ```
 
 Then,
