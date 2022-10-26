@@ -121,7 +121,7 @@ wget https://github.com/InsightSoftwareConsortium/ITK/releases/download/v5.3rc04
 tar -xvf InsightToolkit-5.3rc04.tar.gz
 mkdir InsightToolkit-5.3rc04_build
 cd InsightToolkit-5.3rc04_build
-cmake ../InsightToolkit-5.3rc04
+cmake ../InsightToolkit-5.3rc04 -DITK_USE_SYSTEM_ZLIB=ON
 make -j 16
 cd ..
 ```
@@ -148,7 +148,7 @@ cd TORTOISEV4/TORTOISEV4
 ```
 For nonCUDA version:
 ```
-cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build  -DITK_USE_SYSTEM_ZLIB=ON
+cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build  
 ```
 
 For CUDA version:
