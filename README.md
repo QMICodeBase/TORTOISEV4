@@ -121,10 +121,16 @@ wget https://github.com/InsightSoftwareConsortium/ITK/releases/download/v5.3rc04
 tar -xvf InsightToolkit-5.3rc04.tar.gz
 mkdir InsightToolkit-5.3rc04_build
 cd InsightToolkit-5.3rc04_build
+
+sed -i 's/this->m_SparseGetValueAndDerivativeThreader->SetMaximumNumberOfThreads(number);/this->m_SparseGetValueAndDerivativeThreader->SetMaximumNumberOfThreads(number);this->m_SparseGetValueAndDerivativeThreader->SetNumberOfWorkUnits(number);/g' ../InsightToolkit-5.3rc04/Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx
+sed -i 's/this->m_DenseGetValueAndDerivativeThreader->SetMaximumNumberOfThreads(number);/this->m_DenseGetValueAndDerivativeThreader->SetMaximumNumberOfThreads(number);this->m_DenseGetValueAndDerivativeThreader->SetNumberOfWorkUnits(number);/g' ../InsightToolkit-5.3rc04/Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx
+
 cmake ../InsightToolkit-5.3rc04 -DITK_USE_SYSTEM_ZLIB=ON
 make -j 16
 cd ..
 ```
+
+The sed commands are to fix a bug in MattesMutualInformationv4 metric that prevents limiting the number of threads used.
 
 #### 5) VTK installation (Optional. only for the ComputeGlyphMaps executable)
 
