@@ -60,10 +60,28 @@ TORTOISE community page: https://tortoise.nibib.nih.gov/community
 
 There are 3 ways you can use TORTOISEV4:
 1) Download pre-compiled executables for Linux and MACOSX from   https://tortoise.nibib.nih.gov/
-2) Download the Docker containers from  https://tortoise.nibib.nih.gov/
+2) Download the Docker containers 
 3) Compile the source code
 
 Please note that the source code here will always be up-to-date. However, the assembled packages might take a while to be updated.
+
+## TORTOISEV4 Docker installation and use
+1) Download and install docker from: https://docs.docker.com/engine/install/
+2) Make sure docker works with:  docker run hello-world
+3) Download TORTOISEV4 Docker image:
+```
+docker pull eurotomania/tortoise:latest
+```
+4) Make sure TORTOISE runs fine:
+```
+docker run eurotomania/tortoise
+```
+In Linux, docker might require "sudo" to run.  The above command should run the TORTOISEProcess executable and print out its help. To Run any other executable, just type its name after, as:
+```
+docker run eurotomania/tortoise EstimateTensor
+```
+
+
 
 ## TORTOISEV4 Source code compilation
 
