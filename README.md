@@ -65,7 +65,7 @@ There are 3 ways you can use TORTOISEV4:
 
 Please note that the source code here will always be up-to-date. However, the assembled packages might take a while to be updated.
 
-## TORTOISEV4 Docker installation and use
+## TORTOISEV4 Docker installation and use (recommended way for MACOSX)
 1) Download and install docker from: https://docs.docker.com/engine/install/
 2) Make sure docker works with:  docker run hello-world
 3) Download TORTOISEV4 Docker image:
