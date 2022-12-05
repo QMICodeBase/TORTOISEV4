@@ -17,6 +17,7 @@
 #include "../utilities/read_bmatrix_file.h"
 #include "create_mask.h"
 #include "FINALDATA.h"
+#include "../utilities/math_utilities.h"
 
 
 
@@ -31,6 +32,7 @@ TORTOISE::TORTOISE(int argc, char *argv[])
 {
     std::string TORTOISE_loc = executable_path(argv[0]);         //get the location of the called executable
     this->executable_folder= fs::path(TORTOISE_loc).parent_path().string(); //to access the settings folder
+
 
     //Set up the number of cpus to use
     std::string system_settings_file = this->executable_folder +std::string("/../settings/system_settings/default_system_settings.json");
@@ -82,6 +84,7 @@ TORTOISE::TORTOISE(int argc, char *argv[])
         exit(EXIT_FAILURE);
     }
 
+
     itk::TransformFactory<OkanQuadraticTransformType>::RegisterTransform();
 
 
@@ -102,7 +105,7 @@ TORTOISE::TORTOISE(int argc, char *argv[])
 
     std::string log_dir= this->temp_proc_folder + std::string("/logs");  //Create the log_Stream that will output to both
     if (!fs::exists(log_dir))                                            // std::cout and the log file
-      fs::create_directory(log_dir);
+      fs::create_directories(log_dir);
     std::string log_main=  log_dir + std::string("/log_main.txt");
     std::ofstream log_stream;
     log_stream.open(log_main);
@@ -189,6 +192,168 @@ TORTOISE::TORTOISE(int argc, char *argv[])
 
 
     this->entryPoint();
+
+    FillReportJson();
+
+
+}
+
+void TORTOISE::FillReportJson()
+{
+    this->processing_report_json["TORTOISE_ver"]=GetTORTOISEVersion();
+    if(fs::exists("/.dockerenv"))
+    {
+        this->processing_report_json["TORTOISE_package"] = std::string("Docker version");
+    }
+    else
+    {
+        this->processing_report_json["TORTOISE_package"] = std::string("Linux5_local");
+    }
+
+    std::string log_dir= this->temp_proc_folder + std::string("/logs");
+    this->processing_report_json["log_file"]=  log_dir + std::string("/log_main.txt");
+
+
+    std::string up_name = this->parser->getUpInputName();
+    fs::path up_path(up_name);
+    std::string basename= fs::path(up_path).filename().string();
+    basename=basename.substr(0,basename.rfind(".nii"));
+    this->processing_report_json["settings_file"]= this->temp_proc_folder + std::string("/logs/") + basename + std::string("_proc_settings.dmc");
+
+
+    if(this->my_jsons[0]["EchoTime"]!=json::value_t::null )
+    {
+        float te= this->my_jsons[0]["EchoTime"];
+        this->processing_report_json["te"]= te *1000.;
+    }
+    if(this->my_jsons[0]["RepetitionTime"]!=json::value_t::null )
+    {
+        float tr= this->my_jsons[0]["RepetitionTime"];
+        this->processing_report_json["tr"]=tr*1000.;
+    }
+
+
+    std::vector<std::string> tags={"up","down"};
+    for(int PE=0;PE<2;PE++)
+    {
+        if(this->proc_infos[PE].nii_name!="")
+        {
+            std::string nii_name=this->proc_infos[PE].nii_name;
+            vnl_matrix<double> Bmatrix= read_bmatrix_file(nii_name.substr(0,nii_name.rfind(".nii"))+std::string(".bmtxt"));
+            int Nvols = Bmatrix.rows();
+            vnl_vector<double> bvals= Bmatrix.get_column(0)+Bmatrix.get_column(3)+Bmatrix.get_column(5);
+            this->processing_report_json[tags[PE] + "_nvols"]=Nvols;
+
+            std::vector<int> shells;
+            for(int v=0;v<Nvols;v++)
+            {
+                float curr_b= bvals[v];
+                bool found=false;
+                for(int v2=0;v2<shells.size();v2++)
+                {
+                    if(fabs(shells[v2] -curr_b)<50)
+                    {
+                        found=true;
+                        break;
+                    }
+                }
+                if(!found)
+                    shells.push_back(round50(curr_b));
+            }
+            this->processing_report_json[tags[PE] +"_nshells"]=shells.size();
+
+            if(PE==0)
+                this->processing_report_json["orig_data_" + tags[PE]] = parser->getUpInputName();
+            else
+                this->processing_report_json["orig_data_" + tags[PE]] = parser->getDownInputName();
+
+            this->processing_report_json["orig_structural"] =  parser->getStructuralNames()[0];
+
+
+            this->processing_report_json["den_gibbs_data_" + tags[PE]] = nii_name;
+
+            std::string nname= fs::path(nii_name).filename().string();
+            fs::path proc_path2=fs::path(nii_name).parent_path();
+            std::string basename = nname.substr(0, nname.find(".nii"));
+            fs::path trans_text_path = proc_path2 / (basename + std::string("_moteddy_transformations.txt"));
+            fs::path moteddy_nii_path = proc_path2 / (basename + std::string("_moteddy.nii"));
+            fs::path s2v_text_path = proc_path2 / (basename + std::string("_s2v_transformations.txt"));
+            fs::path slice_resids_path = proc_path2 / (basename + std::string("_slice_resids.txt"));
+            fs::path slice_resids_Z_path = proc_path2 / (basename + std::string("_slice_resids_Z.txt"));
+            fs::path native_inc_map_path = proc_path2 / (basename + std::string("_native_inclusion.nii"));
+            fs::path drift_path = proc_path2 / (basename + std::string("_moteddy_drift.txt"));
+            fs::path b0_path = proc_path2 / ( std::string("blip_")+ tags[PE] + "_b0_quad.nii");
+            fs::path b0_corrected_path = proc_path2 / ( std::string("b0_corrected_final.nii") );
+            fs::path gradfield_path = proc_path2 / ( std::string("field_inv.nii") );
+
+
+
+
+            if(fs::exists(moteddy_nii_path))
+                this->processing_report_json["mot_eddy_data_" + tags[PE]] = moteddy_nii_path.string();
+            if(fs::exists(trans_text_path))
+                this->processing_report_json["inter-volume_motion_dset_" + tags[PE]] = trans_text_path.string();
+            if(fs::exists(s2v_text_path))
+                this->processing_report_json["intra-volume_motion_dset_" + tags[PE]] = s2v_text_path.string();
+            if(fs::exists(slice_resids_path))
+                this->processing_report_json["slice_residuals_" + tags[PE]] = slice_resids_path.string();
+            if(fs::exists(slice_resids_Z_path))
+                this->processing_report_json["slice_residuals_Z_" + tags[PE]] = slice_resids_Z_path.string();
+            if(fs::exists(native_inc_map_path))
+                this->processing_report_json["native_inclusion_map_" + tags[PE]] = native_inc_map_path.string();
+            if(fs::exists(drift_path))
+                this->processing_report_json["signal_drift_" + tags[PE]] = drift_path.string();
+            if(fs::exists(b0_path))
+                this->processing_report_json["b0_epi_" + tags[PE]] = b0_path.string();
+            if(fs::exists(b0_corrected_path))
+                this->processing_report_json["b0_epi_corrected"] = b0_corrected_path.string();
+            if(fs::exists(gradfield_path))
+                this->processing_report_json["gradient_nonlinearity_field"] = gradfield_path.string();
+            if(PE==0)
+            {
+                fs::path fname= proc_path2 / ( std::string("deformation_FINV.nii.gz") );
+                if(fs::exists(fname))
+                    this->processing_report_json["epi_field_" + tags[PE]] = fname.string();
+            }
+            else
+            {
+                fs::path fname= proc_path2 / ( std::string("deformation_MINV.nii.gz") );
+                if(fs::exists(fname))
+                    this->processing_report_json["epi_field_" + tags[PE]] = fname.string();
+            }
+
+
+            std::vector<std::string>  structural_names = RegistrationSettings::get().getVectorValue<std::string>("structural");
+            std::string output_folder= fs::path(output_name).parent_path().string();
+            if(output_folder=="")
+                output_folder="./";
+            if(structural_names.size())
+            {
+                std::string nm = output_folder + "/structural_0.nii";
+                this->processing_report_json["final_structural"] = nm;
+
+            }
+
+            this->processing_report_json["final_data"] = this->output_name;
+
+            fs::path new_inc_path = proc_path2 / (basename + std::string("_final_temp_inc.nii"));
+            if(fs::exists(new_inc_path))
+            {
+                this->processing_report_json["final_inclusion_map_" + tags[PE]] = new_inc_path.string();
+            }
+
+        }
+    }
+
+    std::string output_folder= fs::path(output_name).parent_path().string();
+    if(output_folder=="")
+        output_folder="./";
+
+
+    std::ofstream out_json(output_folder + "/processing_report.json");
+    out_json << std::setw(4) << this->processing_report_json<< std::endl;
+    out_json.close();
+
 
 
 }
@@ -337,6 +502,47 @@ void TORTOISE::Process()
             std::ifstream json_file(this->proc_infos[PE].json_name);
             json_file >> this->my_jsons[PE];
             json_file.close();
+
+            if(this->my_jsons[PE]["PhaseEncodingDirection"]==json::value_t::null)
+            {
+                if(this->my_jsons[PE]["PhaseEncodingAxis"]!=json::value_t::null)
+                {
+                    this->my_jsons[PE]["PhaseEncodingDirection"]=this->my_jsons[PE]["PhaseEncodingAxis"];
+                }
+                else
+                {
+                    if(this->my_jsons[PE]["InPlanePhaseEncodingDirectionDICOM"]!=json::value_t::null)
+                    {
+                        if(this->my_jsons[PE]["InPlanePhaseEncodingDirectionDICOM"]=="COL")
+                        {
+                            this->my_jsons[PE]["PhaseEncodingDirection"]="j";
+                        }
+                        else
+                        {
+                            this->my_jsons[PE]["PhaseEncodingDirection"]="i";
+                        }
+                    }
+                    else
+                    {
+                        (*stream)<<"Phase encoding information not present in JSON file. Create a new json file for the dataset..."<<std::endl;
+                        (*stream)<<"Exiting"<<std::endl;
+                        exit(EXIT_FAILURE);
+                    }
+                }
+            }
+
+            if(this->my_jsons[PE]["PartialFourier"]==json::value_t::null)
+            {
+                if(this->my_jsons[PE]["PercentSampling"]!=json::value_t::null)
+                {
+                    int ps= this->my_jsons[PE]["PercentSampling"];
+                    float psf= 1.*ps/100;
+
+                    this->my_jsons[PE]["PartialFourier"]=psf;
+                }
+                else
+                    this->my_jsons[PE]["PartialFourier"]=1;
+            }
         }
     }
 
@@ -444,6 +650,7 @@ void TORTOISE::Process()
     {
         for(int PE=0;PE<2;PE++)
         {
+
             if(this->proc_infos[PE].nii_name!="")
                 GibbsUnringData(this->proc_infos[PE].nii_name,this->my_jsons[PE]["PartialFourier"],this->my_jsons[PE]["PhaseEncodingDirection"] );
         }

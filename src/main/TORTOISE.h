@@ -78,6 +78,8 @@ private:
 
 
 
+private:
+    void FillReportJson();
 
 
 private:
@@ -150,6 +152,8 @@ private:
 
     std::vector<ImageType3D::Pointer> final_data;
     ImageType3D::Pointer final_mask{nullptr};
+
+    json processing_report_json;
 
 public:
     static TeeStream* stream;

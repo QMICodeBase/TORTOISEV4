@@ -1,17 +1,19 @@
 #ifndef _TORTOISEUTILITIES_CXX
 #define _TORTOISEUTILITIES_CXX
 
-#ifdef _WIN32
-#include <windows.h>
-#elif MACOS
-#include <sys/param.h>
-#include <sys/sysctl.h>
-#else
-#include <unistd.h>
-#endif
 
 #include "boost/system/error_code.hpp"
 #include "boost/filesystem.hpp"
+#include "boost/dll/runtime_symbol_info.hpp"
+
+#ifdef _WIN32
+    #include <windows.h>
+#elif MACOS
+    #include <sys/param.h>
+    #include <sys/sysctl.h>
+#else
+    #include <unistd.h>
+#endif
 
 int is_big_endian(void)
 {
@@ -21,6 +23,14 @@ int is_big_endian(void)
     } bint = {0x01020304};
 
     return bint.c[0] == 1;
+}
+
+
+std::string executable_path(const char *argv0)
+{
+   return boost::dll::program_location().string();
+
+    //boost::filesystem::path program_location();
 }
 
 int getNCores() {
@@ -49,8 +59,19 @@ int getNCores() {
 
 std::string GetTORTOISEVersion()
 {
-    return std::string("V4.0");
+    return std::string("TORTOISE V4.0.0");
 }
+
+
+
+
+/*
+
+
+#include "boost/system/error_code.hpp"
+#include "boost/filesystem.hpp"
+
+
 
 
 
@@ -126,7 +147,7 @@ std::string executable_path(const char *argv0)
 }
 #endif
 
-
+*/
 
 
 #endif

@@ -9,6 +9,6 @@
 using  TransformType=itk::OkanQuadraticTransform<double,3,3>;
 
 
-TransformType::Pointer  RegisterDWIToB0_cuda(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string phase, MeccSettings *mecc_settings, bool initialize,std::vector<float> lim_arr, TransformType::Pointer minit_trans=nullptr );
+TransformType::Pointer  RegisterDWIToB0_cuda(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string phase, MeccSettings *mecc_settings, bool initialize,std::vector<float> lim_arr,  TransformType::Pointer minit_trans=nullptr );
 
 #endif

@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.20)
 PROJECT(TORTOISEV4  )
 
 SET(USEOPENMP 1)
-#   SET(CMAKE_BUILD_TYPE Debug)
- #   SET(ISDEBUG 1)
+  # SET(CMAKE_BUILD_TYPE Debug)
+  #  SET(ISDEBUG 1)
 
 
 if ( NOT DEFINED USECUDA)
@@ -425,11 +425,13 @@ add_executable(CreateGradientNonlinearityBMatrix ../src/tools/CreateGradientNonl
 target_link_libraries(CreateGradientNonlinearityBMatrix  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
+add_executable(UnObliqueImage ../src/tools/UnObliqueImage/UnObliqueImage.cxx   ${SOURCES})
+target_link_libraries(UnObliqueImage  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 
-
-
+add_executable(ConvertGEGradientsToBMatrix ../src/tools/ConvertGEGradientsToBMatrix/ConvertGEGradientsToBMatrix.cxx   ${SOURCES})
+target_link_libraries(ConvertGEGradientsToBMatrix  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 

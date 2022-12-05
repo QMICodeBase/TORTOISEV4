@@ -13,6 +13,8 @@
 #include "../tools/EstimateMAPMRI/MAPMRIModel.h"
 
 
+
+
 #include "register_dwi_to_b0.hxx"
 #ifdef USECUDA
     #include "register_dwi_to_b0_cuda.h"
@@ -1005,8 +1007,11 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
         fclose(fp);
     }
     fs::path slice_resids_path = proc_path2 / (basename + std::string("_slice_resids.txt"));
+    fs::path slice_resids_Z_path = proc_path2 / (basename + std::string("_slice_resids_Z.txt"));
+
     {
         FILE *fp=fopen(slice_resids_path.string().c_str(),"w");
+        FILE *fp2=fopen(slice_resids_Z_path.string().c_str(),"w");
         for(int vol=0;vol<Nvols;vol++)
         {
             for(int k=0;k<sz[2];k++)
@@ -1016,11 +1021,19 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
                     val=log(val);
                 else
                     val=0;
+
+                double val_Z =0;
+                if( MADs_sl(shell_ids[vol],k)!=0)
+                    val_Z=(val - meds_sl(shell_ids[vol],k))/  MADs_sl(shell_ids[vol],k);
+
                 fprintf(fp,"%f ",val);
+                fprintf(fp2,"%f ",val_Z);
             }
             fprintf(fp,"\n");
+            fprintf(fp2,"\n");
         }
         fclose(fp);
+        fclose(fp2);
     }
 
     #pragma omp parallel for
@@ -1808,8 +1821,26 @@ std::vector<ImageType3D::Pointer> DIFFPREP::TransformRepolData(std::string nii_f
         fs::path proc_path2=fs::path(this->nii_name).parent_path();
         std::string basename = nname.substr(0, nname.find(".nii"));
         fs::path inc_img_path = proc_path2 / (basename + std::string("_native_inclusion.nii"));
+        fs::path outlier_map_path = proc_path2 / (basename + std::string("_outlier_map.txt"));
+
+        std::ofstream out_outlier_map(outlier_map_path.string());
+
         for(int v=0; v<Nvols;v++)
+        {
             write_3D_image_to_4D_file<ImageType3DBool::PixelType>(native_inclusion_img[v],inc_img_path.string(), v,Nvols);
+            ImageType3D::IndexType cind;
+            cind[0]= sz[0]/2;
+            cind[1]= sz[1]/2;
+
+            for(int k=0;k<sz[2];k++)
+            {
+                cind[2]= k;
+                int val = (int)(native_inclusion_img[v]->GetPixel(cind));
+                out_outlier_map<<1-val<<" ";
+            }
+            out_outlier_map<<std::endl;
+        }
+        out_outlier_map.close();
     } //if repol
 
 
