@@ -15,7 +15,7 @@ private:
  
 public:
     void SetNMaxCores(int nc){NMaxCores=nc;}
-    void SetNAvailableCores(int nc){NAvailableCores=nc;}
+    void static SetNAvailableCores(int nc){NAvailableCores=nc;}
     int  GetNMaxCores(){return NMaxCores;}
     static int  GetNAvailableCores(){return NAvailableCores;}
 

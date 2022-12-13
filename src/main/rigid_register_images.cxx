@@ -48,7 +48,7 @@ QuadraticTransformType::Pointer CompositeLinearToQuadratic(const CompositeTransf
 
 RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string metric_type,float lr)
 {
-    int NITK= TORTOISE::GetAvailableITKThreadFor();
+    int NITK= TORTOISE::GetAvailableITKThreadFor();    
 
     typedef itk::MattesMutualInformationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType3;
     MetricType3::Pointer m= MetricType3::New();

@@ -214,7 +214,7 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         this->AddOption( option );
     }
     {
-        std::string description = std::string("Flat to estimate learning rate at every iteration. Makes DRBUDDI slower but better results. Boolean. Default:0")  ;
+        std::string description = std::string("Flag to estimate learning rate at every iteration. Makes DRBUDDI slower but better results. Boolean. Default:0")  ;
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "DRBUDDI_estimate_LR_per_iteration");
         option->SetDescription( description );
@@ -232,9 +232,27 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         option->SetModule(6);
         this->AddOption( option );
     }
+    {
+        std::string description = std::string("Flag to disable ALL ITK multi-threading. The only multi-threading is OpenMP if this glaf is 1. Boolean. Default:0")  ;
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "disable_itk_threads");
+        option->SetDescription( description );
+        option->SetModule(6);
+        this->AddOption( option );
+    }
+
 
 }
 
+bool DRBUDDI_PARSERBASE::getDisableITKThreads()
+{
+    OptionType::Pointer option = this->GetOption( "disable_itk_threads");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+       return 0;
+
+}
 
 std::string DRBUDDI_PARSERBASE::getUpInputName()
 {

@@ -34,6 +34,9 @@ TORTOISE::TORTOISE(int argc, char *argv[])
     this->executable_folder= fs::path(TORTOISE_loc).parent_path().string(); //to access the settings folder
 
 
+    //parse all the command line parameters
+    this->parser = new TORTOISE_PARSER(argc,argv);
+
     //Set up the number of cpus to use
     std::string system_settings_file = this->executable_folder +std::string("/../settings/system_settings/default_system_settings.json");
     json system_settings_json;
@@ -64,6 +67,10 @@ TORTOISE::TORTOISE(int argc, char *argv[])
             nc=1;
         SetNAvailableCores(nc);
         omp_set_num_threads(GetNAvailableCores());
+        if(parser->getDisableITKThreads())
+        {
+            itk::MultiThreaderBase::SetGlobalDefaultNumberOfThreads( 1 );
+        }
 
 
         std::vector<uint> thread_array; thread_array.resize(GetNAvailableCores());
@@ -73,8 +80,6 @@ TORTOISE::TORTOISE(int argc, char *argv[])
     }
 
 
-    //parse all the command line parameters
-    this->parser = new TORTOISE_PARSER(argc,argv);
 
     //check if the command line parameters are okay.
     bool aokay= CheckIfInputsOkay();

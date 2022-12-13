@@ -52,6 +52,8 @@ public:
     int getNumberOfStructurals();
     std::string getStructuralNames(int str_id);
 
+    bool getDisableITKThreads();
+
 protected:
     void InitializeCommandLineOptions();
 
