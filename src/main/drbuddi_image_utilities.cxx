@@ -11,7 +11,7 @@
 #include "itkGaussianOperator.h"
 #include "itkVectorNeighborhoodOperatorImageFilter.h"
 #include "itkComposeDisplacementFieldsImageFilter.h"
-#include "itkInvertDisplacementFieldImageFilter.h"
+#include "itkInvertDisplacementFieldImageFilterOkan.h"
 #include "itkDiscreteGaussianImageFilter.h"
 
 
@@ -329,7 +329,7 @@ DisplacementFieldType::Pointer NegateField( const DisplacementFieldType::Pointer
 
 DisplacementFieldType::Pointer InvertField( const DisplacementFieldType * field, const DisplacementFieldType * inverseFieldEstimate )
 {
-    using InverterType = itk::InvertDisplacementFieldImageFilter<DisplacementFieldType>;
+    using InverterType = itk::InvertDisplacementFieldImageFilterOkan<DisplacementFieldType>;
 
     typename InverterType::Pointer inverter = InverterType::New();
     inverter->SetInput( field );

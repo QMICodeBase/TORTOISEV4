@@ -127,6 +127,9 @@ int main(int argc, char*argv[])
     
     std::vector<OkanQuadraticTransformType::Pointer> s2v_transformations;
 
+
+    std::cout<<"ranges: " << signal_ranges[0]<< " " << signal_ranges[1]<< " " << signal_ranges[2]<< " " << signal_ranges[3]<< " " <<std::endl;
+
 //    #ifdef USECUDA
   //         VolumeToSliceRegistration_cuda(target, native_synth_img,slspec,signal_ranges,s2v_transformations,do_q,PE_string);
   //  #else

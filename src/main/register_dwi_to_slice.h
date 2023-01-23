@@ -21,13 +21,15 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
 
     s2v_transformations.resize(sz[2]);
 
+    ImageType3D::SizeType sz2= sz;
+
     for(int e=0;e<Nexc;e++)
     {
         ImageType3D::Pointer  temp_slice_img_itk=ImageType3D::New();
 
-        sz[2]=MB;
+        sz2[2]=MB;
         ImageType3D::IndexType start;start.Fill(0);
-        ImageType3D::RegionType reg(start,sz);
+        ImageType3D::RegionType reg(start,sz2);
         temp_slice_img_itk->SetRegions(reg);
         temp_slice_img_itk->Allocate();
         temp_slice_img_itk->FillBuffer(0);
@@ -249,11 +251,6 @@ ImageType3D::Pointer ForwardTransformImage(ImageType3D::Pointer img, std::vector
     using TreeType = TreeGeneratorType::KdTreeType;
     TreeType::Pointer tree = treeGenerator->GetOutput();
 
-
-    const double s=0.5;
-    const double var2=2*s*s;
-
-    bool gaussian_interp=false;
 
     itk::ImageRegionIteratorWithIndex<ImageType3D> it(final_img, final_img->GetLargestPossibleRegion());
     it.GoToBegin();

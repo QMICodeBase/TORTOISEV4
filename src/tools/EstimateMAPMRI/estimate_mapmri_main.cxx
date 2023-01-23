@@ -35,12 +35,13 @@ int main(int argc, char *argv[])
         final_data[v]= read_3D_volume_from_4D(input_name,v);
         if(parser->getInclusionImg()!="")
         {
-            ImageType3DBool::Pointer inc_img=read_3D_volume_from_4DBool(parser->getInclusionImg(),v);
-            using FilterType = itk::CastImageFilter<ImageType3DBool, ImageType3D>;
-            auto filter = FilterType::New();
-            filter->SetInput(inc_img);
-            filter->Update();
-            weight_imgs[v]=filter->GetOutput();
+            ImageType3D::Pointer inc_img=read_3D_volume_from_4D(parser->getInclusionImg(),v);
+           // using FilterType = itk::CastImageFilter<ImageType3DBool, ImageType3D>;
+          //  auto filter = FilterType::New();
+         //   filter->SetInput(inc_img);
+         //   filter->Update();
+           // weight_imgs[v]=filter->GetOutput();
+            weight_imgs[v]=inc_img;
         }
     }
 

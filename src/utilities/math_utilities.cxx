@@ -3,6 +3,23 @@
 
 
 #include "math_utilities.h"
+#include "vnl/vnl_cross.h"
+
+bool SameSide(vnl_vector<double> v1,  vnl_vector<double> v2, vnl_vector<double> v3,vnl_vector<double> v4, vnl_vector<double> p)
+{
+    vnl_vector<double> normal = vnl_cross_3d<double>(v2-v1,v3-v1);
+    double dotv4 = dot_product(normal,v4-v1);
+    double dotP =  dot_product(normal,p-v1);
+    return (sgn<double>(dotv4) == sgn<double>(dotP));
+}
+
+bool PointInTetrahedron(vnl_vector<double> v1,  vnl_vector<double> v2, vnl_vector<double> v3,vnl_vector<double> v4, vnl_vector<double> p)
+{
+    return SameSide(v1, v2, v3, v4, p) &&
+           SameSide(v2, v3, v4, v1, p) &&
+           SameSide(v3, v4, v1, v2, p) &&
+           SameSide(v4, v1, v2, v3, p); 
+}
 
 int round50(float n2)
 {
@@ -43,8 +60,8 @@ double ComputeResidProb(double val, float mu, float sigma,int agg_level)
     }
     if(agg_level==2)
     {
-        norm_x-=1.275;
-        norm_x/=0.4;
+        norm_x-=1.2;
+        norm_x/=0.35;
     }
 
     return 1- normalCDF_val(norm_x );

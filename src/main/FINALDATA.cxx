@@ -35,8 +35,17 @@
 #include "itkBinaryErodeImageFilter.h"
 
 
+//#include "../external_src/tetgen/tetgen.h"
+
+#include "delaunator.hpp"
+
+#include "vnl/vnl_cross.h"
 
 #include "../utilities/math_utilities.h"
+
+#include "itkInvertDisplacementFieldImageFilterOkan.h"
+
+#include <algorithm>
 
 #include <Eigen/Dense>
 using namespace Eigen;
@@ -438,7 +447,7 @@ void FINALDATA::ReadOrigTransforms()
     std::string moteddy_type = RegistrationSettings::get().getValue<std::string>("correction_mode");
     bool s2v_type = RegistrationSettings::get().getValue<bool>("s2v");
     bool repol_type = RegistrationSettings::get().getValue<bool>("repol");
-    std::string drift_type = RegistrationSettings::get().getValue<std::string>("drift");    
+    std::string drift_type = RegistrationSettings::get().getValue<std::string>("drift");
     float THR=RegistrationSettings::get().getValue<float>("outlier_prob");
 
 
@@ -499,7 +508,7 @@ void FINALDATA::ReadOrigTransforms()
 
         this->dwi_transforms[d].resize(Nvols[d]);
         if(fs::exists(moteddy_trans_name) && moteddy_type!="off")
-        {           
+        {
             std::ifstream moteddy_text_file(moteddy_trans_name);
             for( int vol=0; vol<Nvols[d];vol++)
             {
@@ -585,10 +594,10 @@ void FINALDATA::ReadOrigTransforms()
             s2v_text_file.close();
         }
 
-        std::string native_inc_name= this->temp_folder + "/" + basename + "_native_weight.nii";        
+        std::string native_inc_name= this->temp_folder + "/" + basename + "_native_weight.nii";
         if(fs::exists(native_inc_name) && repol_type)
         {
-            this->native_weight_img[d].resize(Nvols[d]);            
+            this->native_weight_img[d].resize(Nvols[d]);
             for(int v=0;v<Nvols[d];v++)
             {
                 this->native_weight_img[d][v]= read_3D_volume_from_4D(native_inc_name,v);
@@ -748,17 +757,17 @@ FINALDATA::CompositeTransformType::Pointer FINALDATA::GenerateCompositeTransform
         }
         DisplacementFieldTransformType::Pointer mot_eddy_trans= DisplacementFieldTransformType::New();
         mot_eddy_trans->SetDisplacementField(mot_eddy_field);
-        all_trans->AddTransform(mot_eddy_trans);       
+        all_trans->AddTransform(mot_eddy_trans);
     }
     if(this->gradwarp_field)
     {
         DisplacementFieldTransformType::Pointer gradwarp_trans= DisplacementFieldTransformType::New();
         gradwarp_trans->SetDisplacementField(this->gradwarp_field);
-        all_trans->AddTransform(gradwarp_trans);        
+        all_trans->AddTransform(gradwarp_trans);
     }
     if(PE==1 && this->b0down_t0_b0up_trans)
     {
-        all_trans->AddTransform(this->b0down_t0_b0up_trans);        
+        all_trans->AddTransform(this->b0down_t0_b0up_trans);
     }
     if(this->epi_trans[PE])
     {
@@ -792,11 +801,11 @@ FINALDATA::CompositeTransformType::Pointer FINALDATA::GenerateCompositeTransform
 
         DisplacementFieldTransformType::Pointer mepi_trans= DisplacementFieldTransformType::New();
         mepi_trans->SetDisplacementField(new_field);
-        all_trans->AddTransform(mepi_trans);        
+        all_trans->AddTransform(mepi_trans);
     }
     if(this->b0_t0_str_trans)
     {
-        all_trans->AddTransform(this->b0_t0_str_trans);        
+        all_trans->AddTransform(this->b0_t0_str_trans);
     }
 
     return all_trans;
@@ -1244,13 +1253,21 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 orig_mask2= create_mask(raw_data[0]);
             if(this->native_weight_img[PE].size())
             {
-                ImageType3D::Pointer synth_img = read_3D_volume_from_4D(native_synth_name,vol);
+                ImageType3D::Pointer synth_img = read_3D_volume_from_4D(native_synth_name,vol);                
                 itk::ImageRegionIteratorWithIndex<ImageType3D> it(synth_img,synth_img->GetLargestPossibleRegion());
+
+                std::vector<float> synth_vals;
+                for(it.GoToBegin();!it.IsAtEnd();++it)
+                {
+                    if(it.Get() > 1 && orig_mask2->GetPixel(it.GetIndex())>0)
+                        synth_vals.push_back(it.Get());
+                }
+                float med_val= median(synth_vals);
+
                 for(it.GoToBegin();!it.IsAtEnd();++it)
                 {
                     ImageType3D::IndexType ind3= it.GetIndex();
-                    if(synth_img->GetPixel(ind3)>1E-4)
-                    //if(orig_mask2->GetPixel(ind3)!=0)
+                    if(synth_img->GetPixel(ind3)>med_val/20.)
                     {
                         float weight= this->native_weight_img[PE][vol]->GetPixel(ind3);
                         if(weight<THR)
@@ -1260,6 +1277,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                     }
                 }
             }
+            write_3D_image_to_4D_file<float>(raw_data[vol],"/qmi13_raid/okan/ABCD_Don_100_subjects/dMRIv3/data/proc_dti/DTIPROC_S021_INV05CA3VX5_4year_20211008.091346.850000_1/tmp_DTI_corr_regT1_orig3/proc/aaa.nii",vol,nvols);
         }
 
 
@@ -1287,26 +1305,51 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 using TreeType = TreeGeneratorType::KdTreeType;
 
                 std::vector<float> values;
+                std::vector<ImageType3D::IndexType> orig_slice_inds;
                 SampleType::Pointer sample = SampleType::New();
                 sample->SetMeasurementVectorSize(3);
                 TreeType::Pointer tree =nullptr;
 
+
+
+                //If we can, we want to do backward interpolation with s2v.
+                // So what what we do is to convert it to a displacement field slice by slice and then invert it.
+                //This field might not be diffeomorphic so we might not be able to invert it accurately
+
+                CompositeTransformType::Pointer all_trans_wo_s2v=GenerateCompositeTransformForVolume(raw_data[0],PE, vol);
+                CompositeTransformType::Pointer all_trans=nullptr;
+                DisplacementFieldType::Pointer forward_s2v_field=nullptr;
+
                 if(this->s2v_transformations[PE].size()!=0)
                 {
-                    ImageType3D::SizeType sz= raw_data[0]->GetLargestPossibleRegion().GetSize();
+                    forward_s2v_field = DisplacementFieldType::New();
+                    forward_s2v_field->SetRegions(raw_data[0]->GetLargestPossibleRegion());
+                    forward_s2v_field->Allocate();
+                    forward_s2v_field->SetSpacing(raw_data[0]->GetSpacing());
+                    forward_s2v_field->SetSpacing(raw_data[0]->GetSpacing());
+                    forward_s2v_field->SetOrigin(raw_data[0]->GetOrigin());
+                    forward_s2v_field->SetDirection(raw_data[0]->GetDirection());
+                    DisplacementFieldType::PixelType zero; zero.Fill(0);
+                    forward_s2v_field->FillBuffer(zero);
 
-                    itk::ImageRegionIteratorWithIndex<ImageType3D> it(raw_data[vol],raw_data[vol]->GetLargestPossibleRegion());
+
+                    itk::ImageRegionIteratorWithIndex<DisplacementFieldType> it(forward_s2v_field,forward_s2v_field->GetLargestPossibleRegion());
                     for(it.GoToBegin();!it.IsAtEnd();++it)
                     {
                         ImageType3D::IndexType ind3=it.GetIndex();
-                      //  if(orig_mask2->GetPixel(ind3)!=0)
-                      //  if(  (this->native_weight_img[PE].size() && this->native_weight_img[PE][vol]->GetPixel(ind3)>THR) || this->native_weight_img[PE].size()==0 )
-                        {
-                            ImageType3D::PointType pt,pt_trans;
 
-                            raw_data[vol]->TransformIndexToPhysicalPoint(ind3,pt);
-                            pt_trans=this->s2v_transformations[PE][vol][ind3[2]]->TransformPoint(pt);
+                        DisplacementFieldType::PointType pt,pt_trans;
+                        forward_s2v_field->TransformIndexToPhysicalPoint(ind3,pt);
+                        pt_trans = this->s2v_transformations[PE][vol][ind3[2]]->TransformPoint(pt);
 
+                        DisplacementFieldType::PixelType vec;
+                        vec[0]= pt_trans[0] - pt[0];
+                        vec[1]= pt_trans[1] - pt[1];
+                        vec[2]= pt_trans[2] - pt[2];
+                        it.Set(vec);
+
+                        if(  (this->native_weight_img[PE].size() && this->native_weight_img[PE][vol]->GetPixel(ind3)>THR) || this->native_weight_img[PE].size()==0 )
+                        {                                                                                    
                             itk::ContinuousIndex<double,3> ind3_t;
                             raw_data[vol]->TransformPhysicalPointToContinuousIndex(pt_trans,ind3_t);
                             MeasurementVectorType tt;
@@ -1316,6 +1359,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
                             sample->PushBack(tt);
                             values.push_back(raw_data[vol]->GetPixel(ind3));
+                            orig_slice_inds.push_back(ind3);
                         }
                     }
                     TreeGeneratorType::Pointer treeGenerator = TreeGeneratorType::New();
@@ -1323,9 +1367,30 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                     treeGenerator->SetBucketSize(16);
                     treeGenerator->Update();
                     tree = treeGenerator->GetOutput();
+
+                    typedef itk::InvertDisplacementFieldImageFilterOkan<DisplacementFieldType> InverterType;
+                    InverterType::Pointer inverter = InverterType::New();
+                    inverter->SetInput( forward_s2v_field );
+                    inverter->SetMaximumNumberOfIterations( 50 );
+                    inverter->SetMeanErrorToleranceThreshold( 0.0004 );
+                    inverter->SetMaxErrorToleranceThreshold( 0.04 );
+                    //inverter->SetNumberOfWorkUnits(NITK);
+                    inverter->SetNumberOfWorkUnits(1);
+                    inverter->Update();
+                    DisplacementFieldType::Pointer backward_s2v_field =inverter->GetOutput();
+
+                    DisplacementFieldTransformType::Pointer backward_s2v_field_trans= DisplacementFieldTransformType::New();
+                    backward_s2v_field_trans->SetDisplacementField(backward_s2v_field);
+
+                    all_trans=CompositeTransformType::New();
+                    all_trans->AddTransform(backward_s2v_field_trans);
+                    all_trans->AddTransform(all_trans_wo_s2v);
+                    all_trans->FlattenTransformQueue();
+
                 } //if s2v
 
                 ImageType3D::SizeType orig_sz= raw_data[vol]->GetLargestPossibleRegion().GetSize();
+                ImageType3D::SpacingType orig_spc = raw_data[vol]->GetSpacing();
                 ImageType3D::SizeType final_sz= final_img->GetLargestPossibleRegion().GetSize();
 
                 using BSInterpolatorType = itk::BSplineInterpolateImageFunction<ImageType3D, double>;
@@ -1333,11 +1398,15 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 BSinterpolator->SetSplineOrder(3);
                 BSinterpolator->SetInputImage(raw_data[vol]);
 
+                using LinearInterpolatorType = itk::LinearInterpolateImageFunction<ImageType3D, double>;
+                LinearInterpolatorType::Pointer Lininterpolator = LinearInterpolatorType::New();
+                Lininterpolator->SetInputImage(raw_data[vol]);
+
                 using NNInterpolatorType = itk::NearestNeighborInterpolateImageFunction<ImageType3D, double>;
                 NNInterpolatorType::Pointer NNinterpolator = NNInterpolatorType::New();
                 if(this->native_weight_img[PE].size())
                 {
-                    NNinterpolator->SetInputImage(this->native_weight_img[PE][vol]);                    
+                    NNinterpolator->SetInputImage(this->native_weight_img[PE][vol]);
 
                     final_inclusion_imgs[vol]=ImageType3D::New();
                     final_inclusion_imgs[vol]->SetRegions(template_structural->GetLargestPossibleRegion());
@@ -1357,37 +1426,39 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                     final_weight_imgs[vol]->FillBuffer(1);
                 }
 
-                // The following transform includes all the transformations EXCEPT s2v
-                // We are handling s2v separately.                
-                CompositeTransformType::Pointer all_trans=GenerateCompositeTransformForVolume(raw_data[0],PE, vol);
+
+
+                const double DIST_POW=  RegistrationSettings::get().getValue<int>("interp_POW");
+                unsigned int                           numberOfNeighbors = 16;
 
 
                 itk::ImageRegionIteratorWithIndex<ImageType3D> it(final_img,final_img->GetLargestPossibleRegion());
                 for(it.GoToBegin();!it.IsAtEnd();++it)
                 {
                     ImageType3D::IndexType ind3=it.GetIndex();
-                    ImageType3D::PointType pt,pt_trans;
-                    final_img->TransformIndexToPhysicalPoint(ind3,pt);
-                    pt_trans= all_trans->TransformPoint(pt);
+                    ImageType3D::PointType pt;
+                    final_img->TransformIndexToPhysicalPoint(ind3,pt);                    
+                    ImageType3D::PointType pt_trans_nos2v= all_trans_wo_s2v->TransformPoint(pt);
 
                     if(this->native_weight_img[PE].size())
                     {
-                        if(NNinterpolator->IsInsideBuffer(pt_trans))
+                        if(NNinterpolator->IsInsideBuffer(pt_trans_nos2v))
                         {
-                            ImageType3D::PixelType val = NNinterpolator->Evaluate(pt_trans);
+                            ImageType3D::PixelType val = NNinterpolator->Evaluate(pt_trans_nos2v);
                             final_weight_imgs[vol]->SetPixel(ind3,val);
                             if(val<=THR)
                                 final_inclusion_imgs[vol]->SetPixel(ind3,0);
                         }
                     }
 
-
+                    if(ind3[0]==60 && ind3[1]==89 && ind3[2]==30)
+                        int ma=0;
 
                     if(this->s2v_transformations[PE].size()==0)
                     {
-                        if(BSinterpolator->IsInsideBuffer(pt_trans))
+                        if(BSinterpolator->IsInsideBuffer(pt_trans_nos2v))
                         {
-                            ImageType3D::PixelType val = BSinterpolator->Evaluate(pt_trans);                            
+                            ImageType3D::PixelType val = BSinterpolator->Evaluate(pt_trans_nos2v);
                             if(val<0)
                                 val=0;
                             final_img->SetPixel(ind3,val);
@@ -1395,207 +1466,135 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                     }
                     else
                     {
-                      //  if(  (final_inclusion_imgs.size() && final_inclusion_imgs[vol]->GetPixel(ind3)) || final_inclusion_imgs.size()==0)
+                        ImageType3D::PointType pt_trans=all_trans->TransformPoint(pt);
+
+                        itk::ContinuousIndex<double,3> ind3_t;
+                        raw_data[vol]->TransformPhysicalPointToContinuousIndex(pt_trans_nos2v,ind3_t);
+                        if(ind3_t[0]<-1 || ind3_t[0]>orig_sz[0] || ind3_t[1]<-1 || ind3_t[1]>orig_sz[1] || ind3_t[2]<-1 || ind3_t[2]>orig_sz[2] )
                         {
+                            it.Set(0);
+                            continue;
+                        }
 
-                            if(values.size()>0)
+                        itk::ContinuousIndex<double,3> ind3_ts2v;
+                        raw_data[vol]->TransformPhysicalPointToContinuousIndex(pt_trans,ind3_ts2v);
+
+                        bool forward_interp=false;
+
+
+                        //We check voxel by voxel if the inverted, i.e. backward s2v deformation field  and the forward sv2 transformation
+                        // are consistent, i.e. give close displacements.
+                        // if not, most likely not diffeomorphic so not invertable
+                        // then we revert back to forward interpolation with idw.
+
+                        int SL= (int)std::round(ind3_ts2v[2]);
+                        if(SL<0 || SL > orig_sz[2]-1)
+                            forward_interp=true;
+                        else
+                        {
+                            ImageType3D::PointType pt_trans_s2v_inv= this->s2v_transformations[PE][vol][SL]->TransformPoint(pt_trans);
+
+                            DisplacementFieldType::PixelType diff;
+                            diff[0]= pt_trans_s2v_inv[0] - pt_trans_nos2v[0];
+                            diff[1]= pt_trans_s2v_inv[1] - pt_trans_nos2v[1];
+                            diff[2]= pt_trans_s2v_inv[2] - pt_trans_nos2v[2];
+                            double diff_mag = sqrt(diff[0]*diff[0]+diff[1]*diff[1]+diff[2]*diff[2]);
+
+                            if(diff_mag > 0.1*orig_spc[2])
+                                forward_interp=true;
+                        }
+
+
+
+                        if(!forward_interp || values.size()==0)
+                        {
+                            if(BSinterpolator->IsInsideBuffer(pt_trans))
                             {
-                                itk::ContinuousIndex<double,3> ind3_t;
-                                raw_data[vol]->TransformPhysicalPointToContinuousIndex(pt_trans,ind3_t);
+                                ImageType3D::PixelType val = BSinterpolator->Evaluate(pt_trans);
+                                if(val<0)
+                                    val=0;
+                                final_img->SetPixel(ind3,val);
+                            }
+                        }
+                        else
+                        {
+                            MeasurementVectorType queryPoint;
+                            queryPoint[0]=ind3_t[0];
+                            queryPoint[1]=ind3_t[1];
+                            queryPoint[2]=ind3_t[2];
 
-                                if(ind3_t[0]<0 || ind3_t[0]>orig_sz[0]-1 || ind3_t[1]<0 || ind3_t[1]>orig_sz[1]-1 || ind3_t[2]<0 || ind3_t[2]>orig_sz[2]-1 )
+                            TreeType::InstanceIdentifierVectorType neighbors;
+                            std::vector<double> dists;
+                            tree->Search(queryPoint, numberOfNeighbors, neighbors,dists);
+
+                            std::vector<double>::iterator mini = std::min_element(dists.begin(), dists.end());
+                            double mn= *mini;
+                            int mn_id=std::distance(dists.begin(), mini);
+
+                            if(mn<0.1)
+                            {
+                                float val= values[neighbors[mn_id]];
+                                it.Set(val);
+                            }
+                            else
+                            {
+                                // If neigbor exists within one voxel distance
+                                // do inverse powered distance weighted interpolation
+                                // power is 6 to make images sharper.
+
+                                double sm_weight=0;
+                                double sm_val=0;
+                                int Nl1=0;
+                                for(int n=0;n<numberOfNeighbors;n++)
                                 {
-                                    it.Set(0);
-                                    continue;
+                                    int neighbor= neighbors[n];
+                                    float dist = dists[n];
+                                    if(dist <= 1)
+                                        Nl1++;
+
+                                    double dist2= 1./pow(dist,DIST_POW);
+                                    if(dist2>1E-50)
+                                    {
+                                        sm_val+= values[neighbor] *dist2;
+                                        sm_weight+= dist2;
+                                    }
                                 }
-
-                                //Everything up to this point was backward transformation
-                                //Now Forward transformation for s2v
-                                //First find nearest nighbors from kd-tree
-                                MeasurementVectorType queryPoint;
-                                queryPoint[0]=ind3_t[0];
-                                queryPoint[1]=ind3_t[1];
-                                queryPoint[2]=ind3_t[2];
-
-                                unsigned int                           numberOfNeighbors = 16;
-                                TreeType::InstanceIdentifierVectorType neighbors;
-                                std::vector<double> dists;
-                                tree->Search(queryPoint, numberOfNeighbors, neighbors,dists);
-
-                                std::vector<double>::iterator mini = std::min_element(dists.begin(), dists.end());
-                                double mn= *mini;
-                                int mn_id=std::distance(dists.begin(), mini);
+                                float idw_val = 0;
+                                if(sm_weight!=0)
+                                    idw_val=sm_val/sm_weight;
 
 
-                                const double DIST_POW=8;
-                                //If REALLY close nearest neighbor just set value to that point.
-                                if(mn<0.1)
+                                //if(mn<1.)
+                                if(Nl1>3)
                                 {
-                                    float val= values[neighbors[mn_id]];
-                                    it.Set(val);
+                                    it.Set(idw_val);
                                 }
                                 else
                                 {
-                                    // If neigbor exists within one voxel distance
-                                    // do inverse powered distance weighted interpolation
-                                    // power is 8 to make images sharper.
-                                    if(mn<1.)
-                                    {
-                                        double sm_weight=0;
-                                        double sm_val=0;
-                                        for(int n=0;n<numberOfNeighbors;n++)
-                                        {
-                                            int neighbor= neighbors[n];
-                                            float dist = dists[n];
 
-                                            double dist2= 1./pow(dist,DIST_POW);
-                                            if(dist2>1E-50)
-                                            {
-                                                sm_val+= values[neighbor] *dist2;
-                                                sm_weight+= dist2;
-                                            }
-                                        }
-                                        if(sm_weight==0)
-                                            it.Set(0);
-                                        else
+                                    int slice_id_min = orig_slice_inds[neighbors[mn_id]][2];
+
+                                    auto min_params= this->s2v_transformations[PE][vol][slice_id_min]->GetParameters();
+                                    if(fabs(min_params[0])+fabs(min_params[1])+fabs(min_params[2])+fabs(min_params[3])+fabs(min_params[4])+fabs(min_params[5])<1E-10)
+                                    {
+                                        if(BSinterpolator->IsInsideBuffer(pt_trans_nos2v))
                                         {
-                                            it.Set(sm_val/sm_weight);
+                                            ImageType3D::PixelType val = BSinterpolator->Evaluate(pt_trans_nos2v);
+                                            if(val<0)
+                                                val=0;
+                                            final_img->SetPixel(ind3,val);
                                         }
                                     }
                                     else
                                     {
-                                        // Not a single value within a voxel distance
-                                        // Not ideal.
-                                        //So first check if we have neighbors on ALL sides of the cube for RBF interpolation.
-                                        int sm_x=0,gt_x=0, sm_y=0,gt_y=0, sm_z=0,gt_z=0;
-                                        for (unsigned long neighbor : neighbors)
-                                        {
-                                            MeasurementVectorType  aa= tree->GetMeasurementVector(neighbor) ;
-                                            if(aa[0]<=ind3_t[0])
-                                                sm_x++;
-                                            if(aa[0]>ind3_t[0])
-                                                gt_x++;
-                                            if(aa[1]<=ind3_t[1])
-                                                sm_y++;
-                                            if(aa[1]>ind3_t[1])
-                                                gt_y++;
-                                            if(aa[2]<=ind3_t[2])
-                                                sm_z++;
-                                            if(aa[2]>ind3_t[2])
-                                                gt_z++;
-                                        }
-                                        if(sm_x<2 || sm_y<2 || sm_z<2 || gt_x<2 || gt_y<2 || gt_z<2)
-                                        {
-                                            // We do not cover all sides of the cube with neighbors.
-                                            // So default back to powered inverse distance weighting.
-
-
-                                            //
-                                            if(ind3[2]>1 && ind3[2]<final_sz[2]-2)
-                                                if(final_inclusion_imgs.size())
-                                                    final_inclusion_imgs[vol]->SetPixel(ind3,0);
-                                            else
-                                            {
-                                                double sm_weight=0;
-                                                double sm_val=0;
-                                                for(int n=0;n<numberOfNeighbors;n++)
-                                                {
-                                                    int neighbor= neighbors[n];
-                                                    float dist = dists[n];
-
-                                                    double dist2= 1./pow(dist,DIST_POW);
-                                                    if(dist2>1E-50)
-                                                    {
-                                                        sm_val+= values[neighbor] *dist2;
-                                                        sm_weight+= dist2;
-                                                    }
-                                                }
-                                                if(sm_weight==0)
-                                                    it.Set(0);
-                                                else
-                                                {
-                                                    it.Set(sm_val/sm_weight);
-                                                }
-                                            }
-                                        }
-                                        else
-                                        {
-                                            //RBF interpolation
-
-                                            MatrixXd RBF = MatrixXd::Identity(numberOfNeighbors,numberOfNeighbors);
-                                            VectorXd f(numberOfNeighbors);
-                                            VectorXd curr_p(numberOfNeighbors);
-
-                                            double eps=0.3;
-
-                                            for(int r=0;r<numberOfNeighbors;r++)
-                                            {
-                                                MeasurementVectorType  aa1= tree->GetMeasurementVector(neighbors[r]) ;
-                                                f[r]= values[neighbors[r]];
-                                                double r2= (aa1[0]-ind3_t[0])*(aa1[0]-ind3_t[0])+(aa1[1]-ind3_t[1])*(aa1[1]-ind3_t[1])+(aa1[2]-ind3_t[2])*(aa1[2]-ind3_t[2]);
-                                                curr_p[r]= exp(-eps*eps*r2);
-
-                                                for(int c=r+1;c<numberOfNeighbors;c++)
-                                                {
-                                                    MeasurementVectorType  aa2= tree->GetMeasurementVector(neighbors[c]) ;
-
-                                                    double rm= (aa1[0]-aa2[0])*(aa1[0]-aa2[0])+(aa1[1]-aa2[1])*(aa1[1]-aa2[1])+(aa1[2]-aa2[2])*(aa1[2]-aa2[2]);
-
-                                                    double val = exp(-eps*eps *rm);
-                                                    RBF(r,c)=val;
-                                                    RBF(c,r)=val;
-                                                }
-                                            }
-
-                                            JacobiSVD<MatrixXd> svd(RBF);
-                                            double cond = svd.singularValues()(0) / svd.singularValues()(svd.singularValues().size()-1);
-
-                                            //Condition number of RBF interpolator not good
-                                            //revert back to inverse distance interpolation
-                                            if(cond>1E2)
-                                            {
-                                                if(ind3[2]>1 && ind3[2]<final_sz[2]-2)
-                                                    if(final_inclusion_imgs.size())
-                                                        final_inclusion_imgs[vol]->SetPixel(ind3,0);
-
-                                                double sm_weight=0;
-                                                double sm_val=0;
-                                                for(int n=0;n<numberOfNeighbors;n++)
-                                                {
-                                                    int neighbor= neighbors[n];
-                                                    float dist = dists[n];
-
-                                                    double dist2= 1./pow(dist,DIST_POW);
-                                                    if(dist2>1E-50)
-                                                    {
-                                                        sm_val+= values[neighbor] *dist2;
-                                                        sm_weight+= dist2;
-                                                    }
-                                                }
-                                                if(sm_weight==0)
-                                                    it.Set(0);
-                                                else
-                                                {
-                                                    it.Set(sm_val/sm_weight);
-                                                }
-
-                                            }
-                                            else
-                                            {
-                                                VectorXd w = RBF.colPivHouseholderQr().solve(f);
-                                                double valm = w.dot(curr_p);
-                                                it.Set(valm);
-                                            } //if cond
-                                        } //if RBF
-
-                                    } //if mn<1
-
-                                } //if mn<0.1
+                                        it.Set(idw_val);
 
 
 
-                            } //if values.size
-                         } //if final_inc_img->GetPixel
+                                    } // not BSP
+                                } //if not idw
+                            } //if mn>0.1
+                        } //if not backward
                     }  //if s2v
                 } //for ind3
             } //dummy interpolation
@@ -1663,7 +1662,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
 
             //Get average b=0 image and mask it
-            vnl_vector<double> bvals = Bmatrix.get_column(0) + Bmatrix.get_column(3)+ Bmatrix.get_column(5);            
+            vnl_vector<double> bvals = Bmatrix.get_column(0) + Bmatrix.get_column(3)+ Bmatrix.get_column(5);
 
             #pragma omp parallel for
             for(int vol=0;vol<Nvols[PE];vol++)
@@ -1749,7 +1748,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
                 // MAPMRI FITTING
                 const unsigned int FINAL_STAGE_MAPMRI_DEGREE=6;
-                MAPMRIModel mapmri_estimator;
+                MAPMRIModel mapmri_estimator2, mapmri_estimator4,mapmri_estimator6;
                 if(MAPMRI_indices.size()>0)
                 {
                     double max_bval= bvals.max_value();
@@ -1792,18 +1791,44 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                         small_delta=this->jsons[PE]["SmallDelta"];
                     }
 
-                    mapmri_estimator.SetMAPMRIDegree(FINAL_STAGE_MAPMRI_DEGREE);
-                    mapmri_estimator.SetDTImg(dti_estimator.GetOutput());
-                    mapmri_estimator.SetA0Image(dti_estimator.GetA0Image());
-                    mapmri_estimator.SetBmatrix(rot_Bmat);
-                    mapmri_estimator.SetDWIData(final_data);
-                    mapmri_estimator.SetWeightImage(final_weight_imgs);
-                    mapmri_estimator.SetVoxelwiseBmatrix(dummyv);
-                    mapmri_estimator.SetMaskImage(final_mask);
-                    mapmri_estimator.SetVolIndicesForFitting(dummy);
-                    mapmri_estimator.SetSmallDelta(small_delta);
-                    mapmri_estimator.SetBigDelta(big_delta);
-                    mapmri_estimator.PerformFitting();
+                    mapmri_estimator2.SetMAPMRIDegree(2);
+                    mapmri_estimator2.SetDTImg(dti_estimator.GetOutput());
+                    mapmri_estimator2.SetA0Image(dti_estimator.GetA0Image());
+                    mapmri_estimator2.SetBmatrix(rot_Bmat);
+                    mapmri_estimator2.SetDWIData(final_data);
+                    mapmri_estimator2.SetWeightImage(final_weight_imgs);
+                    mapmri_estimator2.SetVoxelwiseBmatrix(dummyv);
+                    mapmri_estimator2.SetMaskImage(final_mask);
+                    mapmri_estimator2.SetVolIndicesForFitting(dummy);
+                    mapmri_estimator2.SetSmallDelta(small_delta);
+                    mapmri_estimator2.SetBigDelta(big_delta);
+                    mapmri_estimator2.PerformFitting();
+
+                    mapmri_estimator4.SetMAPMRIDegree(4);
+                    mapmri_estimator4.SetDTImg(dti_estimator.GetOutput());
+                    mapmri_estimator4.SetA0Image(dti_estimator.GetA0Image());
+                    mapmri_estimator4.SetBmatrix(rot_Bmat);
+                    mapmri_estimator4.SetDWIData(final_data);
+                    mapmri_estimator4.SetWeightImage(final_weight_imgs);
+                    mapmri_estimator4.SetVoxelwiseBmatrix(dummyv);
+                    mapmri_estimator4.SetMaskImage(final_mask);
+                    mapmri_estimator4.SetVolIndicesForFitting(dummy);
+                    mapmri_estimator4.SetSmallDelta(small_delta);
+                    mapmri_estimator4.SetBigDelta(big_delta);
+                    mapmri_estimator4.PerformFitting();
+
+                    mapmri_estimator6.SetMAPMRIDegree(FINAL_STAGE_MAPMRI_DEGREE);
+                    mapmri_estimator6.SetDTImg(dti_estimator.GetOutput());
+                    mapmri_estimator6.SetA0Image(dti_estimator.GetA0Image());
+                    mapmri_estimator6.SetBmatrix(rot_Bmat);
+                    mapmri_estimator6.SetDWIData(final_data);
+                    mapmri_estimator6.SetWeightImage(final_weight_imgs);
+                    mapmri_estimator6.SetVoxelwiseBmatrix(dummyv);
+                    mapmri_estimator6.SetMaskImage(final_mask);
+                    mapmri_estimator6.SetVolIndicesForFitting(dummy);
+                    mapmri_estimator6.SetSmallDelta(small_delta);
+                    mapmri_estimator6.SetBigDelta(big_delta);
+                    mapmri_estimator6.PerformFitting();
                 }
 
 
@@ -1813,10 +1838,66 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 {
                     TORTOISE::EnableOMPThread();
 
+                    ImageType3D::Pointer synth_img_dt= dti_estimator.SynthesizeDWI( rot_Bmat.get_row(vol) );
+                    ImageType3D::Pointer synth_img_mapmri2=nullptr, synth_img_mapmri4=nullptr,synth_img_mapmri6=nullptr;
+
                     if(MAPMRI_indices.size()>0)
+                    {
+                        synth_img_mapmri2= mapmri_estimator2.SynthesizeDWI( rot_Bmat.get_row(vol));
+                        synth_img_mapmri4= mapmri_estimator4.SynthesizeDWI( rot_Bmat.get_row(vol));
+                        synth_img_mapmri6= mapmri_estimator6.SynthesizeDWI( rot_Bmat.get_row(vol));
+
+                        itk::ImageRegionIteratorWithIndex<ImageType3D> it(synth_img_dt,synth_img_dt->GetLargestPossibleRegion());
+
+                        std::vector<float> non_brain_dt_vals;
+                        for(it.GoToBegin();!it.IsAtEnd();++it)
+                        {
+                            ImageType3D::IndexType ind3= it.GetIndex();
+                            if(final_mask->GetPixel(ind3)==0)
+                            {
+                                non_brain_dt_vals.push_back(it.Get());
+                            }
+                        }
+                        double nonbrain_dt_median=median(non_brain_dt_vals);
+
+
+                        for(it.GoToBegin();!it.IsAtEnd();++it)
+                        {
+                            ImageType3D::IndexType ind3= it.GetIndex();
+                            int Ncount=0;
+                            for(int vv=0;vv<Nvols[PE];vv++)
+                            {
+                                if(final_weight_imgs[vv]->GetPixel(ind3)> THR)
+                                    Ncount++;
+                            }
+                            if(final_mask->GetPixel(ind3))
+                            {
+                                double dti_val= it.Get();
+                                double map_val=0;
+
+                                if(bvals[vol]> 55 && Ncount>12 && Ncount < 30)
+                                    map_val=synth_img_mapmri2->GetPixel(ind3);
+                                else if(bvals[vol]> 55 && Ncount>30 && Ncount < 70)
+                                    map_val=synth_img_mapmri4->GetPixel(ind3);
+                                else if(bvals[vol]> 55  && Ncount > 70)
+                                    map_val=synth_img_mapmri6->GetPixel(ind3);
+
+                                if(map_val> 0.5*nonbrain_dt_median)
+                                    it.Set(map_val);
+
+                            }
+                        }
+
+                    }
+                    synth_imgs[vol] =synth_img_dt;
+
+
+
+                    /*
                         synth_imgs[vol] = mapmri_estimator.SynthesizeDWI( rot_Bmat.get_row(vol));
                     else
                         synth_imgs[vol]= dti_estimator.SynthesizeDWI( rot_Bmat.get_row(vol) );
+                        */
 
                     TORTOISE::DisableOMPThread();
                 }
@@ -2068,10 +2149,10 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
 
 
-        std::string new_nii_name=  this->temp_folder + "/" + basename + "_final_temp.nii";        
+        std::string new_nii_name=  this->temp_folder + "/" + basename + "_final_temp.nii";
         for(int v=0;v<Nvols[PE];v++)
         {
-            write_3D_image_to_4D_file<float>(final_data[v],new_nii_name,v,Nvols[PE]);            
+            write_3D_image_to_4D_file<float>(final_data[v],new_nii_name,v,Nvols[PE]);
         }
 
         final_imgs_to_return[PE]=final_data;
@@ -3209,4 +3290,3 @@ void FINALDATA::Generate()
 
 
 #endif
-

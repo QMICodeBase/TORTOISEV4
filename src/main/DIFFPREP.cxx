@@ -39,7 +39,7 @@
 
 
 #include "itkRegionOfInterestImageFilter.h"
-#include "itkInvertDisplacementFieldImageFilter.h"
+#include "itkInvertDisplacementFieldImageFilterOkan.h"
 
 #define  SLICE_NOTCONSIDER 2
 
@@ -1352,11 +1352,24 @@ void DIFFPREP::MotionAndEddy()
                      synth_img= dti_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
                  else if(bvals[vol] >mapmri_bval_cutoff)
                      synth_img = mapmri_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
-                 */
+
                  if(MAPMRI_indices.size()>0)
                      synth_img = mapmri_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
                  else
                      synth_img= dti_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
+                 */
+                 if(bvals[vol]<=55)
+                 {
+                     synth_img= dti_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
+                 }
+                 else
+                 {
+                     if(MAPMRI_indices.size()>0)
+                         synth_img = mapmri_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
+                     else
+                         synth_img= dti_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
+                 }
+
                  eddy_s2v_replaced_synth_dwis[vol]=synth_img;
 
                  // This synthesized image is on the space of the corrected data (for everything).
@@ -1368,8 +1381,9 @@ void DIFFPREP::MotionAndEddy()
 
 
                  {  // curly bracket to automatically delete objects (yes me lazy)
-                     DisplacementFieldType::Pointer distortion_field=  ConvertEddyTransformToField(dwi_transforms[vol],synth_img);
-                     typedef itk::InvertDisplacementFieldImageFilter<DisplacementFieldType> InverterType;
+                     ImageType3D::Pointer synth_img_DP= ChangeImageHeaderToDP<ImageType3D>(synth_img);
+                     DisplacementFieldType::Pointer distortion_field=  ConvertEddyTransformToField(dwi_transforms[vol],synth_img,synth_img_DP);
+                     typedef itk::InvertDisplacementFieldImageFilterOkan<DisplacementFieldType> InverterType;
                      InverterType::Pointer inverter = InverterType::New();
                      inverter->SetInput( distortion_field );
                      inverter->SetMaximumNumberOfIterations( 50 );
@@ -1402,11 +1416,8 @@ void DIFFPREP::MotionAndEddy()
              {
                  (*stream)<<"Done Slice-to-volume registering volume: " <<std::flush;
 
-                 #ifdef USECUDA
-                     #pragma omp parallel for schedule(dynamic)
-                 #else
-                     #pragma omp parallel for
-                 #endif
+
+                 #pragma omp parallel for
                  for(int vol=0;vol<Nvols;vol++)
                  {
                      TORTOISE::EnableOMPThread();
@@ -1422,18 +1433,7 @@ void DIFFPREP::MotionAndEddy()
                      if(epoch==1)
                          do_eddy=false;
 
-                  //   #ifdef USECUDA
-                  //      if(TORTOISE::ReserveGPU())
-                   //     {
-                   //         VolumeToSliceRegistration_cuda(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string);
-                   //         TORTOISE::ReleaseGPU();
-                   //     }
-                   //     else
-                            VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string);
-                 //    #else
-                //            VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string);
-                //     #endif
-
+                     VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string);
                      #pragma omp critical
                      {
                          (*stream)<<vol<<", "<<std::flush;
@@ -1492,6 +1492,8 @@ void DIFFPREP::MotionAndEddy()
                                  ImageType3D::PixelType interp_val =0;
                                  if(interp->IsInsideBuffer(pt_trans))
                                      interp_val=interp->Evaluate(pt_trans);
+                                 if(interp_val<0)
+                                     interp_val=0;
                                  native_native_synth_dwis[vol]->SetPixel(ind3,interp_val);
                              }
                          }
@@ -1608,8 +1610,10 @@ void DIFFPREP::WriteOutputFiles()
             TORTOISE::EnableOMPThread();
             int NITK= TORTOISE::GetAvailableITKThreadFor();
 
-            DisplacementFieldType::Pointer distortion_field=  ConvertEddyTransformToField(dwi_transforms[vol],this->eddy_s2v_replaced_synth_dwis[0]);
-            typedef itk::InvertDisplacementFieldImageFilter<DisplacementFieldType> InverterType;
+            ImageType3D::Pointer ref_img_DP=ChangeImageHeaderToDP<ImageType3D>(this->eddy_s2v_replaced_synth_dwis[0]);
+
+            DisplacementFieldType::Pointer distortion_field=  ConvertEddyTransformToField(dwi_transforms[vol],this->eddy_s2v_replaced_synth_dwis[0],ref_img_DP);
+            typedef itk::InvertDisplacementFieldImageFilterOkan<DisplacementFieldType> InverterType;
             InverterType::Pointer inverter = InverterType::New();
             inverter->SetInput( distortion_field );
             inverter->SetMaximumNumberOfIterations( 50 );
@@ -1622,6 +1626,8 @@ void DIFFPREP::WriteOutputFiles()
             disp_trans->SetDisplacementField(distortion_field_inv);
 
             typedef itk::BSplineInterpolateImageFunction<ImageType3D,double> InterpolatorType;
+            //typedef itk::LinearInterpolateImageFunction<ImageType3D,double> InterpolatorType;
+            //typedef itk::NearestNeighborInterpolateImageFunction<ImageType3D,double> InterpolatorType;
             InterpolatorType::Pointer interp = InterpolatorType::New();
             interp->SetInputImage(this->eddy_s2v_replaced_synth_dwis[vol]);
             interp->SetSplineOrder(3);
@@ -1633,7 +1639,7 @@ void DIFFPREP::WriteOutputFiles()
             {
                 ImageType3D::IndexType ind3;
                 ind3[2]=k;
-
+/*
                 if(slice_to_volume && s2v_transformations.size()>0)
                 {
                     ImageType3D::IndexType sl_st;
@@ -1643,9 +1649,19 @@ void DIFFPREP::WriteOutputFiles()
                     float w= this->native_weight_img[vol]->GetPixel(sl_st);
                     if(w<THR)
                     {
-                        s2v_transformations[vol][k]->SetIdentity();
+                        // The next line caused problems in DTIPROC_S086_INV92Z37BWN_baseline
+                        // Not sure what way is the best
+                        // Now I know.
+                        // anthony's test data volume 93 is terrible if I keep the following lines.
+                        //dont keep them
+
+                    //    OkanQuadraticTransformType::Pointer itrans= OkanQuadraticTransformType::New();
+                   //     itrans->SetPhase(s2v_transformations[vol][k]->GetPhase());
+                   //     itrans->SetIdentity();
+                   //     s2v_transformations[vol][k]=itrans;
                     }
                 }
+                */
 
                 for(int j=0;j<sz[1];j++)
                 {
@@ -1655,14 +1671,17 @@ void DIFFPREP::WriteOutputFiles()
                         ind3[0]=i;
 
                         ImageType3D::PointType pt;
-                        this->eddy_s2v_replaced_synth_dwis[0]->TransformIndexToPhysicalPoint(ind3,pt);
-                        ImageType3D::PointType pt_trans=all_trans->TransformPoint(pt);
+                        native_native_synth_dwis[vol]->TransformIndexToPhysicalPoint(ind3,pt);
                         if(slice_to_volume && s2v_transformations.size()>0)
-                            pt_trans=s2v_transformations[vol][k]->TransformPoint(pt);
+                            pt=s2v_transformations[vol][k]->TransformPoint(pt);
+                        ImageType3D::PointType pt_trans=all_trans->TransformPoint(pt);
+
 
                         ImageType3D::PixelType interp_val =0;
                         if(interp->IsInsideBuffer(pt_trans))
                             interp_val=interp->Evaluate(pt_trans);
+                        if(interp_val<0)
+                            interp_val=0;
                         native_native_synth_dwis[vol]->SetPixel(ind3,interp_val);
                     }
                 }

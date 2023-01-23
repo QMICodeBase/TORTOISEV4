@@ -98,16 +98,15 @@ int main( int argc , char * argv[] )
     typename ScalarResamplerType::Pointer movingResampler = ScalarResamplerType::New();
     
     std::string filename(argv[2]);
-    std::string::size_type idx=filename.rfind('.');
+    std::string::size_type idx=filename.find('.');
     std::string extension = filename.substr(idx+1);
 
     DisplacementFieldTransformType::Pointer disp_trans=nullptr;
     AffineTransformType::Pointer affine_trans=nullptr;
 
     if(idx != std::string::npos)
-    {
-
-        if(extension == string("nii"))
+    {        
+        if(extension == "nii"  || extension == "nii.gz" )
         {
             typedef itk::ImageFileReader<DisplacementFieldType> FieldReaderType;
             typename FieldReaderType::Pointer mreader=FieldReaderType::New();
@@ -129,6 +128,7 @@ int main( int argc , char * argv[] )
             movingResampler->SetTransform(affine_trans);          
         }
     }
+
     
     ImageType3D::Pointer transformed_image3D = ImageType3D::New();
     transformed_image3D->SetRegions( target_image->GetLargestPossibleRegion());
@@ -153,7 +153,6 @@ int main( int argc , char * argv[] )
 
 
 
-
     ImageType3D::SizeType sz = transformed_image3D->GetLargestPossibleRegion().GetSize();
 
 #pragma omp parallel for
@@ -171,7 +170,7 @@ int main( int argc , char * argv[] )
                 ImageType3D::PointType pt,pt_trans;
                 transformed_image3D->TransformIndexToPhysicalPoint(ind3,pt);
 
-                if(extension == string("nii"))
+                if(extension == "nii"  || extension == "nii.gz")
                 {
                     pt_trans= disp_trans->TransformPoint(pt);
                 }

@@ -495,6 +495,15 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
         option->SetModule(7);
         this->AddOption( option );
     }
+    {
+        std::string description = std::string("For final interpolation, the power for inverse distance weighting in case s2v is on. Minimum:2.  Smaller numbers will yield smoother images. Very large numbers will be closer to nearest neighbor interpolation.  Default:8   " );
+
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "interp_POW");
+        option->SetDescription( description );
+        option->SetModule(7);
+        this->AddOption( option );
+    }
 
     {
         std::string description = std::string("Output data combination method:    " );
@@ -800,7 +809,7 @@ float TORTOISE_PARSER::getOutlierFrac()
     if(option->GetNumberOfFunctions())
         return  atof(option->GetFunction(0)->GetName().c_str());
     else
-       return 0.5;
+       return 0.45;
 }
 
 
@@ -984,4 +993,14 @@ std::string TORTOISE_PARSER::getOutputGradientNonlinearityType()
         return option->GetFunction(0)->GetName();
     else
        return std::string("grad_dev");
+}
+
+int TORTOISE_PARSER::getPOW()
+{
+    OptionType::Pointer option = this->GetOption( "interp_POW");
+    if(option->GetNumberOfFunctions())
+        return atoi(option->GetFunction(0)->GetName().c_str());
+    else
+       return 6;
+
 }

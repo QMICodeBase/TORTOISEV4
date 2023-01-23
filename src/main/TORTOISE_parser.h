@@ -66,6 +66,7 @@ public:
     float getOutlierProbabilityThreshold();
     int getOutlierNumberOfResidualClusters();
     int getOutlierReplacementModeAggessive();
+    int getPOW();
 
     int getNiter();
     int getDTIBval();

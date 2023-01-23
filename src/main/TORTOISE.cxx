@@ -23,7 +23,7 @@
 
 #include "itkTransformFileWriter.h"
 #include "itkTransformFactory.h"
-#include "itkInvertDisplacementFieldImageFilter.h"
+#include "itkInvertDisplacementFieldImageFilterOkan.h"
 
 
 
@@ -448,6 +448,7 @@ void TORTOISE::UpdateSettingsFromCommandLine()
     RegistrationSettings::get().setVectorValue<int>("output_voxels",parser->GetOutputNVoxels());
     RegistrationSettings::get().setVectorValue<float>("output_res",parser->GetOutputRes());
     RegistrationSettings::get().setValue<std::string>("output_gradnonlin_Bmtxt_type",parser->getOutputGradientNonlinearityType());
+    RegistrationSettings::get().setValue<int>("interp_POW",parser->getPOW());
 
 }
 
@@ -1524,7 +1525,7 @@ void TORTOISE::CheckAndCopyInputData()
             writeImageD<DisplacementFieldType>(gradwarp_field_inv,gradnonlin_inv_name);
         }
 
-        typedef itk::InvertDisplacementFieldImageFilter<DisplacementFieldType> InverterType;
+        typedef itk::InvertDisplacementFieldImageFilterOkan<DisplacementFieldType> InverterType;
         InverterType::Pointer inverter = InverterType::New();
         inverter->SetInput( gradwarp_field_inv );
         inverter->SetMaximumNumberOfIterations( 50 );
