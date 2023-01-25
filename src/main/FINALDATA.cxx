@@ -35,9 +35,6 @@
 #include "itkBinaryErodeImageFilter.h"
 
 
-//#include "../external_src/tetgen/tetgen.h"
-
-#include "delaunator.hpp"
 
 #include "vnl/vnl_cross.h"
 
@@ -1276,8 +1273,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                         }
                     }
                 }
-            }
-            write_3D_image_to_4D_file<float>(raw_data[vol],"/qmi13_raid/okan/ABCD_Don_100_subjects/dMRIv3/data/proc_dti/DTIPROC_S021_INV05CA3VX5_4year_20211008.091346.850000_1/tmp_DTI_corr_regT1_orig3/proc/aaa.nii",vol,nvols);
+            }          
         }
 
 

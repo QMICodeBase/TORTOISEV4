@@ -21,6 +21,8 @@ public:
     using CurrentImageType = DRBUDDI_Diffeo::CurrentImageType;
     using PhaseEncodingVectorType=DRBUDDI_Diffeo::PhaseEncodingVectorType;
 
+    DRBUDDIStage(){};
+
     DRBUDDIStage(DRBUDDIStageSettings *my_settings)
     {
         settings=my_settings;
@@ -39,11 +41,11 @@ public:
             this->stream= TORTOISE::stream;
         #endif
     }
-    ~DRBUDDIStage(){};
+    virtual   ~DRBUDDIStage() {}
 
 
-    void PreprocessImagesAndFields();
-    void RunDRBUDDIStage();
+
+    virtual void RunDRBUDDIStage();
 
     void SetUpPhaseEncoding(PhaseEncodingVectorType phase_vector)
     {
@@ -64,8 +66,10 @@ public:
     void SetDownPhaseEncoding(PhaseEncodingVectorType dv){down_phase_vector=dv;};
     void SetEstimateLRPerIteration(bool el){estimate_lr_per_iter=el;}
 
-private:
 
+    virtual void PreprocessImagesAndFields();
+
+protected:
     void CreateVirtualImage();
 
 
@@ -76,12 +80,6 @@ private:
     std::vector<CurrentImageType::Pointer> resampled_smoothed_down_images;
     std::vector<CurrentImageType::Pointer> resampled_smoothed_str_images;
     CurrentImageType::Pointer virtual_img{nullptr};
-
-    CurrentFieldType::Pointer def_FINV{nullptr};
-    CurrentFieldType::Pointer def_MINV{nullptr};
-
-    CurrentFieldType::Pointer def_F{nullptr};
-    CurrentFieldType::Pointer def_M{nullptr};
 
     PhaseEncodingVectorType up_phase_vector;
     PhaseEncodingVectorType down_phase_vector;
@@ -94,7 +92,18 @@ private:
     TORTOISE::TeeStream *stream;
 #endif
 
-    bool estimate_lr_per_iter{true};
+
+
+
+private:
+
+
+    CurrentFieldType::Pointer def_F{nullptr};
+    CurrentFieldType::Pointer def_M{nullptr};
+    CurrentFieldType::Pointer def_FINV{nullptr};
+    CurrentFieldType::Pointer def_MINV{nullptr};
+
+    bool estimate_lr_per_iter{false};
 
 
 };

@@ -10,6 +10,7 @@
 
 #ifdef USECUDA
     #include "cuda_image_utilities.h"
+    #include "run_drbuddi_stage_TVVF.h"
 #else
     #include "drbuddi_image_utilities.h"
 #endif
@@ -1810,6 +1811,11 @@ void DRBUDDI_Diffeo::Process()
         #endif
     }
 
+    #ifdef USECUDA
+        DRBUDDIStage_TVVF prev_stage(&(stages[0]));
+    #endif
+
+
     for(int st=0;st< stages.size();st++)
     {
         (*stream)<<"Stage number: "<<st+1<< " / " << stages.size() << std::endl;
@@ -1828,26 +1834,59 @@ void DRBUDDI_Diffeo::Process()
             (*stream)<<this->stages[st].metrics[m].metric_name<<" ";
         (*stream)<<std::endl;
 
-        if(prev_finv && prev_minv)
+
+        if(this->GetRegistrationMethodType()=="TVVF")
         {
-            stages[st].init_finv=prev_finv;
-            stages[st].init_minv=prev_minv;
+            #ifdef USECUDA
+                DRBUDDIStage_TVVF current_stage(&(stages[st]));
+                current_stage.SetUpPhaseEncoding(up_phase_vector);
+                current_stage.SetDownPhaseEncoding(down_phase_vector);
+                if(prev_stage.GetVelocityfield().size()>0)
+                    current_stage.SetVelocityField(prev_stage.GetVelocityfield());
+
+                current_stage.PreprocessImagesAndFields();
+                current_stage.RunDRBUDDIStage();
+
+                prev_stage=current_stage;
+
+            #endif
         }
+        else
+        {
+            if(prev_finv && prev_minv)
+            {
+                stages[st].init_finv=prev_finv;
+                stages[st].init_minv=prev_minv;
+            }
 
-        DRBUDDIStage current_stage(&(stages[st]));
-        current_stage.SetUpPhaseEncoding(up_phase_vector);
-        current_stage.SetDownPhaseEncoding(down_phase_vector);
-        current_stage.SetEstimateLRPerIteration(parser->getEstimateLRPerIteration());
+            DRBUDDIStage current_stage(&(stages[st]));
+            current_stage.SetUpPhaseEncoding(up_phase_vector);
+            current_stage.SetDownPhaseEncoding(down_phase_vector);
+            current_stage.SetEstimateLRPerIteration(parser->getEstimateLRPerIteration());
 
-        current_stage.PreprocessImagesAndFields();
-        current_stage.RunDRBUDDIStage();
+            current_stage.PreprocessImagesAndFields();
+            current_stage.RunDRBUDDIStage();
 
-        prev_finv= stages[st].output_finv;
-        prev_minv= stages[st].output_minv;
+            prev_finv= stages[st].output_finv;
+            prev_minv= stages[st].output_minv;
+        }
     }
 
-    this->def_FINV= stages[stages.size()-1].output_finv;
-    this->def_MINV= stages[stages.size()-1].output_minv;
+    #ifdef USECUDA
+        if(this->GetRegistrationMethodType()=="TVVF")
+        {
+            prev_stage.ComputeFields(this->def_FINV, this->def_MINV);
+        }
+        else
+        {
+            this->def_FINV= stages[stages.size()-1].output_finv;
+            this->def_MINV= stages[stages.size()-1].output_minv;
+        }
+    #else
+        this->def_FINV= stages[stages.size()-1].output_finv;
+        this->def_MINV= stages[stages.size()-1].output_minv;
+    #endif
+
 }
 
 

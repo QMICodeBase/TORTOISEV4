@@ -23,6 +23,14 @@ void  ComputeImageGradient_cuda(cudaPitchedPtr img, const int3 data_sz, const fl
 
 
 
+CUDAIMAGE::Pointer AddImages(CUDAIMAGE::Pointer im1, CUDAIMAGE::Pointer im2);
+void  AddImages_cuda(cudaPitchedPtr im1, cudaPitchedPtr im2, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp);
+
+CUDAIMAGE::Pointer MultiplyImage(CUDAIMAGE::Pointer im1, float factor);
+void  MultiplyImage_cuda(cudaPitchedPtr im1, float factor, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp);
+
+
+
 CUDAIMAGE::Pointer NegateField(CUDAIMAGE::Pointer field);
 void  NegateField_cuda(cudaPitchedPtr field, const int3 data_sz);
 
@@ -64,6 +72,18 @@ void PreprocessImage_cuda(cudaPitchedPtr img,
                       int3 data_sz,
                       float low_val, float up_val,
                       cudaPitchedPtr output);
+
+void IntegrateVelocityFieldGPU(std::vector<CUDAIMAGE::Pointer> velocity_field, float lowt, float hight, CUDAIMAGE::Pointer output_field);
+void IntegrateVelocityField_cuda(cudaPitchedPtr *velocity_field,
+                                 cudaPitchedPtr output_field,
+                                 float lowt, float hight,
+                                 int NTimePoints,
+                                 int3 data_sz,float3 data_res,
+                                 float data_d00,  float data_d01,float data_d02,float data_d10,float data_d11,float data_d12,float data_d20,float data_d21,float data_d22,
+                                 float3 data_orig);
+
+
+
 
 
 

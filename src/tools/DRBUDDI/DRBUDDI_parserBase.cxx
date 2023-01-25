@@ -240,6 +240,14 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         option->SetModule(6);
         this->AddOption( option );
     }
+    {
+        std::string description = std::string("Registration transformation type. Options: SyN or TVVF. Default: SyN.  TVVF only works in CUDA version.")  ;
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "transformation_type");
+        option->SetDescription( description );
+        option->SetModule(6);
+        this->AddOption( option );
+    }
 
 
 }
@@ -751,3 +759,17 @@ std::string DRBUDDI_PARSERBASE::getStructuralNames(int str_id=0)
        return std::string("");
 }
 
+
+
+std::string DRBUDDI_PARSERBASE::getRegistrationMethodType()
+{
+    #ifdef USECUDA
+        OptionType::Pointer option = this->GetOption( "transformation_type");
+        if(option->GetNumberOfFunctions())
+             return option->GetFunction(0)->GetName();
+        else
+            return "SyN";
+    #else
+        return "SyN";
+    #endif
+}

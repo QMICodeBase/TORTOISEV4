@@ -268,6 +268,7 @@ private:            //Subfunctions the main processing functions use
 public:                    //Main processing functions
     void Process();
 
+    std::string GetRegistrationMethodType(){return parser->getRegistrationMethodType();}
 
 
 
@@ -309,6 +310,7 @@ private:          //class member variables
     PhaseEncodingVectorType up_phase_vector, down_phase_vector;
 
     ImageType3D::DirectionType orig_dir,new_dir;
+
 
 
 };

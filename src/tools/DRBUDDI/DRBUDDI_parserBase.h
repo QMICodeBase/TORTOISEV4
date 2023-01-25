@@ -53,6 +53,7 @@ public:
     std::string getStructuralNames(int str_id);
 
     bool getDisableITKThreads();
+    std::string getRegistrationMethodType();
 
 protected:
     void InitializeCommandLineOptions();

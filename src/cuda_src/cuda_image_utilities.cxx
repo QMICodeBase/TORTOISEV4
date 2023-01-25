@@ -91,6 +91,48 @@ CUDAIMAGE::Pointer ComposeFields(CUDAIMAGE::Pointer main_field, CUDAIMAGE::Point
     return output;
 }
 
+
+
+ CUDAIMAGE::Pointer AddImages(CUDAIMAGE::Pointer im1, CUDAIMAGE::Pointer im2)
+ {
+    cudaPitchedPtr d_output={0};
+
+    cudaExtent extent =  make_cudaExtent(im1->components_per_voxel*sizeof(float)*im1->sz.x,im1->sz.y,im1->sz.z);
+    cudaMalloc3D(&d_output, extent);
+
+    AddImages_cuda(im1->getFloatdata(),im2->getFloatdata(), d_output,  im1->sz,im1->components_per_voxel);
+
+    CUDAIMAGE::Pointer output = CUDAIMAGE::New();
+    output->sz=im1->sz;
+    output->dir=im1->dir;
+    output->orig=im1->orig;
+    output->spc=im1->spc;
+    output->components_per_voxel= im1->components_per_voxel;
+    output->SetFloatDataPointer( d_output);
+    return output;
+}
+
+
+ CUDAIMAGE::Pointer MultiplyImage(CUDAIMAGE::Pointer im1, float factor)
+ {
+    cudaPitchedPtr d_output={0};
+
+    cudaExtent extent =  make_cudaExtent(im1->components_per_voxel*sizeof(float)*im1->sz.x,im1->sz.y,im1->sz.z);
+    cudaMalloc3D(&d_output, extent);
+
+    MultiplyImage_cuda(im1->getFloatdata(),factor, d_output,  im1->sz,im1->components_per_voxel);
+
+    CUDAIMAGE::Pointer output = CUDAIMAGE::New();
+    output->sz=im1->sz;
+    output->dir=im1->dir;
+    output->orig=im1->orig;
+    output->spc=im1->spc;
+    output->components_per_voxel= im1->components_per_voxel;
+    output->SetFloatDataPointer( d_output);
+    return output;
+}
+
+
  CUDAIMAGE::Pointer InvertField(CUDAIMAGE::Pointer field,CUDAIMAGE::Pointer initial_estimate)
 {
     cudaPitchedPtr d_output={0};
@@ -209,6 +251,44 @@ std::vector<CUDAIMAGE::Pointer> ComputeImageGradientImg(CUDAIMAGE::Pointer img)
     return output;
 
 }
+
+
+
+void IntegrateVelocityFieldGPU(std::vector<CUDAIMAGE::Pointer> velocity_field, float lowt, float hight, CUDAIMAGE::Pointer output_field)
+{
+    int NT=velocity_field.size();
+
+
+    cudaPitchedPtr *cuda_vfield2= new cudaPitchedPtr[NT];
+    for(int t=0;t<NT;t++)
+        cuda_vfield2[t]=velocity_field[t]->getFloatdata();
+
+
+
+
+    cudaPitchedPtr *cuda_vfield;
+    cudaMalloc((void**) &cuda_vfield, NT*sizeof(cudaPitchedPtr));
+    cudaMemcpy(cuda_vfield, cuda_vfield2, NT*sizeof(cudaPitchedPtr), cudaMemcpyHostToDevice);
+
+
+
+    IntegrateVelocityField_cuda(cuda_vfield,
+                                output_field->getFloatdata(),
+                                lowt,hight,NT,
+                                output_field->sz,
+                                output_field->spc,
+                                output_field->dir(0,0),output_field->dir(0,1),output_field->dir(0,2),output_field->dir(1,0),output_field->dir(1,1),output_field->dir(1,2),output_field->dir(2,0),output_field->dir(2,1),output_field->dir(2,2),
+                                output_field->orig);
+
+    delete[] cuda_vfield2;
+    cudaFree(cuda_vfield);
+
+}
+
+
+
+
+
 
 
 #endif
