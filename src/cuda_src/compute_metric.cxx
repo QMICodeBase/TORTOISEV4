@@ -194,7 +194,7 @@ float ComputeMetric_MSJac(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Poin
 
 
 float ComputeMetric_CCSK(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img, const CUDAIMAGE::Pointer str_img,
-                         CUDAIMAGE::Pointer &updateFieldF, CUDAIMAGE::Pointer &updateFieldM)
+                         CUDAIMAGE::Pointer &updateFieldF, CUDAIMAGE::Pointer &updateFieldM,float t)
 
 {
     updateFieldF = CUDAIMAGE::New();
@@ -220,7 +220,7 @@ float ComputeMetric_CCSK(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Point
      up_img->sz, up_img->spc,
      up_img->dir(0,0),up_img->dir(0,1),up_img->dir(0,2),up_img->dir(1,0),up_img->dir(1,1),up_img->dir(1,2),up_img->dir(2,0),up_img->dir(2,1),up_img->dir(2,2),
      updateFieldF->getFloatdata(), updateFieldM->getFloatdata(),
-     metric_value
+     metric_value,t
      );
 
     return metric_value;
@@ -265,7 +265,32 @@ float ComputeMetric_CC(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer
 }
 
 
+CUDAIMAGE::Pointer ComputeDetImgMain(CUDAIMAGE::Pointer img, CUDAIMAGE::Pointer field, float3 phase_vector)
+{
+    cudaPitchedPtr d_output={0};
+    cudaExtent extent =  make_cudaExtent(sizeof(float)*img->sz.x,img->sz.y,img->sz.z);
+    cudaMalloc3D(&d_output, extent);
+    cudaMemset3D(d_output,0,extent);
 
+    ComputeDetImg_cuda(img->getFloatdata(), field->getFloatdata(),
+                       img->sz, img->spc,
+                       img->dir(0,0),img->dir(0,1),img->dir(0,2),img->dir(1,0),img->dir(1,1),img->dir(1,2),img->dir(2,0),img->dir(2,1),img->dir(2,2),
+                       phase_vector,
+                       d_output
+                       );
+
+    CUDAIMAGE::Pointer output = CUDAIMAGE::New();
+    output->sz=img->sz;
+    output->dir=img->dir;
+    output->orig=img->orig;
+    output->spc=img->spc;
+    output->components_per_voxel= 1;
+    output->SetFloatDataPointer( d_output);
+    return output;
+
+
+
+}
 
 
 #endif

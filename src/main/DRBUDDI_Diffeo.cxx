@@ -1635,7 +1635,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         }
         this->stages.push_back(curr_stage);
     }
-
+/*
     if(Nstr>0 && (this->FA_up_img  && this->FA_down_img) )
     {
         DRBUDDIStageSettings curr_stage;                                   //28
@@ -1649,7 +1649,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         curr_stage.constrain=0;
         DRBUDDIMetric metric1;
         metric1.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
-        metric1.weight=0.2;
+        metric1.weight=0.5;
         curr_stage.metrics.push_back(metric1);
         DRBUDDIMetric metric3;
         metric3.SetMetricType( DRBUDDIMetricEnumeration::CC);
@@ -1664,12 +1664,12 @@ void DRBUDDI_Diffeo::SetDefaultStages()
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=0.5;
+            metric4.weight=0.6;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
     }
-
+*/
 
 }
 

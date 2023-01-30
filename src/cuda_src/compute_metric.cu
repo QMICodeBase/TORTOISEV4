@@ -14,8 +14,8 @@
 #define WIN_RAD 4
 #define WIN_RAD_Z 2
 
-#define WIN_RAD_JAC 4
-#define WIN_RAD_JAC_Z 2
+#define WIN_RAD_JAC 9
+#define WIN_RAD_JAC_Z 4
 
 
 
@@ -1256,7 +1256,7 @@ ComputeMetric_CCJacS_kernel( cudaPitchedPtr b0_img,  cudaPitchedPtr str_img,
                           M1[0]*= detF*a_b;
                           M1[1]*= detF*a_b;
                           M1[2]*= detF*a_b;
-                          float M2= d_new_phase[phase_xyz]*dmf(detF2)* valb_center* 0.5/d_spc[phase]/h ;;
+                          float M2= d_new_phase[phase_xyz]*dmf(detF2)* valb_center* 0.5/d_spc[phase]/h ;
                           M1[phase_xyz]+=M2;
 
                           float second_term= (valS_val - sKS_val/ sKK_val *valK_val);
@@ -2131,7 +2131,7 @@ void ComputeMetric_MSJacSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_i
 
 
 __global__ void
-Compute_K_image( cudaPitchedPtr up_img, cudaPitchedPtr down_img, cudaPitchedPtr K_img)
+Compute_K_image( cudaPitchedPtr up_img, cudaPitchedPtr down_img, cudaPitchedPtr K_img,float t)
 {
     uint ii = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
     uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
@@ -2161,10 +2161,13 @@ Compute_K_image( cudaPitchedPtr up_img, cudaPitchedPtr down_img, cudaPitchedPtr 
             float a = row_up[i];
             float b= row_down[i];
 
-            float a_b= a+b;
+            //float a_b= a+b;
+            //if(a_b>LIMCCSK)
+              //  row_K[i] = 2*a*b/a_b;
 
+            float a_b= a*t+b*(1-t);
             if(a_b>LIMCCSK)
-                row_K[i] = 2*a*b/a_b;
+                row_K[i] = a*b/a_b;
         }
     }
 
@@ -2177,7 +2180,7 @@ __global__ void
 ComputeMetric_CCSK_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                            cudaPitchedPtr K_img, cudaPitchedPtr str_img,
                            cudaPitchedPtr updateFieldF, cudaPitchedPtr updateFieldM,
-                           cudaPitchedPtr metric_img)
+                           cudaPitchedPtr metric_img,float t=0.5)
 {
 
     uint ii = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
@@ -2302,12 +2305,13 @@ ComputeMetric_CCSK_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                 float fval = row_up[i];
                 float mval = row_down[i];
 
-                float sm_mval_fval=(mval+fval);
+                float sm_mval_fval=(fval*t + mval*(1-t));
 
                 if(sm_mval_fval*sm_mval_fval > LIMCCSK)
                 {
                     {
-                        float grad_term =2* mval*mval/sm_mval_fval/sm_mval_fval;
+                        //float grad_term =2* mval*mval/sm_mval_fval/sm_mval_fval;
+                        float grad_term = mval/sm_mval_fval -fval*mval*t/sm_mval_fval/sm_mval_fval;
                         float3 gradI2= ComputeImageGradient(up_img,i,j,k);
 
                         updateF[0]= first_term*grad_term * gradI2.x;
@@ -2315,7 +2319,8 @@ ComputeMetric_CCSK_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                         updateF[2]= first_term*grad_term * gradI2.z;
                     }
                     {
-                        float grad_term= 2* fval*fval/sm_mval_fval/sm_mval_fval;
+                        //float grad_term= 2* fval*fval/sm_mval_fval/sm_mval_fval;
+                        float grad_term = fval/sm_mval_fval - fval*mval*(1-t)/sm_mval_fval/sm_mval_fval;
                         float3 gradJ2= ComputeImageGradient(down_img,i,j,k);
 
                         updateM[0]= first_term*grad_term * gradJ2.x;
@@ -2358,7 +2363,8 @@ void ComputeMetric_CCSK_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cud
                              int3 data_sz, float3 data_spc,
                              float d00,float d01,float d02,float d10,float d11,float d12,float d20,float d21,float d22,
                              cudaPitchedPtr updateFieldF, cudaPitchedPtr updateFieldM,
-                             float &metric_value)
+                             float &metric_value,
+                             float t)
 
 {
     float h_d_dir[]= {d00,d01,d02,d10,d11,d12,d20,d21,d22};
@@ -2382,12 +2388,12 @@ void ComputeMetric_CCSK_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cud
     const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
     const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
 
-    Compute_K_image<<< blockSize,gridSize>>>( up_img, down_img,K_image);
+    Compute_K_image<<< blockSize,gridSize>>>( up_img, down_img,K_image,t);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
 
-    ComputeMetric_CCSK_kernel<<< blockSize,gridSize>>>(up_img,down_img, K_image, str_img, updateFieldF, updateFieldM, metric_image );
+    ComputeMetric_CCSK_kernel<<< blockSize,gridSize>>>(up_img,down_img, K_image, str_img, updateFieldF, updateFieldM, metric_image,t );
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
@@ -2620,7 +2626,51 @@ void ComputeMetric_CC_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
 }
 
+void ComputeDetImg_cuda(cudaPitchedPtr img, cudaPitchedPtr field,
+                        int3 data_sz, float3 data_spc,
+                        float d00,float d01,float d02,float d10,float d11,float d12,float d20,float d21,float d22,
+                        float3 phase_vector,
+                        cudaPitchedPtr output)
+{
+    float h_d_dir[]= {d00,d01,d02,d10,d11,d12,d20,d21,d22};
+    gpuErrchk(cudaMemcpyToSymbol(d_dir, &h_d_dir, 9 * sizeof(float)));
+    float h_d_spc[]= {data_spc.x,data_spc.y,data_spc.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_spc, &h_d_spc, 3 * sizeof(float)));
+    int h_d_sz[]= {data_sz.x,data_sz.y,data_sz.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
 
+
+
+    float new_phase[3];
+    new_phase[0]= d00*phase_vector.x + d01*phase_vector.y +d02*phase_vector.z ;
+    new_phase[1]= d10*phase_vector.x + d11*phase_vector.y +d12*phase_vector.z ;
+    new_phase[2]= d20*phase_vector.x + d21*phase_vector.y +d22*phase_vector.z ;
+    gpuErrchk(cudaMemcpyToSymbol(d_new_phase, &new_phase, 3 * sizeof(float)));
+
+    int phase_xyz,phase;
+    if( (fabs(phase_vector.x) > fabs(phase_vector.y))  && (fabs(phase_vector.x) > fabs(phase_vector.z)))
+        phase=0;
+    else if( (fabs(phase_vector.y) > fabs(phase_vector.x))  && (fabs(phase_vector.y) > fabs(phase_vector.z)))
+        phase=1;
+    else phase=2;
+
+    if( (fabs(new_phase[0]) > fabs(new_phase[1]))  && (fabs(new_phase[0]) > fabs(new_phase[2])))
+        phase_xyz=0;
+    else if( (fabs(new_phase[1]) > fabs(new_phase[0]))  && (fabs(new_phase[1]) > fabs(new_phase[2])))
+        phase_xyz=1;
+    else phase_xyz=2;
+
+
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+
+    computeDetImg<<< blockSize,gridSize>>>( img,field,output,phase,phase_xyz);
+
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+
+}
 
 
 #endif

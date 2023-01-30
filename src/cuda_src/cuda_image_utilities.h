@@ -86,5 +86,4 @@ void IntegrateVelocityField_cuda(cudaPitchedPtr *velocity_field,
 
 
 
-
 #endif

@@ -1388,7 +1388,6 @@ IntegrateVelocityField_kernel(cudaPitchedPtr *vf, cudaPitchedPtr output_field, f
 
 
 
-
             for (unsigned int n = 0; n < NT+2; ++n)
             {
                 float x1[4],x2[4],x3[4],x4[4];
@@ -1407,20 +1406,20 @@ IntegrateVelocityField_kernel(cudaPitchedPtr *vf, cudaPitchedPtr output_field, f
 
 
                 float3 f1= InterpolateVF(vf,x1,NT);
-                x2[0]+=f1.x + deltaTime*0.5;
-                x2[1]+=f1.y + deltaTime*0.5;
-                x2[2]+=f1.z + deltaTime*0.5;
+                x2[0]+=f1.x * deltaTime*0.5;
+                x2[1]+=f1.y * deltaTime*0.5;
+                x2[2]+=f1.z * deltaTime*0.5;
 
 
                 float3 f2= InterpolateVF(vf,x2,NT);
-                x3[0]+=f2.x + deltaTime*0.5;
-                x3[1]+=f2.y + deltaTime*0.5;
-                x3[2]+=f2.z + deltaTime*0.5;
+                x3[0]+=f2.x * deltaTime*0.5;
+                x3[1]+=f2.y * deltaTime*0.5;
+                x3[2]+=f2.z * deltaTime*0.5;
 
                 float3 f3= InterpolateVF(vf,x3,NT);
-                x4[0]+=f3.x + deltaTime;
-                x4[1]+=f3.y + deltaTime;
-                x4[2]+=f3.z + deltaTime;
+                x4[0]+=f3.x * deltaTime;
+                x4[1]+=f3.y * deltaTime;
+                x4[2]+=f3.z * deltaTime;
 
                 float3 f4= InterpolateVF(vf,x4,NT);
 
@@ -1451,10 +1450,6 @@ IntegrateVelocityField_kernel(cudaPitchedPtr *vf, cudaPitchedPtr output_field, f
     }
 
 }
-
-
-
-
 
 
 void IntegrateVelocityField_cuda(cudaPitchedPtr *velocity_field,

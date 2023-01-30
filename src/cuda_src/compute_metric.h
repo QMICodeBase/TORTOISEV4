@@ -85,13 +85,14 @@ void ComputeMetric_MSJacSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_i
 
 
 float ComputeMetric_CCSK(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img, const CUDAIMAGE::Pointer str_img,
-                         CUDAIMAGE::Pointer &updateFieldF, CUDAIMAGE::Pointer &updateFieldM
-                         );
+                         CUDAIMAGE::Pointer &updateFieldF, CUDAIMAGE::Pointer &updateFieldM,
+                         float t=0.5);
 void ComputeMetric_CCSK_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cudaPitchedPtr str_img,
                    int3 data_sz, float3 data_spc,
                    float d00,float d01,float d02,float d10,float d11,float d12,float d20,float d21,float d22,
                    cudaPitchedPtr updateFieldF, cudaPitchedPtr updateFieldM,
-                   float &metric_value
+                   float &metric_value,
+                   float t=0.5
                    );
 
 
@@ -109,6 +110,13 @@ void ComputeMetric_CC_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                    );
 
 
+
+CUDAIMAGE::Pointer ComputeDetImgMain(CUDAIMAGE::Pointer img, CUDAIMAGE::Pointer field, float3 phase_vector);
+void ComputeDetImg_cuda(cudaPitchedPtr img, cudaPitchedPtr field,
+                        int3 data_sz, float3 data_spc,
+                        float d00,float d01,float d02,float d10,float d11,float d12,float d20,float d21,float d22,
+                        float3 phase_vector,
+                        cudaPitchedPtr output);
 
 
 

@@ -290,5 +290,4 @@ void IntegrateVelocityFieldGPU(std::vector<CUDAIMAGE::Pointer> velocity_field, f
 
 
 
-
 #endif

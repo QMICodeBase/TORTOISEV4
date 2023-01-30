@@ -178,7 +178,14 @@ void CUDAIMAGE::SetImageFromITK(DisplacementFieldType::Pointer itk_field)
     this->components_per_voxel=3;
     this->Allocate();
 
-    copy3DHostToPitchedPtr((float*)itk_field->GetBufferPointer(),PitchedFloatData,this->components_per_voxel*sz.x,sz.y,sz.z);
+    using DisplacementFieldTypeFloat= itk::Image<itk::Vector<float,3>,3>;
+    using FilterType = itk::CastImageFilter<DisplacementFieldType, DisplacementFieldTypeFloat>;
+    auto filter = FilterType::New();
+    filter->SetInput(itk_field);
+    filter->Update();
+    auto field2= filter->GetOutput();
+
+    copy3DHostToPitchedPtr((float*)field2->GetBufferPointer(),PitchedFloatData,this->components_per_voxel*sz.x,sz.y,sz.z);
 }
 
 

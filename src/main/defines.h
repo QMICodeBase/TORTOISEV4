@@ -42,6 +42,7 @@ using DTImageType=itk::Image<DTType,3>;
 using MAPType = itk::VariableLengthVector<float>;
 using MAPImageType=itk::VectorImage<PixelDataType,3>;
 
+
 using DisplacementFieldType = itk::DisplacementFieldTransform<CoordType,3>::DisplacementFieldType;
 
 using  InternalMatrixType=vnl_matrix_fixed< double, 3, 3 >;
