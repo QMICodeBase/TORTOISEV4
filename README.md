@@ -111,7 +111,6 @@ For debian systems:
 sudo apt-get update -y
 sudo apt-get install -y fftw3
 sudo apt-get install libfftw3-dev
-sudo apt install zlib1g-dev
 ```
 
 #### 3) Eigen installation 
@@ -143,7 +142,7 @@ cd InsightToolkit-5.3rc04_build
 sed -i 's/this->m_SparseGetValueAndDerivativeThreader->SetMaximumNumberOfThreads(number);/this->m_SparseGetValueAndDerivativeThreader->SetMaximumNumberOfThreads(number);this->m_SparseGetValueAndDerivativeThreader->SetNumberOfWorkUnits(number);/g' ../InsightToolkit-5.3rc04/Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx
 sed -i 's/this->m_DenseGetValueAndDerivativeThreader->SetMaximumNumberOfThreads(number);/this->m_DenseGetValueAndDerivativeThreader->SetMaximumNumberOfThreads(number);this->m_DenseGetValueAndDerivativeThreader->SetNumberOfWorkUnits(number);/g' ../InsightToolkit-5.3rc04/Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx
 
-cmake ../InsightToolkit-5.3rc04 -DITK_USE_SYSTEM_ZLIB=ON
+cmake ../InsightToolkit-5.3rc04
 make -j 16
 cd ..
 ```
@@ -182,7 +181,7 @@ cmake . -D USECUDA=1 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3r
 
 For ComputeGlyphMaps executable version:
 ```
-cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build -D VTK_DIR=../../libraries/VTK-8.0.1_build -DITK_USE_SYSTEM_ZLIB=ON
+cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build -D VTK_DIR=../../libraries/VTK-8.0.1_build 
 ```
 
 Then,
