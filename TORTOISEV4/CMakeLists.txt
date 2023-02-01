@@ -8,7 +8,7 @@ SET(USEOPENMP 1)
 
 
 if ( NOT DEFINED USECUDA)
-    SET(USECUDA 1)
+    SET(USECUDA 0)
 endif()
 if ( NOT DEFINED USE_VTK)
     SET(USE_VTK 0)
@@ -138,7 +138,7 @@ set(SOURCES ../src/main/defines.cxx  ../src/main/TORTOISE_global.cxx ../src/main
 include_directories(../src/main)
 
 IF(USECUDA)
-     include_directories(../src/cuda_src )     
+     include_directories(../src/cuda_src )
      add_executable(TORTOISEProcess_cuda ../src/main/main.cxx    ../src/tools/DRBUDDI/DRBUDDI_parserBase.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateMAPMRI/MAPMRIModel.cxx  ../src/tools/RotateBMatrix/rotate_bmatrix.cxx  ../src/main/FINALDATA.cxx ../src/main/TORTOISE.cxx ../src/main/DIFFPREP.cxx ../src/main/DRBUDDI.cxx ../src/main/DRBUDDIBase.cxx  ../src/main/EPIREG.cxx ../src/main/TORTOISE_parser.cxx ../src/cuda_src/cuda_image.cxx  ../src/cuda_src/warp_image.cu ../src/cuda_src/warp_image.cxx  ../src/main/run_drbuddi_stage.cxx  ../src/main/run_drbuddi_stage_TVVF.cxx ../src/cuda_src/resample_image.cu ../src/cuda_src/resample_image.cxx ../src/cuda_src/gaussian_smooth_image.cu ../src/cuda_src/gaussian_smooth_image.cxx  ../src/cuda_src/cuda_image_utilities.cu ../src/cuda_src/cuda_image_utilities.cxx ../src/cuda_src/compute_metric.cu ../src/cuda_src/compute_metric.cxx ../src/main/DRBUDDI_Diffeo.cxx  ../src/tools/gradnonlin/init_iso_gw.cxx ../src/tools/gradnonlin/gradcal.cxx ../src/tools/ResampleDWIs/resample_dwis.cxx ../src/main/rigid_register_images.cxx ../src/tools/EstimateTensor/estimate_tensor_wlls.cxx ../src/main/create_mask.cxx ../src/cuda_src/register_dwi_to_b0_cuda.cxx ../src/cuda_src/quadratic_transform_image.cxx ../src/cuda_src/quadratic_transform_image.cu ../src/cuda_src/compute_entropy.cxx ../src/cuda_src/compute_entropy.cu  ${SOURCES} )
      target_include_directories(TORTOISEProcess_cuda   PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
      target_link_libraries(TORTOISEProcess_cuda  Eigen3::Eigen ${ITK_LIBRARIES} ${Boost_LIBRARIES}   fftw3 ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a   -static-libgcc -static-libstdc++)
@@ -157,9 +157,9 @@ IF(USECUDA)
 
 
 ELSE(USECUDA)
-    SET(CMAKE_EXE_LINKER_FLAGS "-static ")    
+    SET(CMAKE_EXE_LINKER_FLAGS "-static ")
     add_executable(TORTOISEProcess ../src/main/main.cxx  ../src/tools/DRBUDDI/DRBUDDI_parserBase.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateMAPMRI/MAPMRIModel.cxx   ../src/tools/RotateBMatrix/rotate_bmatrix.cxx ../src/main/FINALDATA.cxx ../src/main/TORTOISE.cxx ../src/main/DIFFPREP.cxx ../src/main/DRBUDDI.cxx ../src/main/DRBUDDIBase.cxx ../src/main/EPIREG.cxx ../src/main/DRBUDDI_Diffeo.cxx ../src/main/run_drbuddi_stage.cxx ../src/main/drbuddi_image_utilities.cxx   ../src/tools/EstimateTensor/estimate_tensor_wlls.cxx ../src/main/create_mask.cxx ../src/tools/ResampleDWIs/resample_dwis.cxx ../src/main/rigid_register_images.cxx ../src/main/TORTOISE_parser.cxx  ../src/tools/gradnonlin/init_iso_gw.cxx ../src/tools/gradnonlin/gradcal.cxx ${SOURCES})
-    target_link_libraries(TORTOISEProcess Eigen3::Eigen ${ITK_LIBRARIES}  ${Boost_LIBRARIES} ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a fftw3 )    
+    target_link_libraries(TORTOISEProcess Eigen3::Eigen ${ITK_LIBRARIES}  ${Boost_LIBRARIES} ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a fftw3 )
 
      add_executable(Vol2SlRegistration   ../src/tools/Vol2SlRegistration/vol2sl_registration_main.cxx  ${SOURCES})
      target_include_directories(Vol2SlRegistration   PRIVATE   )
