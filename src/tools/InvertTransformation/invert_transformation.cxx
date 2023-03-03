@@ -121,6 +121,7 @@ int main( int argc , char * argv[] )
             using TransformReaderType =itk::TransformFileReaderTemplate< double > ;
             TransformReaderType::Pointer reader = TransformReaderType::New();
             reader->SetFileName(filename );
+            reader->Update();
             const TransformReaderType::TransformListType * transforms =       reader->GetTransformList();
             itk::TransformFileReader::TransformListType::const_iterator it = transforms->begin(); 
             AffineTransformType::Pointer affine_trans = static_cast<AffineTransformType*>((*it).GetPointer());

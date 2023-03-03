@@ -1347,17 +1347,6 @@ void DIFFPREP::MotionAndEddy()
                  // Synthesize artificial volume with the same bvec/bval
                  ImageType3D::Pointer synth_img=nullptr;
 
-                 /*
-                 if( bvals[vol] <=mapmri_bval_cutoff)
-                     synth_img= dti_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
-                 else if(bvals[vol] >mapmri_bval_cutoff)
-                     synth_img = mapmri_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
-
-                 if(MAPMRI_indices.size()>0)
-                     synth_img = mapmri_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
-                 else
-                     synth_img= dti_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
-                 */
                  if(bvals[vol]<=55)
                  {
                      synth_img= dti_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );

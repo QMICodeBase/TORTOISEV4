@@ -40,9 +40,16 @@ TORTOISE::TORTOISE(int argc, char *argv[])
     //Set up the number of cpus to use
     std::string system_settings_file = this->executable_folder +std::string("/../settings/system_settings/default_system_settings.json");
     json system_settings_json;
-    std::ifstream system_settings_stream(system_settings_file);
-    system_settings_stream >> system_settings_json;
-    system_settings_stream.close();
+    if(fs::exists(system_settings_file))
+    {
+        std::ifstream system_settings_stream(system_settings_file);
+        system_settings_stream >> system_settings_json;
+        system_settings_stream.close();
+    }
+    else
+    {
+        system_settings_json["PercentOfCpuCoresToUse"]=0.5;
+    }
 
     //Set threading parameters
     {
@@ -272,7 +279,9 @@ void TORTOISE::FillReportJson()
             else
                 this->processing_report_json["orig_data_" + tags[PE]] = parser->getDownInputName();
 
-            this->processing_report_json["orig_structural"] =  parser->getStructuralNames()[0];
+            std::vector<std::string> str_names=parser->getStructuralNames();
+            if(str_names.size()>0)
+                this->processing_report_json["orig_structural"] =  str_names[0];
 
 
             this->processing_report_json["den_gibbs_data_" + tags[PE]] = nii_name;

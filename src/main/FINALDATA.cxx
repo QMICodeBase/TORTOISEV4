@@ -748,9 +748,16 @@ FINALDATA::CompositeTransformType::Pointer FINALDATA::GenerateCompositeTransform
             ref_img_DP->TransformIndexToPhysicalPoint(ind3,pt);
             pt_trans=curr_mot_eddy_trans->TransformPoint(pt);
 
+            itk::ContinuousIndex<double,3> cint;
+            ref_img_DP->TransformPhysicalPointToContinuousIndex(pt_trans,cint);
+
+            ref_img->TransformIndexToPhysicalPoint(ind3,pt);
+            ref_img->TransformContinuousIndexToPhysicalPoint(cint,pt_trans);
+
+
             auto vec= pt_trans- pt;
-            auto vec2= ref_img->GetDirection() * vec;
-            mot_eddy_field->SetPixel(ind3,vec2);
+            //auto vec2= ref_img->GetDirection() * vec;
+            mot_eddy_field->SetPixel(ind3,vec);
         }
         DisplacementFieldTransformType::Pointer mot_eddy_trans= DisplacementFieldTransformType::New();
         mot_eddy_trans->SetDisplacementField(mot_eddy_field);
@@ -1447,8 +1454,6 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                         }
                     }
 
-                    if(ind3[0]==60 && ind3[1]==89 && ind3[2]==30)
-                        int ma=0;
 
                     if(this->s2v_transformations[PE].size()==0)
                     {
@@ -1619,12 +1624,15 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
             basename=basename.substr(0,basename.rfind(".nii"));
             std::string new_nii_name=  this->temp_folder + "/" + basename + "_final_temp_norepol.nii";
             std::string new_inc_name= this->temp_folder + "/" + basename + "_final_temp_inc.nii";
+
+
             #pragma omp critical
             {
                 (*stream)<<vol<<", "<<std::flush;
-                write_3D_image_to_4D_file<float>(final_img,new_nii_name,vol,Nvols[PE]);
-            }
+                if(final_inclusion_imgs.size())
+                    write_3D_image_to_4D_file<float>(final_img,new_nii_name,vol,Nvols[PE]);
 
+            }
             TORTOISE::DisableOMPThread();
         } //for vol
 

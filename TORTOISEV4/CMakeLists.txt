@@ -8,7 +8,7 @@ SET(USEOPENMP 1)
 
 
 if ( NOT DEFINED USECUDA)
-    SET(USECUDA 0)
+    SET(USECUDA 1)
 endif()
 if ( NOT DEFINED USE_VTK)
     SET(USE_VTK 0)
@@ -103,7 +103,8 @@ ENDIF(USECUDA)
 
 IF(ISDEBUG)
      if ( NOT DEFINED ITK_DIR)
-        SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-5.3rc04-debug)
+       # SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-5.3rc04-debug)
+        SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-5.3rc04-release)
     endif()
     FIND_PACKAGE(ITK)
     IF(ITK_FOUND)
@@ -434,7 +435,8 @@ target_link_libraries(UnObliqueImage  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 add_executable(ConvertGEGradientsToBMatrix ../src/tools/ConvertGEGradientsToBMatrix/ConvertGEGradientsToBMatrix.cxx   ${SOURCES})
 target_link_libraries(ConvertGEGradientsToBMatrix  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
-
+add_executable(Combine3DImagesTo4D ../src/tools/Combine3DImagesTo4D/Combine3DImagesTo4D.cxx   ${SOURCES})
+target_link_libraries(Combine3DImagesTo4D  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 IF(USE_VTK)
