@@ -19,7 +19,10 @@ float average(const EigenVecType& x, const EigenVecType& w);
 EigenVecType log_gaussian_skewed(const EigenVecType& x,float alpha,float mu , float sigma );
 inline double normalCDF_val(double value)
 {
-   return 0.5 * erfc(-value * M_SQRT1_2);
+   if(value<-30)
+       return 0;
+
+    return 0.5 * erfc(-value * M_SQRT1_2);
 }
 
 double ComputeResidProb(double val, float mu, float sigma,int agg_level);

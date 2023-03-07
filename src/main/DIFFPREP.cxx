@@ -524,7 +524,7 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
             OkanQuadraticTransformType::Pointer curr_trans=nullptr;
             #ifdef USECUDA
                 if(TORTOISE::ReserveGPU())
-                {
+                {                    
                     curr_trans=  RegisterDWIToB0_cuda(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
                     TORTOISE::ReleaseGPU();
                 }
@@ -1422,7 +1422,7 @@ void DIFFPREP::MotionAndEddy()
                      if(epoch==1)
                          do_eddy=false;
 
-                     VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string);
+                     VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string, this->b0_mask_img);
                      #pragma omp critical
                      {
                          (*stream)<<vol<<", "<<std::flush;
