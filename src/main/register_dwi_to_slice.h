@@ -51,9 +51,8 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
         slice_img->TransformIndexToPhysicalPoint(orig_ind,orig);
         temp_slice_img_itk->SetOrigin(orig);
 
-        bool data_exists=false;
-        if(MB>1)
-            data_exists=true;
+
+        int nvoxels=0;
         for(int kk=0;kk<MB;kk++)
         {
             int k=slspec(e,kk);
@@ -71,7 +70,9 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
 
                     temp_slice_img_itk->SetPixel(ind3_v2,slice_img->GetPixel(ind3));
                     if(MB==1 && mask_img->GetPixel(ind3))
-                        data_exists=true;
+                    {
+                        nvoxels++;
+                    }
                 }
             }
         }
@@ -80,7 +81,7 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
         initialTransform->SetPhase(phase);
         initialTransform->SetIdentity();
 
-        if(data_exists)
+        if(MB>1 || (nvoxels>0.01*sz[0]*sz[1]))
         {
             typedef itk::MattesMutualInformationImageToImageMetricv4Okan<ImageType3D,ImageType3D> MetricType;
             MetricType::Pointer         metric        = MetricType::New();
@@ -176,13 +177,19 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
 
             try
               {
-              registration->Update();
+                  registration->Update();
               }
             catch( itk::ExceptionObject & err )
               {
-              std::cerr << "ExceptionObject caught !" << std::endl;
-              std::cerr<<"Slice: "<< e<<std::endl;
-              std::cerr << err << std::endl;
+                  std::cerr << "ExceptionObject caught !" << std::endl;
+                  std::cerr<<"Slice: "<< e<<std::endl;
+                  std::cerr<<"Probably insufficient data on slice. Reverting to identity transform"<<std::endl;
+                  //std::cerr << err << std::endl;
+
+                  initialTransform = OkanQuadraticTransformType::New();
+                  initialTransform->SetPhase(phase);
+                  initialTransform->SetIdentity();
+
               }
 
         }//data exists
