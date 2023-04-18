@@ -12,7 +12,8 @@
 #include "../tools/EstimateTensor/DTIModel.h"
 #include "../tools/EstimateMAPMRI/MAPMRIModel.h"
 
-
+#include <chrono>
+#include <thread>
 
 
 #include "register_dwi_to_b0.hxx"
@@ -475,9 +476,9 @@ std::vector<float> DIFFPREP::choose_range(ImageType3D::Pointer b0_img,ImageType3
      lim_arr.resize(4);
      lim_arr[0]=0.1;
      lim_arr[1]= fixed_signal[ind];
-     //lim_arr[2]=0.1;
+     lim_arr[2]=std::max(0.1,(double)moving_min);
     // lim_arr[3]= moving_signal[ind];
-     lim_arr[2]=moving_min;
+     //lim_arr[2]=moving_min;
      lim_arr[3]= moving_max;
 
      return lim_arr;
@@ -493,57 +494,105 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
 
      (*stream)<<"Done registering vol: " <<std::flush;
 
+    int Nt= omp_get_max_threads();
+    std::vector< std::vector<int> > my_threads;
+    int newt= std::min(Nt,Nvols);
+    my_threads.resize(newt);
+
+    for( int vol2=0; vol2<Nvols;vol2++)
+    {
+        my_threads [ vol2%newt].push_back(vol2);
+    }
+
+    omp_set_num_threads(newt);
+
+    //The volumes in my_threads 1 will be processed by te GPU
+    // the others by the CPU
+    // so we give a bit more volumes to threads1
+#ifdef USECUDA
+    if(Nt>7 && Nvols >7)
+    {
+        std::vector< std::vector<int> > my_threads2;
+        my_threads2.push_back(my_threads[0]);
+
+        std::vector<int> vec= my_threads[1];
+        vec.insert(vec.end(),my_threads[newt-1].begin(),my_threads[newt-1].end());
+        vec.insert(vec.end(),my_threads[newt-2].begin(),my_threads[newt-2].end());
+        vec.insert(vec.end(),my_threads[newt-3].begin(),my_threads[newt-3].end());
+        my_threads2.push_back(vec);
+
+        for(int v=2;v<newt-3;v++)
+            my_threads2.push_back(my_threads[v]);
+
+        my_threads=my_threads2;
+    }
+#endif
+
+
+
 
 #ifdef USECUDA
-    #pragma omp parallel for schedule(dynamic)
+    #pragma omp parallel for schedule(static,1)
 #else
     #pragma omp parallel for
 #endif
-    for( int vol=0; vol<Nvols;vol++)
+    for(int nt=0;nt<my_threads.size();nt++)
     {
         TORTOISE::EnableOMPThread();
-
-        if(vol == this->b0_vol_id || correction_mode=="off" )
+        for( int vol2=0; vol2<my_threads[nt].size();vol2++)
         {
-            itk::OkanQuadraticTransform<double>::Pointer id_trans=itk::OkanQuadraticTransform<double>::New();
-            id_trans->SetPhase(this->PE_string);
-            id_trans->SetIdentity();
-            dwi_transforms[vol]->ClearTransformQueue();
-            dwi_transforms[vol]->AddTransform(id_trans);
-        }
-        else
-        {
-            ImageType3D::Pointer target= target_imgs[vol];
-            ImageType3D::Pointer target2=ChangeImageHeaderToDP<ImageType3D>(target);
-            ImageType3D::Pointer target_target=dmc_make_target(target2,mask2);
+            int vol= my_threads[nt][vol2];
 
-            ImageType3D::Pointer curr_vol = ChangeImageHeaderToDP<ImageType3D>(source_imgs[vol]);
-            std::vector<float> signal_ranges = choose_range(target, curr_vol,b0_mask_img);
+            if(vol == this->b0_vol_id || correction_mode=="off" )
+            {
+                itk::OkanQuadraticTransform<double>::Pointer id_trans=itk::OkanQuadraticTransform<double>::New();
+                id_trans->SetPhase(this->PE_string);
+                id_trans->SetIdentity();
+                dwi_transforms[vol]->ClearTransformQueue();
+                dwi_transforms[vol]->AddTransform(id_trans);
+            }
+            else
+            {
+                ImageType3D::Pointer target= target_imgs[vol];
+                ImageType3D::Pointer target2=ChangeImageHeaderToDP<ImageType3D>(target);
+                ImageType3D::Pointer target_target=dmc_make_target(target2,mask2);
+
+                ImageType3D::Pointer curr_vol = ChangeImageHeaderToDP<ImageType3D>(source_imgs[vol]);
+                std::vector<float> signal_ranges = choose_range(target, curr_vol,b0_mask_img);
 
 
-            OkanQuadraticTransformType::Pointer curr_trans=nullptr;
-            #ifdef USECUDA
-                if(TORTOISE::ReserveGPU())
-                {                    
-                    curr_trans=  RegisterDWIToB0_cuda(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
-                    TORTOISE::ReleaseGPU();
-                }
-                else
-                    curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
-            #else
-                    curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
-            #endif
+                OkanQuadraticTransformType::Pointer curr_trans=nullptr;
+                #ifdef USECUDA
+                    if(nt==1)
+                    {
+                        if(TORTOISE::ReserveGPU())
+                        {
+                            curr_trans=  RegisterDWIToB0_cuda(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
+                            TORTOISE::ReleaseGPU();
+                        }
+                        else
+                            curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
+                    }
+                    else
+                            curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
 
-            dwi_transforms[vol]->ClearTransformQueue();
-            dwi_transforms[vol]->AddTransform(curr_trans);
-        }
-        #pragma omp critical
-        {            
-            (*stream)<<", "<<vol<<std::flush;
+                #else
+                        curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
+                #endif
+
+
+                dwi_transforms[vol]->ClearTransformQueue();
+                dwi_transforms[vol]->AddTransform(curr_trans);
+            }
+            #pragma omp critical
+            {
+                (*stream)<<", "<<vol<<std::flush;
+            }
         }
         TORTOISE::DisableOMPThread();
     }
     (*stream)<<std::endl<<std::endl;
+    omp_set_num_threads(Nt);
 }
 
 
@@ -734,7 +783,7 @@ void DIFFPREP::EM(std::vector< std::vector<float> >  logRMS_shell, std::vector< 
                 std::mt19937 e2(rd());
                 std::normal_distribution<> dist(M[kk],S[kk]);
 
-                int N= std::round(100000*P[kk]);
+                int N= std::round(500000*P[kk]);
                 for(int n=0;n<N;n++)
                 {
                     double vl = dist(e2);
@@ -786,7 +835,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
     {
         for(int s=0;s<shells.size();s++)
         {
-            if(fabs(bvals[vol] -shells[s])<30)
+            if(fabs(bvals[vol] -shells[s])<20)
             {
                 volumes_per_shell[s]++;
                 break;
@@ -796,7 +845,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
 
 
 
-    #pragma omp parallel for
+ //   #pragma omp parallel for
     for(int vol=0;vol<Nvols; vol++)
     {
         TORTOISE::EnableOMPThread();
@@ -1055,7 +1104,11 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
             ImageType3D::IndexType ind3;
             ind3[2]=k;
 
-            double val = log(all_RMS[vol][k]);
+            double val = all_RMS[vol][k];
+            if(val>0)
+                val=log(val);
+            else
+                val=0;
             double valCDF = ComputeResidProb(val,meds_sl(shell_ids[vol],k), MADs_sl(shell_ids[vol],k),aggressive_level);
 
             for(int j=0;j<sz[1];j++)
@@ -1403,8 +1456,7 @@ void DIFFPREP::MotionAndEddy()
              //slice to volume registration
              if(slice_to_volume)
              {
-                 (*stream)<<"Done Slice-to-volume registering volume: " <<std::flush;
-
+                 (*stream)<<"Done Slice-to-volume registering volume: " <<std::flush;              
 
                  #pragma omp parallel for
                  for(int vol=0;vol<Nvols;vol++)
@@ -1422,9 +1474,9 @@ void DIFFPREP::MotionAndEddy()
                      if(epoch==1)
                          do_eddy=false;
 
-                     VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string, this->b0_mask_img);
+                     VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string, this->b0_mask_img,vol);
                      #pragma omp critical
-                     {
+                     {                         
                          (*stream)<<vol<<", "<<std::flush;
                      }
                      TORTOISE::DisableOMPThread();
@@ -1513,8 +1565,14 @@ void DIFFPREP::MotionAndEddy()
                      {
                          //s2v_replaced_raw_dwis[vol]= ForwardTransformImage(native_native_replaced_raw_dwis[vol], s2v_transformations[vol]);
                          s2v_replaced_raw_dwis[vol]= ForwardTransformImage(native_native_raw_dwis[vol], s2v_transformations[vol]);
-                     }
 
+                         #pragma omp critical
+                         {
+                             std::cout<<vol<< ", "<<std::flush;
+                         }
+                     }
+                     std::cout<<std::endl;
+                     std::cout<<"Done forward transforming..."<<std::endl;
                  }
                  else
                  {
@@ -1856,7 +1914,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::TransformRepolData(std::string nii_f
     {
         if(correction_mode!="off")
         {
-        //    #pragma omp parallel for
+            #pragma omp parallel for
             for(int vol=0;vol<Nvols;vol++)
             {
                 TORTOISE::EnableOMPThread();

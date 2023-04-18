@@ -65,7 +65,7 @@ void CreateDummyJson_PARSER::InitializeCommandLineOptions()
     }
 
     {
-        std::string description = std::string( "Phase encoding direction. Options: i+, i-, j+, j-" );
+        std::string description = std::string( "Phase encoding direction. Options: i+ (for RL), i- (for LR), j+ (for AP), j- (for PA)" );
         OptionType::Pointer option = OptionType::New();
         option->SetShortName( 'p');
         option->SetLongName( "phase");

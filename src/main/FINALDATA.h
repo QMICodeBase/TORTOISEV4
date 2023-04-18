@@ -19,6 +19,9 @@ public:
     {
         epi_trans[0]=nullptr;
         epi_trans[1]=nullptr;
+        Nvols[0]=0;
+        Nvols[1]=0;
+
 
         data_names.push_back(orig_upname);
         jsons.push_back(orig_upjson);

@@ -318,36 +318,11 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
             tp->SetParameters(new_params);            
             CUDAIMAGE::Pointer trans_moving_img = QuadraticTransformImageC(this->moving_img_cuda, tp,fixed_img_cuda);
 
-            /*
 
-            TransformType::Pointer tp2= TransformType::New();
-            tp2->SetPhase("vertical");
-            tp2->SetIdentity();
+            float entropy_m,entropy_f, entropy_j;
+            ComputeJointEntropy(fixed_img_cuda,lim_arr[0],lim_arr[1],trans_moving_img,lim_arr[2],lim_arr[3],Nbins,entropy_j,entropy_f, entropy_m );
 
-            ImageType3D::Pointer fixed_itk=fixed_img_cuda->CudaImageToITKImage();
-
-            typedef itk::MattesMutualInformationImageToImageMetricv4Okan<ImageType3D,ImageType3D> MetricType2;
-            MetricType2::Pointer         metric        = MetricType2::New();
-            metric->SetNumberOfHistogramBins(40);
-            metric->SetUseMovingImageGradientFilter(false);
-            metric->SetUseFixedImageGradientFilter(false);
-            metric->SetFixedMin(lim_arr[0]);
-            metric->SetFixedMax(lim_arr[1]);
-            metric->SetMovingMin(lim_arr[2]);
-            metric->SetMovingMax(lim_arr[3]);
-            metric->SetFixedImage(fixed_itk);
-            metric->SetMovingImage(trans_moving_img->CudaImageToITKImage());
-           // metric->SetTransform(tp2);
-            metric->SetVirtualDomainFromImage(fixed_itk);
-            metric->Initialize();
-            val=metric->GetValue();
-            */
-
-
-            float entropy_m,entropy_j;
-            ComputeJointEntropy(fixed_img_cuda,lim_arr[0],lim_arr[1],trans_moving_img,lim_arr[2],lim_arr[3],Nbins,entropy_j,entropy_m );
-
-            val = -(this->entropy_f + entropy_m)/entropy_j;
+            val = -(entropy_f + entropy_m)/entropy_j;
         }
         else
         {

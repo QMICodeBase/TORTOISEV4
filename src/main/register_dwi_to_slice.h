@@ -10,7 +10,7 @@
 
 using OkanQuadraticTransformType=itk::OkanQuadraticTransform<CoordType,3,3>;
 
-void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Pointer dwi_img , vnl_matrix<int> slspec,std::vector<float> lim_arr,std::vector<OkanQuadraticTransformType::Pointer> &s2v_transformations, bool do_eddy,std::string phase, ImageType3D::Pointer mask_img=nullptr)
+void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Pointer dwi_img , vnl_matrix<int> slspec,std::vector<float> lim_arr,std::vector<OkanQuadraticTransformType::Pointer> &s2v_transformations, bool do_eddy,std::string phase, ImageType3D::Pointer mask_img=nullptr,int vol=0)
 {     
     int Nexc= slspec.rows();
     int MB= slspec.cols();
@@ -18,18 +18,16 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
 
 
     ImageType3D::SizeType sz =slice_img->GetLargestPossibleRegion().GetSize();
-
     s2v_transformations.resize(sz[2]);
 
-    ImageType3D::SizeType sz2= sz;
 
     for(int e=0;e<Nexc;e++)
     {
         ImageType3D::Pointer  temp_slice_img_itk=ImageType3D::New();
 
-        sz2[2]=MB;
+        sz[2]=MB;
         ImageType3D::IndexType start;start.Fill(0);
-        ImageType3D::RegionType reg(start,sz2);
+        ImageType3D::RegionType reg(start,sz);
         temp_slice_img_itk->SetRegions(reg);
         temp_slice_img_itk->Allocate();
         temp_slice_img_itk->FillBuffer(0);
@@ -81,7 +79,7 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
         initialTransform->SetPhase(phase);
         initialTransform->SetIdentity();
 
-        if(MB>1 || (nvoxels>0.01*sz[0]*sz[1]))
+        if(MB>1 || (nvoxels>0.03*sz[0]*sz[1]))
         {
             typedef itk::MattesMutualInformationImageToImageMetricv4Okan<ImageType3D,ImageType3D> MetricType;
             MetricType::Pointer         metric        = MetricType::New();
@@ -137,6 +135,10 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
             grd_scales[19]=  5.*res[2]*1. /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    );
             grd_scales[20]=  5.*res[2]*1. /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    );
 
+            grd_scales[21]= res[0]*1.25;
+            grd_scales[22]= res[1]*1.25;
+            grd_scales[23]= res[2]*1.25;
+
             grd_scales=grd_scales/1.5;
 
 
@@ -178,24 +180,53 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
             try
               {
                   registration->Update();
+                  if(MB==1)
+                  {
+                      auto fparams = initialTransform->GetParameters();
+                      if(fabs(fparams[2]) > 9*spc[2])
+                      {
+                          initialTransform->SetIdentity();
+                          auto nflags= flags;
+                          nflags[2]=0;
+
+                          optimizer->SetOptimizationFlags(nflags);
+                          registration->Update();
+                      }
+
+                  }
+
+
+                  for(int kk=0;kk<MB;kk++)
+                      s2v_transformations[ slspec(e,kk)]=initialTransform;
               }
             catch( itk::ExceptionObject & err )
               {
                   std::cerr << "ExceptionObject caught !" << std::endl;
-                  std::cerr<<"Slice: "<< e<<std::endl;
+                  std::cerr<<"Vol: " << vol << " Slice: "<< e<<std::endl;
                   std::cerr<<"Probably insufficient data on slice. Reverting to identity transform"<<std::endl;
-                  //std::cerr << err << std::endl;
 
-                  initialTransform = OkanQuadraticTransformType::New();
-                  initialTransform->SetPhase(phase);
-                  initialTransform->SetIdentity();
+                  for(int kk=0;kk<MB;kk++)
+                  {
+                      OkanQuadraticTransformType::Pointer tTransform = OkanQuadraticTransformType::New();
+                      tTransform->SetPhase(phase);
+                      tTransform->SetIdentity();
 
+                      s2v_transformations[ slspec(e,kk)]=tTransform;
+                  }
               }
 
         }//data exists
+        else
+        {
+            for(int kk=0;kk<MB;kk++)
+            {
+                OkanQuadraticTransformType::Pointer tTransform = OkanQuadraticTransformType::New();
+                tTransform->SetPhase(phase);
+                tTransform->SetIdentity();
 
-        for(int kk=0;kk<MB;kk++)
-            s2v_transformations[ slspec(e,kk)]=initialTransform;
+                s2v_transformations[ slspec(e,kk)]=tTransform;
+            }
+        }
 
     } //for e in Nexc
 
@@ -258,7 +289,7 @@ ImageType3D::Pointer ForwardTransformImage(ImageType3D::Pointer img, std::vector
     using TreeGeneratorType = itk::Statistics::KdTreeGenerator<SampleType>;
     TreeGeneratorType::Pointer treeGenerator = TreeGeneratorType::New();
     treeGenerator->SetSample(sample);
-    treeGenerator->SetBucketSize(16);
+    treeGenerator->SetBucketSize(3);
     treeGenerator->Update();
 
     using TreeType = TreeGeneratorType::KdTreeType;

@@ -438,7 +438,7 @@ std::string  DRBUDDI_PARSERBASE::getRigidMetricType()
     if(option->GetNumberOfFunctions())
          return option->GetFunction(0)->GetName();
     else
-        return std::string("MI");
+        return std::string("CC");
 }
 float  DRBUDDI_PARSERBASE::getRigidLR()
 {
@@ -446,7 +446,7 @@ float  DRBUDDI_PARSERBASE::getRigidLR()
     if(option->GetNumberOfFunctions())
          return atof(option->GetFunction(0)->GetName().c_str());
     else
-        return 0.25;
+        return 0.5;
 
 }
 int  DRBUDDI_PARSERBASE::getDWIBvalue()

@@ -10,7 +10,7 @@ void ComputeEntropy_cuda(cudaPitchedPtr img, const int3 sz, const int Nbins, con
                      
 
 
-void ComputeJointEntropy_cuda(cudaPitchedPtr img1, float low_lim1, float high_lim1, cudaPitchedPtr img2, float low_lim2, float high_lim2, const int3 sz, const int Nbins,  float &value1 , float &value2);
-void ComputeJointEntropy(CUDAIMAGE::Pointer img1, float low_lim1, float high_lim1, CUDAIMAGE::Pointer img2, float low_lim2, float high_lim2, int Nbins,float &entropy_j,float &entropy_img2);
+void ComputeJointEntropy_cuda(cudaPitchedPtr img1, float low_lim1, float high_lim1, cudaPitchedPtr img2, float low_lim2, float high_lim2, const int3 sz, const int Nbins,  float &valuec , float &value1 , float &value2);
+void ComputeJointEntropy(CUDAIMAGE::Pointer img1, float low_lim1, float high_lim1, CUDAIMAGE::Pointer img2, float low_lim2, float high_lim2, int Nbins,float &entropy_j, float &entropy_img1, float &entropy_img2);
 
 #endif
