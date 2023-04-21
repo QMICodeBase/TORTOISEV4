@@ -1216,7 +1216,6 @@ void FINALDATA::GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer>
 }
 
 
-
 std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformedInterpolatedData()
 {
     std::vector< std::vector<ImageType3D::Pointer> > final_imgs_to_return;
@@ -1224,12 +1223,6 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
     std::string output_gradnonlin_type = RegistrationSettings::get().getValue<std::string>("output_gradnonlin_Bmtxt_type");
     float THR=RegistrationSettings::get().getValue<float>("outlier_prob");
-
-    vnl_matrix<double> tot_Bmat(Nvols[0]+Nvols[1],6);
-    std::vector<ImageType3D::Pointer> tot_weight_imgs;
-    std::vector<int> tot_low_DT_indices, tot_mapmri_indices;
-    std::vector<ImageType3D::Pointer> imgs_for_fitting;
-
 
     for(int PE=0;PE<2;PE++)
     {
@@ -1265,7 +1258,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 orig_mask2= create_mask(raw_data[0]);
             if(this->native_weight_img[PE].size())
             {
-                ImageType3D::Pointer synth_img = read_3D_volume_from_4D(native_synth_name,vol);                
+                ImageType3D::Pointer synth_img = read_3D_volume_from_4D(native_synth_name,vol);
                 itk::ImageRegionIteratorWithIndex<ImageType3D> it(synth_img,synth_img->GetLargestPossibleRegion());
 
                 std::vector<float> synth_vals;
@@ -1288,7 +1281,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                         }
                     }
                 }
-            }          
+            }
         }
 
 
@@ -1360,7 +1353,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                         it.Set(vec);
 
                         if(  (this->native_weight_img[PE].size() && this->native_weight_img[PE][vol]->GetPixel(ind3)>THR) || this->native_weight_img[PE].size()==0 )
-                        {                                                                                    
+                        {
                             itk::ContinuousIndex<double,3> ind3_t;
                             raw_data[vol]->TransformPhysicalPointToContinuousIndex(pt_trans,ind3_t);
                             MeasurementVectorType tt;
@@ -1448,7 +1441,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 {
                     ImageType3D::IndexType ind3=it.GetIndex();
                     ImageType3D::PointType pt;
-                    final_img->TransformIndexToPhysicalPoint(ind3,pt);                    
+                    final_img->TransformIndexToPhysicalPoint(ind3,pt);
                     ImageType3D::PointType pt_trans_nos2v= all_trans_wo_s2v->TransformPoint(pt);
 
                     if(this->native_weight_img[PE].size())
@@ -1646,6 +1639,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
 
         vnl_matrix<double> rot_Bmat;
+
         {
             //Compute rotated Bmatrix, overall version
             vnl_matrix_fixed<double,3,3> id_trans; id_trans.set_identity();
@@ -1662,18 +1656,15 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
             outfile<<rot_Bmat;
             outfile.close();
 
-            if(PE==0)
-                tot_Bmat.update(rot_Bmat,0,0);
-            else
-            {
-                tot_Bmat.update(rot_Bmat,Nvols[0],0);
-            }
         }
 
 
         // and finally  apply outlier replacement
         if(final_inclusion_imgs.size())
         {
+            (*stream)<<std::endl<<"Replacing final outliers..."<<std::endl;
+
+
             //Get average b=0 image and mask it
             vnl_vector<double> bvals = Bmatrix.get_column(0) + Bmatrix.get_column(3)+ Bmatrix.get_column(5);
 
@@ -1721,12 +1712,10 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
             }
 
 
-            tot_weight_imgs.insert(tot_weight_imgs.end(), final_weight_imgs.begin(),final_weight_imgs.end());
-
-
             // FIRST, resynthesize images in the final space using the final_data
             float dti_bval_cutoff= RegistrationSettings::get().getValue<float>(std::string("dti_bval"));
             float mapmri_bval_cutoff= RegistrationSettings::get().getValue<float>(std::string("hardi_bval"));
+
 
             std::vector<int> low_DT_indices, MAPMRI_indices;
             for(int v=0;v<Nvols[PE];v++)
@@ -1734,215 +1723,195 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 if( bvals[v] <=mapmri_bval_cutoff)
                 {
                     low_DT_indices.push_back(v);
-                    if(PE==0)
-                        tot_low_DT_indices.push_back(v);
-                    else
-                        tot_low_DT_indices.push_back(v+Nvols[0]);
-
                 }
                 else
-                {
                     MAPMRI_indices.push_back(v);
-                    if(PE==0)
-                        tot_mapmri_indices.push_back(v);
-                    else
-                        tot_mapmri_indices.push_back(v+Nvols[0]);
-                }
             }
 
-        }// if repol
+            //DTI fitting
 
-        final_imgs_to_return[PE]=final_data;
-        imgs_for_fitting.insert(imgs_for_fitting.end(),final_data.begin(),final_data.end());
+            std::vector<ImageType3D::Pointer> synth_imgs;
+            synth_imgs.resize(Nvols[PE]);
+            raw_data.clear();raw_data.resize(0);
 
-        raw_data.clear();raw_data.resize(0);
-
-    }  //for PE
-
-
-    if(tot_weight_imgs.size())
-    {
-        (*stream)<<std::endl<<"Replacing final outliers..."<<std::endl;
-
-        //DTI fitting
-        std::vector<std::vector<ImageType3D::Pointer> > dummyv;
-        std::vector<int> dummy;
-        DTIModel dti_estimator;
-        dti_estimator.SetBmatrix(tot_Bmat);
-        dti_estimator.SetDWIData(imgs_for_fitting);
-        dti_estimator.SetWeightImage(tot_weight_imgs);
-        dti_estimator.SetVoxelwiseBmatrix(dummyv);
-        dti_estimator.SetMaskImage(nullptr);
-        dti_estimator.SetVolIndicesForFitting(tot_low_DT_indices);
-        dti_estimator.SetFittingMode("WLLS");
-        dti_estimator.PerformFitting();
-        ImageType3D::Pointer final_mask= create_mask(dti_estimator.GetA0Image());
+            ImageType3D::Pointer final_mask;
+            {
+                std::vector<std::vector<ImageType3D::Pointer> > dummyv;
+                std::vector<int> dummy;
+                DTIModel dti_estimator;
+                dti_estimator.SetBmatrix(rot_Bmat);
+                dti_estimator.SetDWIData(final_data);
+                dti_estimator.SetWeightImage(final_weight_imgs);
+                dti_estimator.SetVoxelwiseBmatrix(dummyv);
+                dti_estimator.SetMaskImage(nullptr);
+                dti_estimator.SetVolIndicesForFitting(low_DT_indices);
+                dti_estimator.SetFittingMode("WLLS");
+                dti_estimator.PerformFitting();
+                final_mask= create_mask(dti_estimator.GetA0Image());
 
 
-        //MAPMRI FITTING
-        MAPMRIModel mapmri_estimator2, mapmri_estimator4,mapmri_estimator6;
-        if(tot_mapmri_indices.size()>0)
-        {
-            vnl_vector<double> bvals = tot_Bmat.get_column(0)+tot_Bmat.get_column(3)+tot_Bmat.get_column(5);
-                double max_bval= bvals.max_value();
-                float small_delta,big_delta;
-
-                if(this->jsons[0]["SmallDelta"]==json::value_t::null || this->jsons[0]["BigDelta"]==json::value_t::null)
+                // MAPMRI FITTING
+                const unsigned int FINAL_STAGE_MAPMRI_DEGREE=6;
+                MAPMRIModel mapmri_estimator2, mapmri_estimator4,mapmri_estimator6;
+                if(MAPMRI_indices.size()>0)
                 {
-                    float bd= RegistrationSettings::get().getValue<float>("big_delta");
-                    float sd= RegistrationSettings::get().getValue<float>("small_delta");
+                    double max_bval= bvals.max_value();
+                    float small_delta,big_delta;
 
-                    if(bd!=0 && sd!=0)
+                    if(this->jsons[PE]["SmallDelta"]==json::value_t::null || this->jsons[PE]["BigDelta"]==json::value_t::null)
                     {
-                        big_delta=bd;
-                        small_delta=sd;
+                        float bd= RegistrationSettings::get().getValue<float>("big_delta");
+                        float sd= RegistrationSettings::get().getValue<float>("small_delta");
+
+                        if(bd!=0 && sd!=0)
+                        {
+                            big_delta=bd;
+                            small_delta=sd;
+                        }
+                        else
+                        {
+                            //If the small and big deltas are unknown, just make a guesstimate
+                            //using the max bvalue and assumed gradient strength
+                            double gyro= 267.51532*1E6;
+                            double G= 40*1E-3;  //well most scanners are either 40 mT/m or 80mT/m.
+                            if(this->jsons[PE]["ManufacturersModelName"]!=json::value_t::null)
+                            {
+                                std::string scanner_model=this->jsons[PE]["ManufacturersModelName"];
+                                if(scanner_model.find("Prisma")!=std::string::npos)
+                                    G= 80*1E-3;
+                            }
+                            double temp= max_bval/gyro/gyro/G/G/2.*1E6;
+                            // assume that big_delta = 3 * small_delta
+                            // deltas are in miliseconds
+                            small_delta= pow(temp,1./3.)*1000.;
+                            big_delta= small_delta*3;
+                        }
+                        this->jsons[PE]["BigDelta"]= big_delta;
+                        this->jsons[PE]["SmallDelta"]= small_delta;
                     }
                     else
                     {
-                        //If the small and big deltas are unknown, just make a guesstimate
-                        //using the max bvalue and assumed gradient strength
-                        double gyro= 267.51532*1E6;
-                        double G= 40*1E-3;  //well most scanners are either 40 mT/m or 80mT/m.
-                        if(this->jsons[0]["ManufacturersModelName"]!=json::value_t::null)
-                        {
-                            std::string scanner_model=this->jsons[0]["ManufacturersModelName"];
-                            if(scanner_model.find("Prisma")!=std::string::npos)
-                                G= 80*1E-3;
-                        }
-                        double temp= max_bval/gyro/gyro/G/G/2.*1E6;
-                        // assume that big_delta = 3 * small_delta
-                        // deltas are in miliseconds
-                        small_delta= pow(temp,1./3.)*1000.;
-                        big_delta= small_delta*3;
+                        big_delta=this->jsons[PE]["BigDelta"];
+                        small_delta=this->jsons[PE]["SmallDelta"];
                     }
-                    this->jsons[0]["BigDelta"]= big_delta;
-                    this->jsons[0]["SmallDelta"]= small_delta;
+
+                    mapmri_estimator2.SetMAPMRIDegree(2);
+                    mapmri_estimator2.SetDTImg(dti_estimator.GetOutput());
+                    mapmri_estimator2.SetA0Image(dti_estimator.GetA0Image());
+                    mapmri_estimator2.SetBmatrix(rot_Bmat);
+                    mapmri_estimator2.SetDWIData(final_data);
+                    mapmri_estimator2.SetWeightImage(final_weight_imgs);
+                    mapmri_estimator2.SetVoxelwiseBmatrix(dummyv);
+                    mapmri_estimator2.SetMaskImage(final_mask);
+                    mapmri_estimator2.SetVolIndicesForFitting(dummy);
+                    mapmri_estimator2.SetSmallDelta(small_delta);
+                    mapmri_estimator2.SetBigDelta(big_delta);
+                    mapmri_estimator2.PerformFitting();
+
+                    mapmri_estimator4.SetMAPMRIDegree(4);
+                    mapmri_estimator4.SetDTImg(dti_estimator.GetOutput());
+                    mapmri_estimator4.SetA0Image(dti_estimator.GetA0Image());
+                    mapmri_estimator4.SetBmatrix(rot_Bmat);
+                    mapmri_estimator4.SetDWIData(final_data);
+                    mapmri_estimator4.SetWeightImage(final_weight_imgs);
+                    mapmri_estimator4.SetVoxelwiseBmatrix(dummyv);
+                    mapmri_estimator4.SetMaskImage(final_mask);
+                    mapmri_estimator4.SetVolIndicesForFitting(dummy);
+                    mapmri_estimator4.SetSmallDelta(small_delta);
+                    mapmri_estimator4.SetBigDelta(big_delta);
+                    mapmri_estimator4.PerformFitting();
+
+                  //  mapmri_estimator6.SetMAPMRIDegree(FINAL_STAGE_MAPMRI_DEGREE);
+                  //  mapmri_estimator6.SetDTImg(dti_estimator.GetOutput());
+                  // mapmri_estimator6.SetA0Image(dti_estimator.GetA0Image());
+                  //  mapmri_estimator6.SetBmatrix(rot_Bmat);
+                  //  mapmri_estimator6.SetDWIData(final_data);
+                  //  mapmri_estimator6.SetWeightImage(final_weight_imgs);
+                  //  mapmri_estimator6.SetVoxelwiseBmatrix(dummyv);
+                  //  mapmri_estimator6.SetMaskImage(final_mask);
+                  //  mapmri_estimator6.SetVolIndicesForFitting(dummy);
+                  //  mapmri_estimator6.SetSmallDelta(small_delta);
+                  //  mapmri_estimator6.SetBigDelta(big_delta);
+                  //  mapmri_estimator6.PerformFitting();
                 }
-                else
+
+
+
+                #pragma omp parallel for
+                for(int vol=0;vol<Nvols[PE];vol++)
                 {
-                    big_delta=this->jsons[0]["BigDelta"];
-                    small_delta=this->jsons[0]["SmallDelta"];
+                    TORTOISE::EnableOMPThread();
+
+                    ImageType3D::Pointer synth_img_dt= dti_estimator.SynthesizeDWI( rot_Bmat.get_row(vol) );
+                    ImageType3D::Pointer synth_img_mapmri2=nullptr, synth_img_mapmri4=nullptr,synth_img_mapmri6=nullptr;
+
+                    if(MAPMRI_indices.size()>0)
+                    {
+                        synth_img_mapmri2= mapmri_estimator2.SynthesizeDWI( rot_Bmat.get_row(vol));
+                        synth_img_mapmri4= mapmri_estimator4.SynthesizeDWI( rot_Bmat.get_row(vol));
+                   //     synth_img_mapmri6= mapmri_estimator6.SynthesizeDWI( rot_Bmat.get_row(vol));
+
+                        itk::ImageRegionIteratorWithIndex<ImageType3D> it(synth_img_dt,synth_img_dt->GetLargestPossibleRegion());
+
+                        std::vector<float> non_brain_dt_vals;
+                        for(it.GoToBegin();!it.IsAtEnd();++it)
+                        {
+                            ImageType3D::IndexType ind3= it.GetIndex();
+                            if(final_mask->GetPixel(ind3)==0)
+                            {
+                                non_brain_dt_vals.push_back(it.Get());
+                            }
+                        }
+                        double nonbrain_dt_median=median(non_brain_dt_vals);
+
+
+                        for(it.GoToBegin();!it.IsAtEnd();++it)
+                        {
+                            ImageType3D::IndexType ind3= it.GetIndex();
+                            int Ncount=0;
+                            for(int vv=0;vv<Nvols[PE];vv++)
+                            {
+                                if(final_weight_imgs[vv]->GetPixel(ind3)> THR)
+                                    Ncount++;
+                            }
+                            if(final_mask->GetPixel(ind3))
+                            {
+                                double dti_val= it.Get();
+                                double map_val=0;
+
+                                //if(bvals[vol]> 55 && Ncount>12 && Ncount < 30)
+                                 //   map_val=synth_img_mapmri2->GetPixel(ind3);
+                                //else if(bvals[vol]> 55 && Ncount>30 && Ncount < 70)
+                                //    map_val=synth_img_mapmri4->GetPixel(ind3);
+                                //else if(bvals[vol]> 55  && Ncount > 70)
+                                //    map_val=synth_img_mapmri6->GetPixel(ind3);
+
+                                if(bvals[vol]> 55 && Ncount>12 && Ncount < 30)
+                                    map_val=synth_img_mapmri2->GetPixel(ind3);
+                                else if(bvals[vol]> 55 && Ncount>30 )
+                                    map_val=synth_img_mapmri4->GetPixel(ind3);
+
+
+                                if(map_val> 0.5*nonbrain_dt_median)
+                                    it.Set(map_val);
+
+                            }
+                        }
+
+                    }
+                    synth_imgs[vol] =synth_img_dt;
+
+
+
+                    /*
+                        synth_imgs[vol] = mapmri_estimator.SynthesizeDWI( rot_Bmat.get_row(vol));
+                    else
+                        synth_imgs[vol]= dti_estimator.SynthesizeDWI( rot_Bmat.get_row(vol) );
+                        */
+
+                    TORTOISE::DisableOMPThread();
                 }
-
-                mapmri_estimator2.SetMAPMRIDegree(2);
-                mapmri_estimator2.SetDTImg(dti_estimator.GetOutput());
-                mapmri_estimator2.SetA0Image(dti_estimator.GetA0Image());
-                mapmri_estimator2.SetBmatrix(tot_Bmat);
-                mapmri_estimator2.SetDWIData(imgs_for_fitting);
-                mapmri_estimator2.SetWeightImage(tot_weight_imgs);
-                mapmri_estimator2.SetVoxelwiseBmatrix(dummyv);
-                mapmri_estimator2.SetMaskImage(final_mask);
-                mapmri_estimator2.SetVolIndicesForFitting(dummy);
-                mapmri_estimator2.SetSmallDelta(small_delta);
-                mapmri_estimator2.SetBigDelta(big_delta);
-                mapmri_estimator2.PerformFitting();
-
-                mapmri_estimator4.SetMAPMRIDegree(4);
-                mapmri_estimator4.SetDTImg(dti_estimator.GetOutput());
-                mapmri_estimator4.SetA0Image(dti_estimator.GetA0Image());
-                mapmri_estimator4.SetBmatrix(tot_Bmat);
-                mapmri_estimator4.SetDWIData(imgs_for_fitting);
-                mapmri_estimator4.SetWeightImage(tot_weight_imgs);
-                mapmri_estimator4.SetVoxelwiseBmatrix(dummyv);
-                mapmri_estimator4.SetMaskImage(final_mask);
-                mapmri_estimator4.SetVolIndicesForFitting(dummy);
-                mapmri_estimator4.SetSmallDelta(small_delta);
-                mapmri_estimator4.SetBigDelta(big_delta);
-                mapmri_estimator4.PerformFitting();
-
-                mapmri_estimator6.SetMAPMRIDegree(6);
-                mapmri_estimator6.SetDTImg(dti_estimator.GetOutput());
-                mapmri_estimator6.SetA0Image(dti_estimator.GetA0Image());
-                mapmri_estimator6.SetBmatrix(tot_Bmat);
-                mapmri_estimator6.SetDWIData(imgs_for_fitting);
-                mapmri_estimator6.SetWeightImage(tot_weight_imgs);
-                mapmri_estimator6.SetVoxelwiseBmatrix(dummyv);
-                mapmri_estimator6.SetMaskImage(final_mask);
-                mapmri_estimator6.SetVolIndicesForFitting(dummy);
-                mapmri_estimator6.SetSmallDelta(small_delta);
-                mapmri_estimator6.SetBigDelta(big_delta);
-        //        mapmri_estimator6.PerformFitting();
-
-        } //mapmri
-
-
-
-
-        int tot_vol=0;
-        vnl_vector<double> bvals = tot_Bmat.get_column(0)+tot_Bmat.get_column(3)+tot_Bmat.get_column(5);
-
-        for(int PE=0;PE<2;PE++)
-        {
-            int nvols= Nvols[PE];
-
-            std::string up_name = data_names[PE];
-            if(up_name=="")
-                continue;
-
-            std::vector<ImageType3D::Pointer> final_data = final_imgs_to_return[PE];
-            std::vector<ImageType3D::Pointer> synth_imgs;
-            synth_imgs.resize(Nvols[PE]);
-
-            #pragma omp parallel for
-            for(int vol=0;vol<Nvols[PE];vol++)
-            {
-                TORTOISE::EnableOMPThread();
-
-                ImageType3D::Pointer synth_img_dt= dti_estimator.SynthesizeDWI( tot_Bmat.get_row(vol+tot_vol) );
-                ImageType3D::Pointer synth_img_mapmri2=nullptr, synth_img_mapmri4=nullptr,synth_img_mapmri6=nullptr;
-
-                if(tot_mapmri_indices.size()>0)
-                {
-                    synth_img_mapmri2= mapmri_estimator2.SynthesizeDWI( tot_Bmat.get_row(vol+tot_vol) );
-                    synth_img_mapmri4= mapmri_estimator4.SynthesizeDWI( tot_Bmat.get_row(vol+tot_vol) );
-               //     synth_img_mapmri6= mapmri_estimator6.SynthesizeDWI( tot_Bmat.get_row(vol+tot_vol) );
-
-                    itk::ImageRegionIteratorWithIndex<ImageType3D> it(synth_img_dt,synth_img_dt->GetLargestPossibleRegion());
-                    std::vector<float> non_brain_dt_vals;
-                    for(it.GoToBegin();!it.IsAtEnd();++it)
-                    {
-                        ImageType3D::IndexType ind3= it.GetIndex();
-                        if(final_mask->GetPixel(ind3)==0)
-                        {
-                            non_brain_dt_vals.push_back(it.Get());
-                        }
-                    }
-                    double nonbrain_dt_median=median(non_brain_dt_vals);
-
-                    for(it.GoToBegin();!it.IsAtEnd();++it)
-                    {
-                        ImageType3D::IndexType ind3= it.GetIndex();
-                        int Ncount=0;
-                        for(int vv=0;vv<Nvols[PE];vv++)
-                        {
-                            if(tot_weight_imgs[vv+tot_vol]->GetPixel(ind3)> THR)
-                                Ncount++;
-                        }
-                        if(final_mask->GetPixel(ind3))
-                        {
-                            double dti_val= it.Get();
-                            double map_val=0;
-
-                            if(bvals[vol+tot_vol]> 55 && Ncount>12 && Ncount < 30)
-                                map_val=synth_img_mapmri2->GetPixel(ind3);
-                            //else if(bvals[vol+tot_vol]> 55 && Ncount>30 && Ncount < 70)
-                            else if(bvals[vol+tot_vol]> 55 && Ncount>30 )
-                                map_val=synth_img_mapmri4->GetPixel(ind3);
-                           // else if(bvals[vol+tot_vol]> 55  && Ncount > 70)
-                             //   map_val=synth_img_mapmri6->GetPixel(ind3);
-
-
-                            if(map_val> 0.5*nonbrain_dt_median)
-                                it.Set(map_val);
-                        }
-                    }
-
-                } //if mapmri
-                synth_imgs[vol] =synth_img_dt;
-
-                TORTOISE::DisableOMPThread();
-
-            } //for vol
+            }
 
 
             // SECOND.  Sometimes there is a big signal scale difference between the synthesized and actual images.
@@ -1957,37 +1926,34 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 TORTOISE::EnableOMPThread();
 
                 //Generate a final mask that includes both the brain mask and outlier mask
-                using DupType= itk::ImageDuplicator<ImageType3D>;
-                DupType::Pointer dup = DupType::New();
-                dup->SetInputImage(final_mask);
-                dup->Update();
-                ImageType3D::Pointer weight_img_final= dup->GetOutput();
-                weight_img_final->FillBuffer(0);
+                using FilterType = itk::MultiplyImageFilter<ImageType3D, ImageType3D, ImageType3D>;
+                FilterType::Pointer filter2 = FilterType::New();
+                filter2->SetInput2(final_mask);
+                filter2->SetInput1(final_inclusion_imgs[vol]);
+                filter2->Update();
+                ImageType3D::Pointer weight_img_final= filter2->GetOutput();
 
                 //Check if we have a valid voxel
                 bool allzeros=true;
-                itk::ImageRegionIteratorWithIndex<ImageType3D> it(weight_img_final,weight_img_final->GetLargestPossibleRegion());
+                itk::ImageRegionIterator<ImageType3D> it(weight_img_final,weight_img_final->GetLargestPossibleRegion());
                 it.GoToBegin();
                 while(!it.IsAtEnd())
                 {
-                    ImageType3D::IndexType ind3= it.GetIndex();
-                    if(final_mask->GetPixel(ind3) && (tot_weight_imgs[tot_vol+vol]->GetPixel(ind3) > THR))
-                        it.Set(1);
-
                     if(it.Get())
                     {
                         allzeros=false;
+                        break;
                     }
                     ++it;
                 }
 
                 // get the volume ids with the closest bmat_vec by sorting the distances to the current one
                 // we will use the noise from these images in background regions if necessary
-                vnl_vector<double> bmat_vec = tot_Bmat.get_row(vol+tot_vol);
+                vnl_vector<double> bmat_vec = rot_Bmat.get_row(vol);
                 std::vector<mypair> dists;
                 for(int v2=0;v2<Nvols[PE];v2++)
                 {
-                    float dist = (tot_Bmat.get_row(v2+tot_vol) -bmat_vec).magnitude();
+                    float dist = (rot_Bmat.get_row(v2) -bmat_vec).magnitude();
                     dists.push_back({dist,v2});
                 }
                 std::sort (dists.begin(), dists.end(), comparator);
@@ -2013,11 +1979,11 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                             //get noise from a similar image for the background
                             for(int v2=0;v2<Nvols[PE];v2++)
                             {
-                                if( fabs(bvals[vol+tot_vol]-bvals[dists[v2].second +tot_vol])<10)
+                                if( fabs(bvals[vol]-bvals[dists[v2].second])<10)
                                 {
-                                    if(tot_weight_imgs[dists[v2].second +tot_vol]->GetPixel(ind3)>THR)
+                                    if(final_inclusion_imgs[dists[v2].second]->GetPixel(ind3)==1)
                                     {
-                                        float val=final_data[dists[v2].second ]->GetPixel(ind3);
+                                        float val=final_data[dists[v2].second]->GetPixel(ind3);
                                         it.Set(val);
                                         break;
                                     }
@@ -2080,7 +2046,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                             {
                                 ind3[0]=i;
                                 ind2[0]=i;
-                                sl_img->SetPixel(ind2, tot_weight_imgs[vol+tot_vol]->GetPixel(ind3)>=THR);
+                                sl_img->SetPixel(ind2, final_inclusion_imgs[vol]->GetPixel(ind3));
                             }
                         }
 
@@ -2113,7 +2079,8 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                                 ind3[0]=i;
                                 ind2[0]=i;
 
-                                if(tot_weight_imgs[vol+tot_vol]->GetPixel(ind3)<THR)
+
+                                if(final_inclusion_imgs[vol]->GetPixel(ind3)==0)
                                 {
                                     float val=final_data2->GetPixel(ind3);
 
@@ -2122,9 +2089,9 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                                         //get noise from a similar image for the background
                                         for(int v2=0;v2<Nvols[PE];v2++)
                                         {
-                                            if( fabs(bvals[vol+tot_vol]-bvals[dists[v2].second +tot_vol])<10)
+                                            if( fabs(bvals[vol]-bvals[dists[v2].second])<10)
                                             {
-                                                if(tot_weight_imgs[dists[v2].second +tot_vol]->GetPixel(ind3)>THR)
+                                                if(final_inclusion_imgs[dists[v2].second]->GetPixel(ind3)==1)
                                                 {
                                                     val=final_data[dists[v2].second]->GetPixel(ind3);
                                                     break;
@@ -2159,7 +2126,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                                             float val_real= final_data2->GetPixel(ind3);
                                             float val_synth= synth_imgs[vol]->GetPixel(ind3);
 
-                                            float w= tot_weight_imgs[vol+tot_vol]->GetPixel(ind3);
+                                            float w= final_weight_imgs[vol]->GetPixel(ind3);
                                             val=  w * val_real + (1-w) * val_synth;
                                         }
                                     }
@@ -2177,8 +2144,6 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
                 TORTOISE::DisableOMPThread();
             } //for vol
-
-
             (*stream)<<std::endl;
 
             fs::path up_path(up_name);
@@ -2190,24 +2155,23 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 write_3D_image_to_4D_file<float>(synth_imgs[v],new_synth_name,v,Nvols[PE]);
             }
 
-            std::string new_nii_name=  this->temp_folder + "/" + basename + "_final_temp.nii";
-            for(int v=0;v<Nvols[PE];v++)
-            {
-                write_3D_image_to_4D_file<float>(final_data[v],new_nii_name,v,Nvols[PE]);
-            }
-
-            final_imgs_to_return[PE]=final_data;
+        } //if repol
 
 
 
-            tot_vol+=Nvols[PE];
-        }  //for PE
+        std::string new_nii_name=  this->temp_folder + "/" + basename + "_final_temp.nii";
+        for(int v=0;v<Nvols[PE];v++)
+        {
+            write_3D_image_to_4D_file<float>(final_data[v],new_nii_name,v,Nvols[PE]);
+        }
 
-    } //if repol
+        final_imgs_to_return[PE]=final_data;
+
+    } //for PE
 
     return final_imgs_to_return;
-
 }
+
 
 
 
