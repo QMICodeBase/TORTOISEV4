@@ -2036,111 +2036,6 @@ void DTIModel::EstimateTensorWLLS()
 
       if(!mask_img)
       {
-          vnl_vector<double>  bvals = Bmatrix.get_column(0)+Bmatrix.get_column(3)+Bmatrix.get_column(5);
-          std::vector<int> b0_indices,dwi_inds;
-          float b0_val = bvals.min_value();
-          for(int b=0; b<bvals.size();b++)
-          {
-              if( fabs(bvals[b] - b0_val) <10)
-                  b0_indices.push_back(b);
-              else
-                  dwi_inds.push_back(b);
-          }
-
-          if(b0_indices.size()>1)
-          {
-              itk::ImageRegionIteratorWithIndex<ImageType3D> it(A0_img,A0_img->GetLargestPossibleRegion());
-              for(it.GoToBegin();!it.IsAtEnd();++it)
-              {
-                  ImageType3D::IndexType ind3= it.GetIndex();
-
-                  double mn=0;
-                  for(int b=0;b<b0_indices.size();b++)
-                  {
-                      mn+=  dwi_data[b0_indices[b]]->GetPixel(ind3);
-                  }
-                  mn/= b0_indices.size();
-                  double var= 0;
-                  for(int b=0;b<b0_indices.size();b++)
-                  {
-                      var += (dwi_data[b0_indices[b]]->GetPixel(ind3) -mn) *(dwi_data[b0_indices[b]]->GetPixel(ind3) -mn);
-                  }
-                  var/=  b0_indices.size()-1;
-                  double stdev= sqrt(var);
-
-                  if(it.Get()> mn+10*stdev || it.Get()< mn-10*stdev)
-                  {
-                      it.Set(mn);
-
-                      vnl_matrix<double> curr_logS(dwi_inds.size(),1);
-                      vnl_diag_matrix<double> curr_weights(dwi_inds.size(),dwi_inds.size());
-                      vnl_matrix<double> curr_design_matrix(dwi_inds.size(),6,0);
-
-                      for(int vol=0;vol<dwi_inds.size();vol++)
-                      {
-                          int vol_id= dwi_inds[vol];
-                          double nval = dwi_data[vol_id]->GetPixel(ind3);
-
-                          curr_logS(vol,0)= -log(nval/mn);
-                          curr_weights[vol]= nval*nval;
-
-                          curr_design_matrix.set_row(vol,Bmatrix.get_row(vol_id));
-                      }
-                      vnl_matrix<double> mid= curr_design_matrix.transpose()* curr_weights * curr_design_matrix;
-                      vnl_matrix<double> D= vnl_svd<double>(mid).solve(curr_design_matrix.transpose()*curr_weights*curr_logS);
-
-                      if(D(1,0)!=D(1,0))
-                          D(1,0)=0;
-                      if(D(2,0)!=D(2,0))
-                          D(2,0)=0;
-                      if(D(3,0)!=D(3,0))
-                          D(3,0)=0;
-                      if(D(4,0)!=D(4,0))
-                          D(4,0)=0;
-                      if(D(5,0)!=D(5,0))
-                          D(5,0)=0;
-                      if(D(0,0)!=D(0,0))
-                          D(0,0)=0;
-
-                      vnl_matrix_fixed<double,3,3> Dmat;
-                      Dmat(0,0)=D(0,0)/1000.;
-                      Dmat(1,0)=D(1,0)/1000.;
-                      Dmat(0,1)=D(1,0)/1000.;
-                      Dmat(2,0)=D(2,0)/1000.;
-                      Dmat(0,2)=D(2,0)/1000.;
-                      Dmat(1,1)=D(3,0)/1000.;
-                      Dmat(1,2)=D(4,0)/1000.;
-                      Dmat(2,1)=D(4,0)/1000.;
-                      Dmat(2,2)=D(5,0)/1000.;
-
-                      vnl_symmetric_eigensystem<double> eig(Dmat);
-                      if(eig.D(0,0)<0)
-                          eig.D(0,0)=0;
-                      if(eig.D(1,1)<0)
-                          eig.D(1,1)=0;
-                      if(eig.D(2,2)<0)
-                          eig.D(2,2)=0;
-                      vnl_matrix_fixed<double,3,3> Dmat_corr= eig.recompose();
-
-                      if(Dmat_corr(0,0)+Dmat_corr(1,1)+Dmat_corr(2,2) >0.2)    //bad fit
-                      {
-                          Dmat_corr.fill(0);
-                      }
-
-                      DTImageType::PixelType dt;
-                      dt[0]=Dmat_corr(0,0);
-                      dt[1]=Dmat_corr(0,1);
-                      dt[2]=Dmat_corr(0,2);
-                      dt[3]=Dmat_corr(1,1);
-                      dt[4]=Dmat_corr(1,2);
-                      dt[5]=Dmat_corr(2,2);
-
-                      dt_image->SetPixel(ind3,dt);
-                  }
-              }
-          }
-          else
-          {
               for(int k=0;k<size[2];k++)
               {
                    ImageType3D::IndexType ind3;
@@ -2200,18 +2095,11 @@ void DTIModel::EstimateTensorWLLS()
                   }
               }
 
-          }
+
 
       }
 
 
-
-     /*
-     if(!mask_img)
-     {
-
-     }
-     */
      output_img=dt_image;
 }
 

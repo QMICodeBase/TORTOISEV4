@@ -289,7 +289,7 @@ ImageType3D::Pointer ForwardTransformImage(ImageType3D::Pointer img, std::vector
     using TreeGeneratorType = itk::Statistics::KdTreeGenerator<SampleType>;
     TreeGeneratorType::Pointer treeGenerator = TreeGeneratorType::New();
     treeGenerator->SetSample(sample);
-    treeGenerator->SetBucketSize(3);
+    treeGenerator->SetBucketSize(8);
     treeGenerator->Update();
 
     using TreeType = TreeGeneratorType::KdTreeType;
