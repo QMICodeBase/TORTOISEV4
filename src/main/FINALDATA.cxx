@@ -1745,7 +1745,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 dti_estimator.SetVoxelwiseBmatrix(dummyv);
                 dti_estimator.SetMaskImage(nullptr);
                 dti_estimator.SetVolIndicesForFitting(low_DT_indices);
-                dti_estimator.SetFittingMode("WLLS");
+                dti_estimator.SetFittingMode("WLLS");                
                 dti_estimator.PerformFitting();
                 final_mask= create_mask(dti_estimator.GetA0Image());
 

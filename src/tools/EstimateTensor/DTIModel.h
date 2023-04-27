@@ -35,7 +35,31 @@ public:
     ImageType3D::Pointer getCSImg(){return CS_img;}
     ImageType3D::Pointer getVFImg(){return VF_img;}
     ImageType3D::Pointer getVFImg2(){return VF_img2;}
-    DTImageType::Pointer getFlowImg(){return flow_tensor_img;}
+    DTImageType::Pointer getFlowImg(){return flow_tensor_img;}    
+
+    ImageType3D::Pointer ComputeTRMap()
+    {
+        if(this->output_img==nullptr)
+            return nullptr;
+
+        ImageType3D::Pointer tr_img = ImageType3D::New();
+        tr_img->SetRegions(this->output_img->GetLargestPossibleRegion());
+        tr_img->Allocate();
+        tr_img->SetSpacing(this->output_img->GetSpacing());
+        tr_img->SetOrigin(this->output_img->GetOrigin());
+        tr_img->SetDirection(this->output_img->GetDirection());
+        tr_img->FillBuffer(0);
+
+        itk::ImageRegionIteratorWithIndex<ImageType3D> it( tr_img,tr_img->GetLargestPossibleRegion());
+        for(it.GoToBegin();!it.IsAtEnd(); ++it)
+        {
+            ImageType3D::IndexType ind3= it.GetIndex();
+            OutputImageType::PixelType dt= this->output_img->GetPixel(ind3);
+            float val = dt[0]+dt[3]+dt[5];
+            it.Set(val);
+        }
+        return tr_img;
+    }
 
 
 private:
@@ -54,6 +78,7 @@ private:
     ImageType3D::Pointer VF_img{nullptr};
     ImageType3D::Pointer VF_img2{nullptr};
     DTImageType::Pointer flow_tensor_img{nullptr};
+
 };
 
 

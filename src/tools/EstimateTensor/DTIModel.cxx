@@ -2036,66 +2036,64 @@ void DTIModel::EstimateTensorWLLS()
 
       if(!mask_img)
       {
-              for(int k=0;k<size[2];k++)
+          for(int k=0;k<size[2];k++)
+          {
+               ImageType3D::IndexType ind3;
+              ind3[2]=k;
+              for(int j=0;j<size[1];j++)
               {
-                   ImageType3D::IndexType ind3;
-                  ind3[2]=k;
-                  for(int j=0;j<size[1];j++)
+                  ind3[1]=j;
+                  for(int i=0;i<size[0];i++)
                   {
-                      ind3[1]=j;
-                      for(int i=0;i<size[0];i++)
+                      ind3[0]=i;
+
+                      std::vector<float> data_for_median;
+                       ImageType3D::IndexType newind;
+
+                      for(int k2= std::max(k-1,0);k2<=std::min(k+1,(int)size[2]-1);k2++)
                       {
-                          ind3[0]=i;
-
-                          std::vector<float> data_for_median;
-                           ImageType3D::IndexType newind;
-
-                          for(int k2= std::max(k-1,0);k2<=std::min(k+1,(int)size[2]-1);k2++)
+                          newind[2]=k2;
+                          for(int i2= std::max(i-1,0);i2<=std::min(i+1,(int)size[0]-1);i2++)
                           {
-                              newind[2]=k2;
-                              for(int i2= std::max(i-1,0);i2<=std::min(i+1,(int)size[0]-1);i2++)
+                              newind[0]=i2;
+                              for(int j2= std::max(j-1,0);j2<=std::min(j+1,(int)size[1]-1);j2++)
                               {
-                                  newind[0]=i2;
-                                  for(int j2= std::max(j-1,0);j2<=std::min(j+1,(int)size[1]-1);j2++)
-                                  {
-                                      newind[1]=j2;
+                                  newind[1]=j2;
 
-                                      float newval= A0_img->GetPixel(newind);
-                                      if(newval >=0)
-                                          data_for_median.push_back(newval);
+                                  float newval= A0_img->GetPixel(newind);
+                                  if(newval >=0)
+                                      data_for_median.push_back(newval);
 
-                                  }
                               }
                           }
+                      }
 
-                          if(data_for_median.size())
-                          {
-                              float med=median(data_for_median);
+                      if(data_for_median.size())
+                      {
+                          float med=median(data_for_median);
 
-                              std::transform(data_for_median.begin(), data_for_median.end(), data_for_median.begin(), bind2nd(std::plus<double>(), -med));
+                          std::transform(data_for_median.begin(), data_for_median.end(), data_for_median.begin(), bind2nd(std::plus<double>(), -med));
 
-                              for(unsigned int mi = 0; mi < data_for_median.size(); mi++)
-                                  if(data_for_median[mi] < 0)
-                                      data_for_median[mi] *= -1;
+                          for(unsigned int mi = 0; mi < data_for_median.size(); mi++)
+                              if(data_for_median[mi] < 0)
+                                  data_for_median[mi] *= -1;
 
-                              float abs_med= median(data_for_median);
-                              float stdev= abs_med *  1.4826;
+                          float abs_med= median(data_for_median);
+                          float stdev= abs_med *  1.4826;
 
 
 
-                              float val = A0_img->GetPixel(ind3);
-                              if( val < med-10*stdev  || val > med+10*stdev)
-                                  A0_img->SetPixel(ind3,0);
-                          }
-                          else
-                          {
-                             A0_img->SetPixel(ind3,0);
-                          }
+                          float val = A0_img->GetPixel(ind3);
+                          if( val < med-10*stdev  || val > med+10*stdev)
+                              A0_img->SetPixel(ind3,0);
+                      }
+                      else
+                      {
+                         A0_img->SetPixel(ind3,0);
                       }
                   }
               }
-
-
+          }
 
       }
 
@@ -2115,6 +2113,20 @@ ImageType3D::Pointer DTIModel::SynthesizeDWI(vnl_vector<double> bmatrix_vec)
     synth_image->SetSpacing(A0_img->GetSpacing());
     synth_image->FillBuffer(0.);
 
+
+    int vol_id=-1;
+    double mx = std::numeric_limits<double>::max();
+    for(int v=0;v<Bmatrix.rows();v++)
+    {
+        vnl_vector<double> t_bvec= Bmatrix.get_row(v);
+        auto diff= bmatrix_vec - t_bvec;
+        double nrm = diff.magnitude();
+        if(nrm<mx)
+        {
+            mx=nrm;
+            vol_id=v;
+        }
+    }
 
 
     double freeWater_ADC=3E-3;

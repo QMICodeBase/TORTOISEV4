@@ -808,7 +808,7 @@ void DIFFPREP::EM(std::vector< std::vector<float> >  logRMS_shell, std::vector< 
 
 
 
-std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageType3D::Pointer> native_native_synth_dwis,  std::vector<ImageType3D::Pointer> raw_dwis,std::vector<int> shells,vnl_vector<double> bvals)
+std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageType3D::Pointer> native_native_synth_dwis,  std::vector<ImageType3D::Pointer> raw_dwis,std::vector<int> shells,vnl_vector<double> bvals,ImageType3D::Pointer TR_map)
 {
 
     int aggressive_level = RegistrationSettings::get().getValue<int>("outlier_replacement_mode");
@@ -856,7 +856,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
         int shell_id=-1;
         for(int s=0;s<shells.size();s++)
         {
-            if(fabs(bvals[vol] -shells[s])<40)
+            if(fabs(bvals[vol] -shells[s])<20)
             {
                 shell_id=s;
                 shell_ids[vol]=shell_id;
@@ -882,7 +882,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
         {
             ImageType3D::IndexType ind3= it.GetIndex();
             if(b0_mask_img->GetPixel(ind3)>0)
-            {
+            {                                
                 float resid= native_native_synth_dwis[vol]->GetPixel(ind3) - raw_dwis[vol]->GetPixel(ind3) ;
                 it.Set(resid);
             }
@@ -905,9 +905,12 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
                    ind3[0]=i;
                    if(b0_mask_img->GetPixel(ind3))
                    {
-                       Npix++;
-                       double resid= resid_img->GetPixel(ind3);
-                       sm+=resid*resid;
+                       if(  ((bvals[vol] <= 100) && TR_map->GetPixel(ind3) < 0.0075) ||  (bvals[vol] > 100) )
+                       {
+                           Npix++;
+                           double resid= resid_img->GetPixel(ind3);
+                           sm+=resid*resid;
+                       }
                    }
                }
            }
@@ -1361,8 +1364,11 @@ void DIFFPREP::MotionAndEddy()
              dti_estimator.SetVoxelwiseBmatrix(dummyv);
              dti_estimator.SetMaskImage(nullptr);
              dti_estimator.SetVolIndicesForFitting(low_DT_indices);
-             dti_estimator.SetFittingMode("WLLS");
-             dti_estimator.PerformFitting();
+             dti_estimator.SetFittingMode("WLLS");             
+             dti_estimator.PerformFitting();             
+             ImageType3D::Pointer TR_map=nullptr;
+             if(outlier_replacement)
+                 TR_map=dti_estimator.ComputeTRMap();
 	                     
 
              // MAPMRI FITTING
@@ -1547,7 +1553,7 @@ void DIFFPREP::MotionAndEddy()
                  // transformed back to everything UNCORRECTED space.
                  // so,  we can now check for outliers by statistical analysis.
 
-                 this->native_weight_img = ReplaceOutliers(native_native_synth_dwis, native_native_raw_dwis,shells,bvals);
+                 this->native_weight_img = ReplaceOutliers(native_native_synth_dwis, native_native_raw_dwis,shells,bvals,TR_map);
                  (*stream)<<"Replacing outliers...Done!"<<std::endl;
                  //Clean memory
                  //native_native_synth_dwis.clear(); native_native_synth_dwis.resize(Nvols);
@@ -1562,8 +1568,7 @@ void DIFFPREP::MotionAndEddy()
                      (*stream)<<"Forward transforming slices..."<<std::endl;
                      #pragma omp parallel for
                      for(int vol=0;vol<Nvols;vol++)
-                     {
-                         //s2v_replaced_raw_dwis[vol]= ForwardTransformImage(native_native_replaced_raw_dwis[vol], s2v_transformations[vol]);
+                     {                         
                          s2v_replaced_raw_dwis[vol]= ForwardTransformImage(native_native_raw_dwis[vol], s2v_transformations[vol]);
 
                          #pragma omp critical

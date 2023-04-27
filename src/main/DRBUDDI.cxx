@@ -35,6 +35,42 @@ DRBUDDI::DRBUDDI(std::string uname,std::string dname,std::vector<std::string> st
     this->structural_names=str_names;
     my_json=mjson;
 
+
+
+#ifdef DRBUDDIALONE
+    this->stream= &(std::cout);
+#else
+    this->stream= TORTOISE::stream;
+#endif
+
+    if(this->my_json["PhaseEncodingDirection"]==json::value_t::null)
+    {
+        if(this->my_json["PhaseEncodingAxis"]!=json::value_t::null)
+        {
+            this->my_json["PhaseEncodingDirection"]=this->my_json["PhaseEncodingAxis"];
+        }
+        else
+        {
+            if(this->my_json["InPlanePhaseEncodingDirectionDICOM"]!=json::value_t::null)
+            {
+                if(this->my_json["InPlanePhaseEncodingDirectionDICOM"]=="COL")
+                {
+                    this->my_json["PhaseEncodingDirection"]="j";
+                }
+                else
+                {
+                    this->my_json["PhaseEncodingDirection"]="i";
+                }
+            }
+            else
+            {
+                (*stream)<<"Phase encoding information not present in JSON file. Create a new json file for the dataset..."<<std::endl;
+                (*stream)<<"Exiting"<<std::endl;
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
     std::string json_PE= my_json["PhaseEncodingDirection"];      //get phase encoding direction
     if(json_PE.find("j")!=std::string::npos)
         PE_string="vertical";
@@ -49,12 +85,6 @@ DRBUDDI::DRBUDDI(std::string uname,std::string dname,std::vector<std::string> st
         this->proc_folder="./";
 
 
-
-#ifdef DRBUDDIALONE
-    this->stream= &(std::cout);
-#else
-    this->stream= TORTOISE::stream;
-#endif
 
     (*stream)<<"Starting DRBUDDI Processing..."<<std::endl;
 }

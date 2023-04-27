@@ -37,8 +37,8 @@ private:            //Subfunctions the main processing functions use
     void ClassicMotionEddyCorrectAllDWIs(ImageType3D::Pointer target, std::vector<ImageType3D::Pointer> dwis);
     void SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> target_imgs, std::vector<ImageType3D::Pointer> source_imgs);
 
-    //std::vector<ImageType3D::Pointer> ReplaceOutliers( std::vector<ImageType3D::Pointer> native_native_synth_dwis, std::vector<ImageType3D::Pointer> s2v_synth_dwis, std::vector<ImageType3D::Pointer> raw_dwis,std::vector<int> shells,vnl_vector<double> bvals,std::vector<ImageType3DBool::Pointer> inc_img);
-    std::vector<ImageType3D::Pointer>  ReplaceOutliers( std::vector<ImageType3D::Pointer> native_native_synth_dwis,  std::vector<ImageType3D::Pointer> raw_dwis,std::vector<int> shells,vnl_vector<double> bvals);
+
+    std::vector<ImageType3D::Pointer>  ReplaceOutliers( std::vector<ImageType3D::Pointer> native_native_synth_dwis,  std::vector<ImageType3D::Pointer> raw_dwis,std::vector<int> shells,vnl_vector<double> bvals,ImageType3D::Pointer TR_map);
     void EM(std::vector< std::vector<float> >  logRMS_shell, std::vector< std::vector<float> > &per_shell_inliers, std::vector< std::vector<float> > &per_shell_outliers ,std::vector<float> &Pin_per_shell,std::vector<float> &medians,std::vector<float> &MADs);
 
     std::vector<ImageType3D::Pointer> TransformRepolData(std::string nii_filename, vnl_matrix<double> &rot_Bmatrix, std::vector<ImageType3DBool::Pointer> &final_inclusion_imgs);
