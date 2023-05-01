@@ -436,8 +436,8 @@ add_executable(ConvertGEGradientsToBMatrix ../src/tools/ConvertGEGradientsToBMat
 target_link_libraries(ConvertGEGradientsToBMatrix  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
-add_executable(ImportBruker ../src/tools/import_bruker/ImportBruker.cxx ../src/tools/import_bruker/bruker_parser.cxx   ../src/utilities/write_bmatrix_file.cxx  ${SOURCES})
-target_link_libraries(ImportBruker  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+#add_executable(ImportBruker ../src/tools/import_bruker/ImportBruker.cxx ../src/tools/import_bruker/bruker_parser.cxx   ../src/utilities/write_bmatrix_file.cxx  ${SOURCES})
+#target_link_libraries(ImportBruker  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 #add_executable(Combine3DImagesTo4D ../src/tools/Combine3DImagesTo4D/Combine3DImagesTo4D.cxx   ${SOURCES})
 #target_link_libraries(Combine3DImagesTo4D  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
