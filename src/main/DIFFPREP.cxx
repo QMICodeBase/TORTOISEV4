@@ -884,6 +884,9 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
             if(b0_mask_img->GetPixel(ind3)>0)
             {                                
                 float resid= native_native_synth_dwis[vol]->GetPixel(ind3) - raw_dwis[vol]->GetPixel(ind3) ;
+                if(  (bvals[vol] <= 800) && TR_map->GetPixel(ind3) > 0.007)
+                    resid=0;
+
                 it.Set(resid);
             }
             ++it;
@@ -905,7 +908,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
                    ind3[0]=i;
                    if(b0_mask_img->GetPixel(ind3))
                    {
-                       if(  ((bvals[vol] <= 100) && TR_map->GetPixel(ind3) < 0.0075) ||  (bvals[vol] > 100) )
+                       if(  ((bvals[vol] <= 800) && TR_map->GetPixel(ind3) < 0.007) ||  (bvals[vol] > 800) )
                        {
                            Npix++;
                            double resid= resid_img->GetPixel(ind3);
@@ -1369,7 +1372,7 @@ void DIFFPREP::MotionAndEddy()
              ImageType3D::Pointer TR_map=nullptr;
              if(outlier_replacement)
                  TR_map=dti_estimator.ComputeTRMap();
-	                     
+
 
              // MAPMRI FITTING
              MAPMRIModel mapmri_estimator;
