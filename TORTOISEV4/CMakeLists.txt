@@ -14,6 +14,12 @@ if ( NOT DEFINED USE_VTK)
     SET(USE_VTK 0)
 endif()
 
+if ( NOT DEFINED QSIPREP)
+    SET(QSIPREP 0)
+else()
+    message("Doing smaller build for QSIPrep")
+endif()
+
 if ( DEFINED CMAKE_BUILD_TYPE)
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
         SET(ISDEBUG 0)
@@ -158,7 +164,9 @@ IF(USECUDA)
 
 
 ELSE(USECUDA)
+    if(NOT QSIPREP)
     SET(CMAKE_EXE_LINKER_FLAGS "-static ")
+    endif()
     add_executable(TORTOISEProcess ../src/main/main.cxx  ../src/tools/ResampleDWIs/resample_dwis.cxx  ../src/tools/DRBUDDI/DRBUDDI_parserBase.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateMAPMRI/MAPMRIModel.cxx   ../src/tools/RotateBMatrix/rotate_bmatrix.cxx ../src/main/FINALDATA.cxx ../src/main/TORTOISE.cxx ../src/main/DIFFPREP.cxx ../src/main/DRBUDDI.cxx ../src/main/DRBUDDIBase.cxx ../src/main/EPIREG.cxx ../src/main/DRBUDDI_Diffeo.cxx ../src/main/run_drbuddi_stage.cxx ../src/main/drbuddi_image_utilities.cxx   ../src/tools/EstimateTensor/estimate_tensor_wlls.cxx ../src/main/create_mask.cxx ../src/tools/ResampleDWIs/resample_dwis.cxx ../src/main/rigid_register_images.cxx ../src/main/TORTOISE_parser.cxx  ../src/tools/gradnonlin/init_iso_gw.cxx ../src/tools/gradnonlin/gradcal.cxx ${SOURCES})
     target_link_libraries(TORTOISEProcess Eigen3::Eigen ${ITK_LIBRARIES}  ${Boost_LIBRARIES} ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a fftw3 )
 
