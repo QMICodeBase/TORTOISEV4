@@ -748,9 +748,16 @@ FINALDATA::CompositeTransformType::Pointer FINALDATA::GenerateCompositeTransform
             ref_img_DP->TransformIndexToPhysicalPoint(ind3,pt);
             pt_trans=curr_mot_eddy_trans->TransformPoint(pt);
 
+            itk::ContinuousIndex<double,3> cint;
+            ref_img_DP->TransformPhysicalPointToContinuousIndex(pt_trans,cint);
+
+            ref_img->TransformIndexToPhysicalPoint(ind3,pt);
+            ref_img->TransformContinuousIndexToPhysicalPoint(cint,pt_trans);
+
+
             auto vec= pt_trans- pt;
-            auto vec2= ref_img->GetDirection() * vec;
-            mot_eddy_field->SetPixel(ind3,vec2);
+            //auto vec2= ref_img->GetDirection() * vec;
+            mot_eddy_field->SetPixel(ind3,vec);
         }
         DisplacementFieldTransformType::Pointer mot_eddy_trans= DisplacementFieldTransformType::New();
         mot_eddy_trans->SetDisplacementField(mot_eddy_field);
@@ -982,6 +989,8 @@ void FINALDATA::GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer>
             else
             {
                 std::string final_folder= fs::path(this->output_name).parent_path().string();
+                if(final_folder=="")
+                    final_folder="./";
                 {
                     //std::string name = data_names[0];
                     //fs::path path(name);
@@ -1207,7 +1216,6 @@ void FINALDATA::GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer>
 }
 
 
-
 std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformedInterpolatedData()
 {
     std::vector< std::vector<ImageType3D::Pointer> > final_imgs_to_return;
@@ -1250,7 +1258,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 orig_mask2= create_mask(raw_data[0]);
             if(this->native_weight_img[PE].size())
             {
-                ImageType3D::Pointer synth_img = read_3D_volume_from_4D(native_synth_name,vol);                
+                ImageType3D::Pointer synth_img = read_3D_volume_from_4D(native_synth_name,vol);
                 itk::ImageRegionIteratorWithIndex<ImageType3D> it(synth_img,synth_img->GetLargestPossibleRegion());
 
                 std::vector<float> synth_vals;
@@ -1273,8 +1281,10 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                         }
                     }
                 }
-            }          
+            }           
         }
+
+
 
 
         (*stream)<<std::endl<<"Transforming Volume done: "<<std::flush;
@@ -1345,7 +1355,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                         it.Set(vec);
 
                         if(  (this->native_weight_img[PE].size() && this->native_weight_img[PE][vol]->GetPixel(ind3)>THR) || this->native_weight_img[PE].size()==0 )
-                        {                                                                                    
+                        {
                             itk::ContinuousIndex<double,3> ind3_t;
                             raw_data[vol]->TransformPhysicalPointToContinuousIndex(pt_trans,ind3_t);
                             MeasurementVectorType tt;
@@ -1433,7 +1443,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 {
                     ImageType3D::IndexType ind3=it.GetIndex();
                     ImageType3D::PointType pt;
-                    final_img->TransformIndexToPhysicalPoint(ind3,pt);                    
+                    final_img->TransformIndexToPhysicalPoint(ind3,pt);
                     ImageType3D::PointType pt_trans_nos2v= all_trans_wo_s2v->TransformPoint(pt);
 
                     if(this->native_weight_img[PE].size())
@@ -1447,8 +1457,6 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                         }
                     }
 
-                    if(ind3[0]==60 && ind3[1]==89 && ind3[2]==30)
-                        int ma=0;
 
                     if(this->s2v_transformations[PE].size()==0)
                     {
@@ -1499,7 +1507,6 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                             if(diff_mag > 0.1*orig_spc[2])
                                 forward_interp=true;
                         }
-
 
 
                         if(!forward_interp || values.size()==0)
@@ -1619,12 +1626,15 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
             basename=basename.substr(0,basename.rfind(".nii"));
             std::string new_nii_name=  this->temp_folder + "/" + basename + "_final_temp_norepol.nii";
             std::string new_inc_name= this->temp_folder + "/" + basename + "_final_temp_inc.nii";
+
+
             #pragma omp critical
             {
                 (*stream)<<vol<<", "<<std::flush;
-                write_3D_image_to_4D_file<float>(final_img,new_nii_name,vol,Nvols[PE]);
-            }
+                if(final_inclusion_imgs.size())
+                    write_3D_image_to_4D_file<float>(final_img,new_nii_name,vol,Nvols[PE]);
 
+            }
             TORTOISE::DisableOMPThread();
         } //for vol
 
@@ -1813,18 +1823,18 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                     mapmri_estimator4.SetBigDelta(big_delta);
                     mapmri_estimator4.PerformFitting();
 
-                    mapmri_estimator6.SetMAPMRIDegree(FINAL_STAGE_MAPMRI_DEGREE);
-                    mapmri_estimator6.SetDTImg(dti_estimator.GetOutput());
-                    mapmri_estimator6.SetA0Image(dti_estimator.GetA0Image());
-                    mapmri_estimator6.SetBmatrix(rot_Bmat);
-                    mapmri_estimator6.SetDWIData(final_data);
-                    mapmri_estimator6.SetWeightImage(final_weight_imgs);
-                    mapmri_estimator6.SetVoxelwiseBmatrix(dummyv);
-                    mapmri_estimator6.SetMaskImage(final_mask);
-                    mapmri_estimator6.SetVolIndicesForFitting(dummy);
-                    mapmri_estimator6.SetSmallDelta(small_delta);
-                    mapmri_estimator6.SetBigDelta(big_delta);
-                    mapmri_estimator6.PerformFitting();
+                  //  mapmri_estimator6.SetMAPMRIDegree(FINAL_STAGE_MAPMRI_DEGREE);
+                  //  mapmri_estimator6.SetDTImg(dti_estimator.GetOutput());
+                  // mapmri_estimator6.SetA0Image(dti_estimator.GetA0Image());
+                  //  mapmri_estimator6.SetBmatrix(rot_Bmat);
+                  //  mapmri_estimator6.SetDWIData(final_data);
+                  //  mapmri_estimator6.SetWeightImage(final_weight_imgs);
+                  //  mapmri_estimator6.SetVoxelwiseBmatrix(dummyv);
+                  //  mapmri_estimator6.SetMaskImage(final_mask);
+                  //  mapmri_estimator6.SetVolIndicesForFitting(dummy);
+                  //  mapmri_estimator6.SetSmallDelta(small_delta);
+                  //  mapmri_estimator6.SetBigDelta(big_delta);
+                  //  mapmri_estimator6.PerformFitting();
                 }
 
 
@@ -1841,7 +1851,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                     {
                         synth_img_mapmri2= mapmri_estimator2.SynthesizeDWI( rot_Bmat.get_row(vol));
                         synth_img_mapmri4= mapmri_estimator4.SynthesizeDWI( rot_Bmat.get_row(vol));
-                        synth_img_mapmri6= mapmri_estimator6.SynthesizeDWI( rot_Bmat.get_row(vol));
+                   //     synth_img_mapmri6= mapmri_estimator6.SynthesizeDWI( rot_Bmat.get_row(vol));
 
                         itk::ImageRegionIteratorWithIndex<ImageType3D> it(synth_img_dt,synth_img_dt->GetLargestPossibleRegion());
 
@@ -1871,12 +1881,18 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                                 double dti_val= it.Get();
                                 double map_val=0;
 
+                                //if(bvals[vol]> 55 && Ncount>12 && Ncount < 30)
+                                 //   map_val=synth_img_mapmri2->GetPixel(ind3);
+                                //else if(bvals[vol]> 55 && Ncount>30 && Ncount < 70)
+                                //    map_val=synth_img_mapmri4->GetPixel(ind3);
+                                //else if(bvals[vol]> 55  && Ncount > 70)
+                                //    map_val=synth_img_mapmri6->GetPixel(ind3);
+
                                 if(bvals[vol]> 55 && Ncount>12 && Ncount < 30)
                                     map_val=synth_img_mapmri2->GetPixel(ind3);
-                                else if(bvals[vol]> 55 && Ncount>30 && Ncount < 70)
+                                else if(bvals[vol]> 55 && Ncount>30 )
                                     map_val=synth_img_mapmri4->GetPixel(ind3);
-                                else if(bvals[vol]> 55  && Ncount > 70)
-                                    map_val=synth_img_mapmri6->GetPixel(ind3);
+
 
                                 if(map_val> 0.5*nonbrain_dt_median)
                                     it.Set(map_val);
@@ -2157,6 +2173,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
     return final_imgs_to_return;
 }
+
 
 
 

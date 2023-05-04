@@ -301,10 +301,6 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
             CurrentFieldType::Pointer field_down=IntegrateVelocityField(t,1);
             CurrentFieldType::Pointer field_str=IntegrateVelocityField(t,0.5);
 
-            //   auto aaa= field_up->CudaImageToITKField();
-            //   auto bbb= field_up->CudaImageToITKField();
-            //   writeImageD<DisplacementFieldType>(aaa,"/qmi13_raid/okan/ABCD_Don_100_subjects/dMRIv3/data/proc_dti/DTIPROC_S021_INV05CA3VX5_4year_20211008.091346.850000_1/tmp_DTI_corr_regT1_orig3/proc/aaa.nii");
-            //   writeImageD<DisplacementFieldType>(bbb,"/qmi13_raid/okan/ABCD_Don_100_subjects/dMRIv3/data/proc_dti/DTIPROC_S021_INV05CA3VX5_4year_20211008.091346.850000_1/tmp_DTI_corr_regT1_orig3/proc/bbb.nii");
 
             for(int met=0; met< Nmetrics;met++)
             {                            

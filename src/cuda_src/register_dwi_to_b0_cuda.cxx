@@ -203,7 +203,7 @@ TransformType::Pointer  RegisterDWIToB0_cuda(ImageType3D::Pointer fixed_img, Ima
                 fixed_img_cuda_current=ResampleImage(fixed_img_cuda_current,virtual_img);
                 virtual_img= CreateVirtualImg(moving_img_cuda_current,shrinkFactorsPerLevel[st]);
                 moving_img_cuda_current=ResampleImage(moving_img_cuda_current,virtual_img);                
-            }            
+            }
             if(moving_img_cuda_current->getFloatdata().ptr !=nullptr)
                 moving_img_cuda_current->CreateTexture();            
             
@@ -225,9 +225,10 @@ TransformType::Pointer  RegisterDWIToB0_cuda(ImageType3D::Pointer fixed_img, Ima
 
             TransformType::ParametersType params= optimizer->GetParameters();
             initialTransform->SetParameters(params);
+
+
         }       
     }
-
 
 
     TransformType::ParametersType finalParameters=initialTransform->GetParameters();

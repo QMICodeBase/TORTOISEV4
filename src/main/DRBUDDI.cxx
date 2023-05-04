@@ -35,6 +35,42 @@ DRBUDDI::DRBUDDI(std::string uname,std::string dname,std::vector<std::string> st
     this->structural_names=str_names;
     my_json=mjson;
 
+
+
+#ifdef DRBUDDIALONE
+    this->stream= &(std::cout);
+#else
+    this->stream= TORTOISE::stream;
+#endif
+
+    if(this->my_json["PhaseEncodingDirection"]==json::value_t::null)
+    {
+        if(this->my_json["PhaseEncodingAxis"]!=json::value_t::null)
+        {
+            this->my_json["PhaseEncodingDirection"]=this->my_json["PhaseEncodingAxis"];
+        }
+        else
+        {
+            if(this->my_json["InPlanePhaseEncodingDirectionDICOM"]!=json::value_t::null)
+            {
+                if(this->my_json["InPlanePhaseEncodingDirectionDICOM"]=="COL")
+                {
+                    this->my_json["PhaseEncodingDirection"]="j";
+                }
+                else
+                {
+                    this->my_json["PhaseEncodingDirection"]="i";
+                }
+            }
+            else
+            {
+                (*stream)<<"Phase encoding information not present in JSON file. Create a new json file for the dataset..."<<std::endl;
+                (*stream)<<"Exiting"<<std::endl;
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+
     std::string json_PE= my_json["PhaseEncodingDirection"];      //get phase encoding direction
     if(json_PE.find("j")!=std::string::npos)
         PE_string="vertical";
@@ -50,12 +86,6 @@ DRBUDDI::DRBUDDI(std::string uname,std::string dname,std::vector<std::string> st
 
 
 
-#ifdef DRBUDDIALONE
-    this->stream= &(std::cout);
-#else
-    this->stream= TORTOISE::stream;
-#endif
-
     (*stream)<<"Starting DRBUDDI Processing..."<<std::endl;
 }
 
@@ -65,7 +95,21 @@ void DRBUDDI::Process()
     if(parser->getDRBUDDIStep()==0)
         Step0_CreateImages();
     if(parser->getDRBUDDIStep()<=1)
+    {
+        if(parser->getDRBUDDIStep()==1)
+        {
+            this->b0_up=readImageD<ImageType3D>(proc_folder+"/blip_up_b0.nii");
+            this->b0_down=readImageD<ImageType3D>(proc_folder+"/blip_down_b0.nii");
+
+            if(fs::exists(proc_folder+"/blip_up_FA.nii"))
+                this->FA_up=readImageD<ImageType3D>(proc_folder+"/blip_up_FA.nii");
+            if(fs::exists(proc_folder+"/blip_down_FA.nii"))
+                this->FA_down=readImageD<ImageType3D>(proc_folder+"/blip_down_FA.nii");
+        }
+
+
         Step1_RigidRegistration();
+    }
     Step2_DiffeoRegistration();
     Step3_WriteOutput();
 }
@@ -383,7 +427,33 @@ void DRBUDDI::Step1_RigidRegistration()
         (*stream)<<"Rigidly registering structural image id: " <<str<<" to b0_up quad..."<<std::endl;
 
         ImageType3D::Pointer str_img = readImageD<ImageType3D>(parser->getStructuralNames(str));
-        RigidTransformType::Pointer rigid_trans= RigidRegisterImagesEuler( initial_corrected_b0,  str_img,parser->getRigidMetricType(),parser->getRigidLR());
+        RigidTransformType::Pointer rigid_trans1= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, "CC",parser->getRigidLR());
+        RigidTransformType::Pointer rigid_trans2= RigidRegisterImagesEuler( initial_corrected_b0,  str_img,"MI",parser->getRigidLR());
+
+        auto params1= rigid_trans1->GetParameters();
+        auto params2= rigid_trans2->GetParameters();
+        auto p1=params1-params2;
+
+        double diff=0;
+        diff+= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] +
+               p1[3]*p1[3]/400. + p1[4]*p1[4]/400. + p1[5]*p1[5]/400. ;
+
+        RigidTransformType::Pointer rigid_trans=nullptr;
+        std::cout<<"R1: "<< params1<<std::endl;
+        std::cout<<"R2: "<< params2<<std::endl;
+        std::cout<<"MI vs CC diff: "<< diff<<std::endl;
+        if(diff<0.001)
+            rigid_trans=rigid_trans2;
+        else
+        {
+            auto params= 0.5*(params1+params2);
+            params1= params;
+            rigid_trans1->SetParameters(params1);
+            rigid_trans= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, "MI",parser->getRigidLR(),rigid_trans1);
+        }
+
+
+        (*stream)<<"Rigid transformation: " << rigid_trans->GetParameters()<<std::endl;
 
         {
             ResampleImageFilterType::Pointer resampleFilter3 = ResampleImageFilterType::New();

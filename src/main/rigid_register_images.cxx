@@ -12,7 +12,6 @@
 #include "itkConjugateGradientLineSearchOptimizerv4.h"
 
 
-
 QuadraticTransformType::Pointer CompositeLinearToQuadratic(const CompositeTransformType * compositeTransform, std::string phase)
 {
     typedef   itk::Euler3DTransform<double> RigidTransformType;
@@ -46,7 +45,7 @@ QuadraticTransformType::Pointer CompositeLinearToQuadratic(const CompositeTransf
 
 
 
-RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string metric_type,float lr)
+RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string metric_type,float lr,RigidTransformType::Pointer in_trans)
 {
     int NITK= TORTOISE::GetAvailableITKThreadFor();    
 
@@ -58,11 +57,10 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
 
     typedef itk::CorrelationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType2;
     MetricType2::Pointer m2= MetricType2::New();
-    m2->SetMaximumNumberOfWorkUnits(NITK);        
+    m2->SetMaximumNumberOfWorkUnits(NITK);
 
     using MetricType =itk::ImageToImageMetricv4<ImageType3D,ImageType3D> ;
     MetricType::Pointer         metric        = nullptr;
-
     if(metric_type=="CC")
         metric=m2;
     else
@@ -71,15 +69,22 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
     RigidTransformType::Pointer initial_transform = RigidTransformType::New();
     initial_transform->SetIdentity();
 
-    typedef itk::CenteredTransformInitializer<RigidTransformType, ImageType3D, ImageType3D> TransformInitializerType;
-    typename TransformInitializerType::Pointer initializer = TransformInitializerType::New();
 
-    initializer->SetTransform( initial_transform );
-    initializer->SetFixedImage( fixed_img );
-    initializer->SetMovingImage( moving_img );
-    initializer->GeometryOn();
-    initializer->InitializeTransform();
+    if(in_trans==nullptr)
+    {
+        typedef itk::CenteredTransformInitializer<RigidTransformType, ImageType3D, ImageType3D> TransformInitializerType;
+        typename TransformInitializerType::Pointer initializer = TransformInitializerType::New();
 
+        initializer->SetTransform( initial_transform );
+        initializer->SetFixedImage( fixed_img );
+        initializer->SetMovingImage( moving_img );
+        initializer->GeometryOn();
+        initializer->InitializeTransform();
+    }
+    else
+    {
+        initial_transform->SetParameters(in_trans->GetParameters());
+    }
 
 
     using RigidRegistrationType = itk::ImageRegistrationMethodv4<ImageType3D, ImageType3D, RigidTransformType> ;
@@ -94,28 +99,31 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
 
 
     RigidRegistrationType::ShrinkFactorsArrayType shrinkFactorsPerLevel;
-    shrinkFactorsPerLevel.SetSize( 4 );
-    shrinkFactorsPerLevel[0] = 6;
-    shrinkFactorsPerLevel[1] = 4;
-    shrinkFactorsPerLevel[2] = 2;
-    shrinkFactorsPerLevel[3] = 1;
+    shrinkFactorsPerLevel.SetSize( 5 );
+    shrinkFactorsPerLevel[0] = 8;
+    shrinkFactorsPerLevel[1] = 6;
+    shrinkFactorsPerLevel[2] = 4;
+    shrinkFactorsPerLevel[3] = 2;
+    shrinkFactorsPerLevel[4] = 1;
 
     RigidRegistrationType::SmoothingSigmasArrayType smoothingSigmasPerLevel;
-    smoothingSigmasPerLevel.SetSize( 4 );
-    smoothingSigmasPerLevel[0] = 1.;
-    smoothingSigmasPerLevel[1] = 0.5;
-    smoothingSigmasPerLevel[2] = 0.05;
-    smoothingSigmasPerLevel[3] = 0.002;
+    smoothingSigmasPerLevel.SetSize( 5 );
+    smoothingSigmasPerLevel[0] = 3.;
+    smoothingSigmasPerLevel[1] = 2.5;
+    smoothingSigmasPerLevel[2] = 2.;
+    smoothingSigmasPerLevel[3] = 1.;
+    smoothingSigmasPerLevel[4] = 0.;
 
     std::vector<unsigned int> currentStageIterations;
+    currentStageIterations.push_back(10000);
+    currentStageIterations.push_back(10000);
+    currentStageIterations.push_back(1000);
     currentStageIterations.push_back(1000);
     currentStageIterations.push_back(100);
-    currentStageIterations.push_back(100);
-    currentStageIterations.push_back(100);
 
 
 
-    rigidRegistration->SetNumberOfLevels( 4 );
+    rigidRegistration->SetNumberOfLevels( 5 );
     rigidRegistration->SetSmoothingSigmasPerLevel( smoothingSigmasPerLevel );
     rigidRegistration->SetShrinkFactorsPerLevel( shrinkFactorsPerLevel );
     rigidRegistration->SetSmoothingSigmasAreSpecifiedInPhysicalUnits(false);
@@ -156,8 +164,8 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
     typedef itk::ConjugateGradientLineSearchOptimizerv4Template<double> ConjugateGradientDescentOptimizerType;
     typename ConjugateGradientDescentOptimizerType::Pointer optimizer = ConjugateGradientDescentOptimizerType::New();
     optimizer->SetLowerLimit( 0 );
-    optimizer->SetUpperLimit( 2 );
-    optimizer->SetEpsilon( 0.2 );
+    optimizer->SetUpperLimit( 4 );
+    optimizer->SetEpsilon( 0.15 );
     optimizer->SetLearningRate( learningRate );
     optimizer->SetMaximumStepSizeInPhysicalUnits( learningRate );
     optimizer->SetNumberOfIterations( 1000 );

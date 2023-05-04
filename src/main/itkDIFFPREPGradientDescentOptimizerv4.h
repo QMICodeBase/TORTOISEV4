@@ -149,7 +149,7 @@ public:
       void SetFixedCudaImage(CUDAIMAGE::Pointer nimg)
       {
           fixed_img_cuda=nimg;
-          entropy_f= ComputeEntropy(fixed_img_cuda, Nbins, lim_arr[0],lim_arr[1]);
+          //entropy_f= ComputeEntropy(fixed_img_cuda, Nbins, lim_arr[0],lim_arr[1]);
       }
       void SetMovingCudaImage(CUDAIMAGE::Pointer nimg){moving_img_cuda=nimg;}
       void SetLimits(std::vector<float> aa){lim_arr=aa;}
@@ -217,7 +217,7 @@ private:
       std::vector<float> lim_arr;
       int Nbins{100};
 
-      double entropy_f{0};
+      //float entropy_f{0};
   #endif
 
 
