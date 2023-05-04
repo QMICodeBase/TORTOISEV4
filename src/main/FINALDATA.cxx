@@ -1254,6 +1254,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
         for(int vol=0;vol<nvols;vol++)
         {
             raw_data[vol]= read_3D_volume_from_4D(data_names[PE],vol);
+
             if(vol==0)
                 orig_mask2= create_mask(raw_data[0]);
             if(this->native_weight_img[PE].size())
@@ -1281,10 +1282,9 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                         }
                     }
                 }
-            }           
+            }
+
         }
-
-
 
 
         (*stream)<<std::endl<<"Transforming Volume done: "<<std::flush;

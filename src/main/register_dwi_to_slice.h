@@ -16,74 +16,269 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
     int MB= slspec.cols();
     int NITK= TORTOISE::GetAvailableITKThreadFor();
 
-
     ImageType3D::SizeType sz =slice_img->GetLargestPossibleRegion().GetSize();
     s2v_transformations.resize(sz[2]);
-
-
-    for(int e=0;e<Nexc;e++)
+    for(int k=0;k<sz[2];k++)
     {
-        ImageType3D::Pointer  temp_slice_img_itk=ImageType3D::New();
-
-        sz[2]=MB;
-        ImageType3D::IndexType start;start.Fill(0);
-        ImageType3D::RegionType reg(start,sz);
-        temp_slice_img_itk->SetRegions(reg);
-        temp_slice_img_itk->Allocate();
-        temp_slice_img_itk->FillBuffer(0);
-        temp_slice_img_itk->SetDirection(slice_img->GetDirection());
-
-        ImageType3D::SpacingType spc= slice_img->GetSpacing();
-        if(MB>1)
-        {
-           spc[2]=(slspec(e,1)-slspec(e,0))*spc[2];
-        }
-        temp_slice_img_itk->SetSpacing(spc);
-
-        ImageType3D::IndexType orig_ind;
-        orig_ind[0]=0;
-        orig_ind[1]=0;
-        orig_ind[2]=slspec(e,0);
-
-        ImageType3D::PointType orig;
-        slice_img->TransformIndexToPhysicalPoint(orig_ind,orig);
-        temp_slice_img_itk->SetOrigin(orig);
-
-
-        int nvoxels=0;
-        for(int kk=0;kk<MB;kk++)
-        {
-            int k=slspec(e,kk);
-            ImageType3D::IndexType ind3,ind3_v2;
-            ind3_v2[2]=kk;
-            ind3[2]=k;
-            for(int j=0;j<sz[1];j++)
-            {
-                ind3[1]=j;
-                ind3_v2[1]=j;
-                for(int i=0;i<sz[0];i++)
-                {
-                    ind3[0]=i;
-                    ind3_v2[0]=i;
-
-                    temp_slice_img_itk->SetPixel(ind3_v2,slice_img->GetPixel(ind3));
-                    if(MB==1 && mask_img->GetPixel(ind3))
-                    {
-                        nvoxels++;
-                    }
-                }
-            }
-        }
-
         OkanQuadraticTransformType::Pointer  initialTransform = OkanQuadraticTransformType::New();
         initialTransform->SetPhase(phase);
         initialTransform->SetIdentity();
+        s2v_transformations[k]=initialTransform;
+    }
 
-        if(MB>1 || (nvoxels>0.03*sz[0]*sz[1]))
+
+    OkanQuadraticTransformType::ParametersType flags, grd_scales;
+    grd_scales.SetSize(OkanQuadraticTransformType::NQUADPARAMS);
+    flags.SetSize(OkanQuadraticTransformType::NQUADPARAMS);
+    flags.Fill(0);
+    flags[0]=flags[1]=flags[2]=flags[3]=flags[4]=flags[5]=1;
+    if(do_eddy)
+    {
+        flags[6]=flags[7]=flags[8]=flags[9]=flags[10]=flags[11]=1;
+        flags[12]=flags[13]=1;
+    }
+
+
+    ImageType3D::SpacingType res = slice_img->GetSpacing();
+    grd_scales[0]= res[0]*1.25;
+    grd_scales[1]= res[1]*1.25;
+    grd_scales[2]= res[2]*1.25;
+    grd_scales[3]=0.04;
+    grd_scales[4]=0.04;
+    grd_scales[5]=0.04;
+    grd_scales[6]= res[2]*1.5 /   ( sz[0]/2.*res[0]    )*2;
+    grd_scales[7]= res[2]*1.5 /   ( sz[1]/2.*res[1]    )*2.;
+    grd_scales[8]= res[2]*1.5 /   ( sz[2]/2.*res[2]    )*2.;
+    grd_scales[9]=  0.5*res[2]*10. /   ( sz[0]/2.*res[0]    ) / ( sz[1]/2.*res[1]    );
+    grd_scales[10]= 0.5*res[2]*10. /   ( sz[0]/2.*res[0]    ) / ( sz[2]/2.*res[2]    );
+    grd_scales[11]= 0.5*res[2]*10. /   ( sz[1]/2.*res[1]    ) / ( sz[2]/2.*res[2]    );
+    grd_scales[12]= res[2]*5. /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    );
+    grd_scales[13]= res[2]*8. /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    )/2.;
+    grd_scales[14]=  5.*res[2]*4 /   ( sz[0]/2.*res[0]    ) / ( sz[1]/2.*res[1]    ) / ( sz[2]/2.*res[2]    );
+    grd_scales[15]=  5.*res[2]*1 /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    );
+    grd_scales[16]=  5.*res[2]*1. /   ( sz[1]/2.*res[1]    ) / ( sz[1]/2.*res[1]    ) / ( sz[1]/2.*res[1]    );
+    grd_scales[17]=  5.*res[2]*1. /   ( sz[0]/2.*res[0]    ) / ( sz[2]/2.*res[2]    ) / ( sz[2]/2.*res[2]    );
+    grd_scales[18]=  5.*res[2]*1. /   ( sz[1]/2.*res[1]    ) / ( sz[2]/2.*res[2]    ) / ( sz[2]/2.*res[2]    );
+    grd_scales[19]=  5.*res[2]*1. /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    );
+    grd_scales[20]=  5.*res[2]*1. /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    );
+    grd_scales[21]= res[0]*1.25;
+    grd_scales[22]= res[1]*1.25;
+    grd_scales[23]= res[2]*1.25;
+    grd_scales=grd_scales/1.5;
+
+
+    int fact=1;
+
+    int phase_id=6;
+    if(phase=="vertical")
+        phase_id=7;
+    else if(phase=="slice")
+        phase_id=8;
+
+    if(MB==1)
+    {
+        grd_scales=grd_scales/2.;
+        flags[6]=flags[7]=flags[8]=flags[9]=flags[10]=flags[11]=0;
+        flags[12]=flags[13]=0;
+
+
+        for(int k=0;k<sz[2]-fact*2;k++)
         {
+            ImageType3D::Pointer  temp_slice_img_itk=ImageType3D::New();
+            ImageType3D::SizeType szn= sz;
+
+            szn[2]=fact+1;
+            ImageType3D::IndexType start;start.Fill(0);
+            ImageType3D::RegionType reg(start,szn);
+            temp_slice_img_itk->SetRegions(reg);
+            temp_slice_img_itk->Allocate();
+            temp_slice_img_itk->FillBuffer(0);
+            temp_slice_img_itk->SetDirection(slice_img->GetDirection());
+
+            ImageType3D::SpacingType spc= slice_img->GetSpacing();
+            spc[2]=2*spc[2];
+            temp_slice_img_itk->SetSpacing(spc);
+            ImageType3D::IndexType orig_ind;
+            orig_ind[0]=0;
+            orig_ind[1]=0;
+            orig_ind[2]=k;
+            ImageType3D::PointType orig;
+            slice_img->TransformIndexToPhysicalPoint(orig_ind,orig);
+            temp_slice_img_itk->SetOrigin(orig);
+
+            int nvoxels=0;
+            for(int kk=0;kk<fact+1;kk++)
+            {
+                int sl= k+ kk*2;
+                ImageType3D::IndexType ind3,ind3_v2;
+                ind3_v2[2]=kk;
+                ind3[2]=sl;
+                for(int j=0;j<sz[1];j++)
+                {
+                    ind3[1]=j;
+                    ind3_v2[1]=j;
+                    for(int i=0;i<sz[0];i++)
+                    {
+                        ind3[0]=i;
+                        ind3_v2[0]=i;
+
+                        temp_slice_img_itk->SetPixel(ind3_v2,slice_img->GetPixel(ind3));
+                        if(mask_img->GetPixel(ind3))
+                            nvoxels++;
+                    }
+                }
+            }
+
+            OkanQuadraticTransformType::Pointer  initialTransform = OkanQuadraticTransformType::New();
+            initialTransform->SetPhase(phase);
+            initialTransform->SetIdentity();
+            initialTransform->SetParametersForOptimizationFlags(flags);
+
+            if(nvoxels>0.1*sz[0]*sz[1])
+            {
+                typedef itk::MattesMutualInformationImageToImageMetricv4Okan<ImageType3D,ImageType3D> MetricType;
+                MetricType::Pointer         metric        = MetricType::New();
+                metric->SetNumberOfHistogramBins(30);
+                metric->SetUseMovingImageGradientFilter(false);
+                metric->SetUseFixedImageGradientFilter(false);
+                metric->SetFixedMin(lim_arr[0]);
+                metric->SetFixedMax(lim_arr[1]);
+                metric->SetMovingMin(lim_arr[2]);
+                metric->SetMovingMax(lim_arr[3]);
+                metric->SetMaximumNumberOfWorkUnits(NITK);
+
+
+                using OptimizerType=itk::DIFFPREPGradientDescentOptimizerv4<double>;
+                OptimizerType::Pointer      optimizer     = OptimizerType::New();
+                optimizer->SetOptimizationFlags(flags);
+                optimizer->SetGradScales(grd_scales);
+                optimizer->SetNumberHalves(3);
+                optimizer->SetBrkEps(0.0005);
+
+
+                typedef itk::OkanImageRegistrationMethodv4<ImageType3D,ImageType3D, OkanQuadraticTransformType,ImageType3D >           RegistrationType;
+                RegistrationType::Pointer   registration  = RegistrationType::New();
+                registration->SetFixedImage(temp_slice_img_itk);
+                registration->SetMovingImage(dwi_img);
+                registration->SetMetricSamplingPercentage(1.);
+                registration->SetOptimizer(optimizer);
+                registration->SetInitialTransform(initialTransform);
+                registration->InPlaceOn();
+
+                RegistrationType::ShrinkFactorsArrayType shrinkFactorsPerLevel;
+                shrinkFactorsPerLevel.SetSize( 1 );
+                shrinkFactorsPerLevel[0] = 1;
+                RegistrationType::SmoothingSigmasArrayType smoothingSigmasPerLevel;
+                smoothingSigmasPerLevel.SetSize( 1 );
+                smoothingSigmasPerLevel[0] = 0.;
+
+
+                registration->SetNumberOfLevels( 1 );
+                registration->SetSmoothingSigmasPerLevel( smoothingSigmasPerLevel );
+                registration->SetSmoothingSigmasAreSpecifiedInPhysicalUnits(false);
+                registration->SetShrinkFactorsPerLevel( shrinkFactorsPerLevel );
+                registration->SetNumberOfWorkUnits(NITK);
+                registration->SetMetric(        metric        );
+
+                try
+                {
+                      registration->Update();
+
+
+                      for(int kk=0;kk<fact+1;kk++)
+                      {
+                          int sl= k+ kk*2;
+                          if(s2v_transformations[sl]->GetParameters()[phase_id]==1)
+                              s2v_transformations[sl]->SetParameters(initialTransform->GetParameters());
+                          else
+                          {
+                              auto op = s2v_transformations[sl]->GetParameters();
+                              for(int pp=0;pp<op.size();pp++ )
+                                  op[pp]+= initialTransform->GetParameters()[pp];
+                              s2v_transformations[sl]->SetParameters(op);
+                          }
+                      }
+
+                }
+                catch( itk::ExceptionObject & err )
+                {
+                      std::cerr << "ExceptionObject caught !" << std::endl;
+                      std::cerr<<"Vol: " << vol << " Slice: "<< k<<std::endl;
+                      std::cerr<<"Probably insufficient data on slice. Reverting to identity transform"<<std::endl;
+
+                 //     s2v_transformations[k]->SetIdentity();
+                }
+            } // if nvoxels
+            else
+            {
+              //  s2v_transformations[k]->SetIdentity();
+            }
+        } //for k
+
+
+        for(int k=0;k<sz[2];k++)
+        {
+            auto op = s2v_transformations[k]->GetParameters();
+            for(int pp=0;pp<op.size();pp++ )
+                op[pp]/= op[phase_id];
+            s2v_transformations[k]->SetParameters(op);
+        }
+
+    }
+    else
+    {
+        sz[2]=MB;
+        for(int e=0;e<Nexc;e++)
+        {
+            ImageType3D::Pointer  temp_slice_img_itk=ImageType3D::New();
+
+            ImageType3D::IndexType start;start.Fill(0);
+            ImageType3D::RegionType reg(start,sz);
+            temp_slice_img_itk->SetRegions(reg);
+            temp_slice_img_itk->Allocate();
+            temp_slice_img_itk->FillBuffer(0);
+            temp_slice_img_itk->SetDirection(slice_img->GetDirection());
+
+            ImageType3D::SpacingType spc= slice_img->GetSpacing();
+            spc[2]=(slspec(e,1)-slspec(e,0))*spc[2];
+            temp_slice_img_itk->SetSpacing(spc);
+
+            ImageType3D::IndexType orig_ind;
+            orig_ind[0]=0;
+            orig_ind[1]=0;
+            orig_ind[2]=slspec(e,0);
+
+            ImageType3D::PointType orig;
+            slice_img->TransformIndexToPhysicalPoint(orig_ind,orig);
+            temp_slice_img_itk->SetOrigin(orig);
+
+            for(int kk=0;kk<MB;kk++)
+            {
+                int k=slspec(e,kk);
+                ImageType3D::IndexType ind3,ind3_v2;
+                ind3_v2[2]=kk;
+                ind3[2]=k;
+                for(int j=0;j<sz[1];j++)
+                {
+                    ind3[1]=j;
+                    ind3_v2[1]=j;
+                    for(int i=0;i<sz[0];i++)
+                    {
+                        ind3[0]=i;
+                        ind3_v2[0]=i;
+                        temp_slice_img_itk->SetPixel(ind3_v2,slice_img->GetPixel(ind3));
+                    }
+                }
+            }
+
+            OkanQuadraticTransformType::Pointer  initialTransform = OkanQuadraticTransformType::New();
+            initialTransform->SetPhase(phase);
+            initialTransform->SetIdentity();
+            initialTransform->SetParametersForOptimizationFlags(flags);
+
             typedef itk::MattesMutualInformationImageToImageMetricv4Okan<ImageType3D,ImageType3D> MetricType;
             MetricType::Pointer         metric        = MetricType::New();
-            metric->SetNumberOfHistogramBins(40);
+            metric->SetNumberOfHistogramBins(30);
             metric->SetUseMovingImageGradientFilter(false);
             metric->SetUseFixedImageGradientFilter(false);
             metric->SetFixedMin(lim_arr[0]);
@@ -91,56 +286,6 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
             metric->SetMovingMin(lim_arr[2]);
             metric->SetMovingMax(lim_arr[3]);
             metric->SetMaximumNumberOfWorkUnits(NITK);
-
-            OkanQuadraticTransformType::ParametersType flags, grd_scales;
-            grd_scales.SetSize(OkanQuadraticTransformType::NQUADPARAMS);
-            flags.SetSize(OkanQuadraticTransformType::NQUADPARAMS);
-            flags.Fill(0);
-            flags[0]=flags[1]=flags[2]=flags[3]=flags[4]=flags[5]=1;
-            if(do_eddy)
-            {
-                flags[6]=flags[7]=flags[8]=flags[9]=flags[10]=flags[11]=1;
-                flags[12]=flags[13]=1;
-            }
-
-            initialTransform->SetParametersForOptimizationFlags(flags);
-
-            ImageType3D::SpacingType res = slice_img->GetSpacing();
-            grd_scales[0]= res[0]*1.25;
-            grd_scales[1]= res[1]*1.25;
-            grd_scales[2]= res[2]*1.25;
-
-            grd_scales[3]=0.04;
-            grd_scales[4]=0.04;
-            grd_scales[5]=0.04;
-
-
-            grd_scales[6]= res[2]*1.5 /   ( sz[0]/2.*res[0]    )*2;
-            grd_scales[7]= res[2]*1.5 /   ( sz[1]/2.*res[1]    )*2.;
-            grd_scales[8]= res[2]*1.5 /   ( sz[2]/2.*res[2]    )*2.;
-
-            grd_scales[9]=  0.5*res[2]*10. /   ( sz[0]/2.*res[0]    ) / ( sz[1]/2.*res[1]    );
-            grd_scales[10]= 0.5*res[2]*10. /   ( sz[0]/2.*res[0]    ) / ( sz[2]/2.*res[2]    );
-            grd_scales[11]= 0.5*res[2]*10. /   ( sz[1]/2.*res[1]    ) / ( sz[2]/2.*res[2]    );
-
-            grd_scales[12]= res[2]*5. /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    );
-            grd_scales[13]= res[2]*8. /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    )/2.;
-
-            grd_scales[14]=  5.*res[2]*4 /   ( sz[0]/2.*res[0]    ) / ( sz[1]/2.*res[1]    ) / ( sz[2]/2.*res[2]    );
-
-            grd_scales[15]=  5.*res[2]*1 /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    );
-            grd_scales[16]=  5.*res[2]*1. /   ( sz[1]/2.*res[1]    ) / ( sz[1]/2.*res[1]    ) / ( sz[1]/2.*res[1]    );
-            grd_scales[17]=  5.*res[2]*1. /   ( sz[0]/2.*res[0]    ) / ( sz[2]/2.*res[2]    ) / ( sz[2]/2.*res[2]    );
-            grd_scales[18]=  5.*res[2]*1. /   ( sz[1]/2.*res[1]    ) / ( sz[2]/2.*res[2]    ) / ( sz[2]/2.*res[2]    );
-            grd_scales[19]=  5.*res[2]*1. /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    );
-            grd_scales[20]=  5.*res[2]*1. /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    );
-
-            grd_scales[21]= res[0]*1.25;
-            grd_scales[22]= res[1]*1.25;
-            grd_scales[23]= res[2]*1.25;
-
-            grd_scales=grd_scales/1.5;
-
 
 
             using OptimizerType=itk::DIFFPREPGradientDescentOptimizerv4<double>;
@@ -156,7 +301,6 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
             registration->SetFixedImage(temp_slice_img_itk);
             registration->SetMovingImage(dwi_img);
             registration->SetMetricSamplingPercentage(1.);
-
             registration->SetOptimizer(optimizer);
             registration->SetInitialTransform(initialTransform);
             registration->InPlaceOn();
@@ -176,31 +320,14 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
             registration->SetNumberOfWorkUnits(NITK);
             registration->SetMetric(        metric        );
 
-
             try
-              {
+            {
                   registration->Update();
-                  if(MB==1)
-                  {
-                      auto fparams = initialTransform->GetParameters();
-                      if(fabs(fparams[2]) > 9*spc[2])
-                      {
-                          initialTransform->SetIdentity();
-                          auto nflags= flags;
-                          nflags[2]=0;
-
-                          optimizer->SetOptimizationFlags(nflags);
-                          registration->Update();
-                      }
-
-                  }
-
-
                   for(int kk=0;kk<MB;kk++)
                       s2v_transformations[ slspec(e,kk)]=initialTransform;
-              }
+            }
             catch( itk::ExceptionObject & err )
-              {
+            {
                   std::cerr << "ExceptionObject caught !" << std::endl;
                   std::cerr<<"Vol: " << vol << " Slice: "<< e<<std::endl;
                   std::cerr<<"Probably insufficient data on slice. Reverting to identity transform"<<std::endl;
@@ -210,25 +337,14 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
                       OkanQuadraticTransformType::Pointer tTransform = OkanQuadraticTransformType::New();
                       tTransform->SetPhase(phase);
                       tTransform->SetIdentity();
-
                       s2v_transformations[ slspec(e,kk)]=tTransform;
                   }
-              }
-
-        }//data exists
-        else
-        {
-            for(int kk=0;kk<MB;kk++)
-            {
-                OkanQuadraticTransformType::Pointer tTransform = OkanQuadraticTransformType::New();
-                tTransform->SetPhase(phase);
-                tTransform->SetIdentity();
-
-                s2v_transformations[ slspec(e,kk)]=tTransform;
             }
-        }
+        } //for nexc
 
-    } //for e in Nexc
+    } //if mb==1
+
+
 
 
 }

@@ -2015,6 +2015,30 @@ void DTIModel::EstimateTensorWLLS()
                      A0_img->SetPixel(ind3,  0);
                  }
 
+                 if( Dmat_corr(0,0)+Dmat_corr(1,1)+Dmat_corr(2,2) > 0.0085)  //flow
+                 {
+                     double mn = (eig.D(0,0)+ eig.D(1,1)+ eig.D(2,2))/3.;
+                     double nom = (eig.D(0,0)-mn)*(eig.D(0,0)-mn)+ (eig.D(1,1)-mn)*(eig.D(1,1)-mn)+(eig.D(2,2)-mn)*(eig.D(2,2)-mn);
+                     double denom= eig.D(0,0)*eig.D(0,0)+eig.D(1,1)*eig.D(1,1)+eig.D(2,2)*eig.D(2,2);
+
+
+                     double FA=0;
+                     if(denom!=0)
+                         FA= sqrt( 1.5*nom/denom);
+
+                     if(FA>0.4)
+                     {
+                         Dmat_corr(0,0)=mn;
+                         Dmat_corr(1,1)=mn;
+                         Dmat_corr(2,2)=mn;
+
+                         Dmat_corr(0,1)=Dmat_corr(1,0)=0;
+                         Dmat_corr(0,2)=Dmat_corr(2,0)=0;
+                         Dmat_corr(2,1)=Dmat_corr(1,2)=0;
+
+                     }
+                 }
+
 
                  DTImageType::PixelType dt;
                  dt[0]=Dmat_corr(0,0);
