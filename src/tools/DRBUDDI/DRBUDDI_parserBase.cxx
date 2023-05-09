@@ -248,8 +248,26 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         option->SetModule(6);
         this->AddOption( option );
     }
+    {
+        std::string description = std::string("Number of cores to use in the CPU version. The default is 50\% of system cores.")  ;
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "ncores");
+        option->SetDescription( description );
+        option->SetModule(6);
+        this->AddOption( option );
+    }
 
 
+}
+
+
+int DRBUDDI_PARSERBASE::getNumberOfCores()
+{
+    OptionType::Pointer option = this->GetOption( "ncores");
+    if(option->GetNumberOfFunctions())
+        return (int)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+       return 0;
 }
 
 bool DRBUDDI_PARSERBASE::getDisableITKThreads()

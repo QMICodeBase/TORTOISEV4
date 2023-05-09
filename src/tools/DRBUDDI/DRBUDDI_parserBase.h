@@ -55,6 +55,8 @@ public:
     bool getDisableITKThreads();
     std::string getRegistrationMethodType();
 
+    int getNumberOfCores();
+
 protected:
     void InitializeCommandLineOptions();
 

@@ -15,9 +15,34 @@ int main(int argc,char *argv[])
     std::string executable_folder= fs::path(TORTOISE_loc).parent_path().string(); //to access the settings folder
 
     //Set up the number of cpus to use
-    std::string system_settings_file = executable_folder +std::string("/../settings/system_settings/default_system_settings.json");
+    //std::string system_settings_file = executable_folder +std::string("/../settings/system_settings/default_system_settings.json");
 
 
+    int nc=1;
+    if(parser->getNumberOfCores()!=0)
+    {
+        nc=parser->getNumberOfCores();
+        std::cout<<"The number of threads read from command line:  "<<nc<<std::endl;
+    }
+    else
+    {
+        const char* env_p = std::getenv("OMP_NUM_THREADS");
+        if(env_p)
+        {
+            nc=atoi(env_p)-1;
+            std::cout<<"The number of threads from OMP_NUM_THREADS: "<<nc<<std::endl;
+        }
+        else
+        {
+            nc=(int)(getNCores() *0.5)-1;
+            std::cout<<"The number of threads to use in DRBUDDI could not be automatically determined. "<<std::endl;
+            std::cout<<"It is currently set to: " <<nc<<std::endl;
+            std::cout<<"Please set the OMP_NUM_THREADS environmental variable to change this."<<std::endl;
+        }
+    }
+
+
+/*
     int nc=1;
     if(fs::exists(system_settings_file))
     {
@@ -45,6 +70,8 @@ int main(int argc,char *argv[])
             std::cout<<"Please set the OMP_NUM_THREADS environmental variable to change this."<<std::endl;
         }
     }
+*/
+
 
 
     if(nc==0)
