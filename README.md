@@ -81,7 +81,10 @@ In Linux, docker might require "sudo" to run.  The above command should run the 
 docker run eurotomania/tortoise EstimateTensor
 ```
 
-
+To mount your local data drive to Docker:
+```
+docker run -v /mydatadrive:/mydatadrive eurotomania/tortoise TORTOISEProcess --up_data /mydatadrive/my.nii
+```
 
 ## TORTOISEV4 Source code compilation
 
