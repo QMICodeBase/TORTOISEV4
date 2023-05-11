@@ -33,6 +33,9 @@ public:
     typename OutputImageType::Pointer GetOutput(){return output_img;}
     void SetOutput(typename OutputImageType::Pointer oi){output_img=oi;}
     void SetFreeWaterDiffusivity(float fwd){free_water_diffusivity=fwd;}
+    void SetNoiseImg(ImageType3D::Pointer ni){noise_img=ni;}
+
+    std::vector<ImageType3D::Pointer> GetWeightImage()    {return weight_imgs;}
 
 
     virtual void PerformFitting(){};
@@ -46,6 +49,8 @@ protected:
 
     json my_json;
     vnl_matrix<double> Bmatrix;
+
+    ImageType3D::Pointer noise_img{nullptr};
 
     std::vector<ImageType3D::Pointer> dwi_data;
     std::vector<ImageType3D::Pointer> weight_imgs;

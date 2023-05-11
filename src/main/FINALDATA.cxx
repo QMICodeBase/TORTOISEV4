@@ -1287,6 +1287,10 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
         }
 
 
+        std::string noise_name= this->temp_folder + "/" + basename + "_noise.nii";
+        ImageType3D::Pointer noise_img= readImageD<ImageType3D>(noise_name);
+        ImageType3D::Pointer final_noise_img=nullptr;
+
         (*stream)<<std::endl<<"Transforming Volume done: "<<std::flush;
 
 
@@ -1325,6 +1329,22 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 CompositeTransformType::Pointer all_trans_wo_s2v=GenerateCompositeTransformForVolume(raw_data[0],PE, vol);
                 CompositeTransformType::Pointer all_trans=nullptr;
                 DisplacementFieldType::Pointer forward_s2v_field=nullptr;
+
+                if(vol==0)
+                {
+                    using NNInterpolatorType = itk::NearestNeighborInterpolateImageFunction<ImageType3D, double>;
+                    NNInterpolatorType::Pointer NNinterpolator = NNInterpolatorType::New();
+
+                    using ResamplerType = itk::ResampleImageFilter<ImageType3D,ImageType3D>;
+                    ResamplerType::Pointer resampler= ResamplerType::New();
+                    resampler->SetDefaultPixelValue(0);
+                    resampler->SetInput(noise_img);
+                    resampler->SetInterpolator(NNinterpolator );
+                    resampler->SetOutputParametersFromImage(template_structural);
+                    resampler->SetTransform(all_trans_wo_s2v);
+                    resampler->Update();
+                    final_noise_img= resampler->GetOutput();
+                }
 
                 if(this->s2v_transformations[PE].size()!=0)
                 {
@@ -2166,6 +2186,11 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
         {
             write_3D_image_to_4D_file<float>(final_data[v],new_nii_name,v,Nvols[PE]);
         }
+
+        std::string new_noise_name=  this->temp_folder + "/" + basename + "_final_temp_noise.nii";
+        writeImageD<ImageType3D>(final_noise_img,new_noise_name);
+
+
 
         final_imgs_to_return[PE]=final_data;
 

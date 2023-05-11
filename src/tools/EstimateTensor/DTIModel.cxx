@@ -672,53 +672,152 @@ void DTIModel::EstimateTensorNT2()
     } //for k
 
 
+}
+
+
+double DTIModel::check_condition_number(std::vector<int> &outlier_index, vnl_matrix<double> Bmatrix)
+{
+    vnl_svd<double> my_svd(Bmatrix);
+    int N= my_svd.W().rows();
+
+
+    double cn_original = my_svd.W()(0,0) / my_svd.W()(N-1,N-1);
+
+
+    for(int i=0; i<outlier_index.size();i++)
+    {
+        int vol = outlier_index[i];
+        Bmatrix(vol,0)=0;
+        Bmatrix(vol,1)=0;
+        Bmatrix(vol,2)=0;
+        Bmatrix(vol,3)=0;
+        Bmatrix(vol,4)=0;
+        Bmatrix(vol,5)=0;
+    }
+
+    vnl_svd<double> my_svd2(Bmatrix);
+    double cn = my_svd2.W()(0,0) / my_svd2.W()(N-1,N-1);
+
+    if(cn / cn_original > 2)
+    {
+        std::vector<int> dummy;
+        outlier_index =dummy;
+    }
+
+    return cn;
+}
+
+
+
+std::vector<int> DTIModel::check_gradient_direction(std::vector<int> outlier_index_original,vnl_matrix<double> Bmatrix)
+{
+
+    vnl_matrix<double> dir6(6,3);
+    dir6(0,0)=  0.79546387; dir6(0,1)= -0.10374812; dir6(0,2)= 0.59705407 ;
+    dir6(1,0)= -0.86270267; dir6(1,1)= -0.37933154; dir6(1,2)=  0.33444235;
+    dir6(2,0)=  0.05833067; dir6(2,1)= -0.8499489 ; dir6(2,2)=  0.5236262;
+    dir6(3,0)= -0.16712488; dir6(3,1)=  0.06830884; dir6(3,2)=  0.98356656;
+    dir6(4,0)=  0.33000462; dir6(4,1)=  0.82804632; dir6(4,2)=  0.45325075;
+    dir6(5,0)= -0.6947986 ; dir6(5,1)=  0.65772637; dir6(5,2)=  0.29094833;
+
+
+    int Nvols = Bmatrix.rows();
+
+    vnl_matrix<double> bvecs(Nvols,3);
+    vnl_matrix<double> bvals(Nvols,1);
+
+
+    for(int i=0;i<Nvols;i++)
+    {
+           vnl_vector<double> bmat_vec= Bmatrix.get_row(i);
+
+           vnl_matrix_fixed<double,3,3> bmat;
+           bmat(0,0)= bmat_vec[0];
+           bmat(0,1)= bmat_vec[1]/2;
+           bmat(1,0)= bmat_vec[1]/2;
+           bmat(0,2)= bmat_vec[2]/2;
+           bmat(2,0)= bmat_vec[2]/2;
+           bmat(1,1)= bmat_vec[3];
+           bmat(1,2)= bmat_vec[4]/2;
+           bmat(2,1)= bmat_vec[4]/2;
+           bmat(2,2)= bmat_vec[5];
+
+           vnl_symmetric_eigensystem<double> eig(bmat);
+
+           bvals(i,0)= eig.D(2,2);
+           vnl_vector<double> cbvec= eig.V.get_column(2);
+           bvecs(i,0)= -cbvec[0];
+           bvecs(i,1)= cbvec[1];
+           bvecs(i,2)= cbvec[2];
+
+           if(bvecs(i,2)<0)
+           {
+               bvecs(i,0)=-bvecs(i,0);
+               bvecs(i,1)=-bvecs(i,1);
+               bvecs(i,2)=-bvecs(i,2);
+           }
+    }
+
+
+    int nd=0;
+
+    vnl_matrix<double> direction_temp = bvecs;
+    std::vector<int> outlier_index_temp = outlier_index_original;
+
+    for(int i=0;i<outlier_index_original.size();i++)
+    {
+        direction_temp(outlier_index_original[i],0)=0;
+        direction_temp(outlier_index_original[i],1)=0;
+        direction_temp(outlier_index_original[i],2)=0;
+
+    }
+
+    vnl_vector<double> sum_of_vector(6,0);
+
+
+    for(int i=0;i<6;i++)
+    {
+        for(int j=0;j<Nvols;j++)
+        {
+            vnl_vector<double> vec1 =  dir6.get_row(i);
+            vnl_vector<double> vec2=  direction_temp.get_row(j);
+
+            if((vec1.magnitude()!=0) && (vec2.magnitude()!=0) )
+            {
+                double cos_theta = fabs(vec1[0]*vec2[0]+vec1[1]*vec2[1]+vec1[2]*vec2[2]    );
+                sum_of_vector[i]+= cos_theta;
+                nd++;
+            }
+        }
+    }
+
+
+    std::vector<int> dummy;
+
+    if(sum_of_vector.min_value() < 3.23)
+    {
+        return dummy;
+    }
+
+    return outlier_index_original;
 
 }
 
 
 
-void DTIModel::EstimateTensorRESTORE()
+
+
+DTImageType::PixelType  DTIModel::RobustFit(vnl_matrix<double> design_matrix,vnl_vector<double> signal, double initial_A0_estimate,
+                                  DTImageType::PixelType initial_dt_estimate1,  vnl_vector<double> sigstdev,
+                                  std::vector<int> &b0_indices,double &A0_estimate,std::vector<int> &outlier_index,double &CS_val,float THR)
 {
-    /*
-    EstimateTensorNLLS();
-
-
-    double noise_rms = ComputeNoiseValues();
-
-
-    int Nvols=Bmatrix.rows();
-
-    std::vector<int> all_indices;
-    if(indices_fitting.size()>0)
-        all_indices= indices_fitting;
-    else
-    {
-        for(int ma=0;ma<Nvols;ma++)
-            all_indices.push_back(ma);
-    }
-
-    if(stream)
-        (*stream)<<"Computing Tensors NLLS RESTORE..."<<std::endl;
-    else
-        std::cout<<"Computing Tensors NLLS RESTORE..."<<std::endl;
-
-    if(this-weight_imgs.size()==0)
-    {
-        this-weight_imgs.resize(Nvols);
-        for(int v=0;v<Nvols;v++)
-        {
-            this->weight_imgs[v]=ImageType3D::New();
-            this->weight_imgs[v]->SetRegions(A0_img->GetLargestPossibleRegion());
-            this->weight_imgs[v]->Allocate();
-            this->weight_imgs[v]->SetSpacing(A0_img->GetSpacing());
-            this->weight_imgs[v]->SetOrigin(A0_img->GetOrigin());
-            this->weight_imgs[v]->SetDirection(A0_img->GetDirection());
-            this->weight_imgs[v]->FillBuffer(1.);
-        }
-    }
-
-
-    ImageType3D::SizeType size = dwi_data[0]->GetLargestPossibleRegion().GetSize();
+    vnl_vector<double> initial_dt_estimate(6);
+    initial_dt_estimate[0]=initial_dt_estimate1[0];
+    initial_dt_estimate[1]=initial_dt_estimate1[1];
+    initial_dt_estimate[2]=initial_dt_estimate1[2];
+    initial_dt_estimate[3]=initial_dt_estimate1[3];
+    initial_dt_estimate[4]=initial_dt_estimate1[4];
+    initial_dt_estimate[5]=initial_dt_estimate1[5];
 
     mp_config_struct config;
     config.maxiter=500;
@@ -733,37 +832,512 @@ void DTIModel::EstimateTensorRESTORE()
     config.douserscale=0;
     config.nofinitecheck=0;
 
-    CS_img=ImageType3D::New();
-    CS_img->SetRegions(A0_img->GetLargestPossibleRegion());
-    CS_img->Allocate();
-    CS_img->SetSpacing(A0_img->GetSpacing());
-    CS_img->SetOrigin(A0_img->GetOrigin());
-    CS_img->SetDirection(A0_img->GetDirection());
-    CS_img->FillBuffer(0.);
+    DTImageType::PixelType new_dt ;
 
+    vars_struct my_struct;
+    my_struct.useWeights=true;
+
+
+    int Nvols = design_matrix.rows();
+
+    mp_result_struct my_results_struct;
+    vnl_vector<double> my_resids(Nvols);
+    my_results_struct.resid= my_resids.data_block();
+    my_results_struct.xerror=NULL;
+    my_results_struct.covar=NULL;
+
+
+    //Use analytical derivatives in LM optimizer
+    double p[7];
+    mp_par pars[7];
+    memset(&pars[0], 0, sizeof(pars));
+    pars[0].side=3;
+    pars[1].side=3;
+    pars[2].side=3;
+    pars[3].side=3;
+    pars[4].side=3;
+    pars[5].side=3;
+    pars[6].side=3;
+
+
+    int degrees_of_freedom = design_matrix.rows() -7;
+    double robust_thresh_chi_confidence=3.0;
+    double robust_thresh_chi = 1.0 + robust_thresh_chi_confidence*sqrt(2.0/degrees_of_freedom);
+
+
+    double tensor_improvement = 0.005;
+    int max_iteration=40;
+    int weightfun=1;
+    double threshold = THR;
+
+
+    vnl_vector<double> signal_estimate(Nvols);
+    vnl_vector<double> init_weight(Nvols);
+    vnl_vector<double> idxyfit(Nvols);
+
+
+    for(int v=0;v<Nvols;v++)
+    {
+      double exp_term = design_matrix(v,1)*initial_dt_estimate[0]*1000.+
+                        design_matrix(v,2)*initial_dt_estimate[1]*1000.+
+                        design_matrix(v,3)*initial_dt_estimate[2]*1000.+
+                        design_matrix(v,4)*initial_dt_estimate[3]*1000.+
+                        design_matrix(v,5)*initial_dt_estimate[4]*1000.+
+                        design_matrix(v,6)*initial_dt_estimate[5]*1000.;
+
+      signal_estimate[v] = initial_A0_estimate * exp(exp_term);
+      init_weight[v]= 1./sigstdev[v]/sigstdev[v];
+    }
+    vnl_vector<double> weight= init_weight;
+
+    vnl_vector<double> yresidue = signal - signal_estimate;
+    std::vector<float> yres_std;
+    for(int v=0;v<Nvols;v++)
+    {
+      yres_std.push_back(yresidue[v]);
+    }
+    double med_yres= median(yres_std);
+    std::vector<float> abs_diff;
+    for(int v=0;v<Nvols;v++)
+    {
+      abs_diff.push_back(fabs(yresidue[v]-med_yres));
+    }
+
+    double c= 1.4826 * median(abs_diff);
+
+    double original_df =  degrees_of_freedom;
+    double df =  degrees_of_freedom;
+
+    int rcounter=1;
+    bool converged=0;
+
+    double total_weight=0,total_init_weight=0;
+
+    vnl_vector<double> result = initial_dt_estimate;
+
+    double curr_A0_estimate= initial_A0_estimate;
+
+      while(!converged)
+      {
+          vnl_vector<double> tensor_in=result;
+          double total_yres = 0;
+          for(int v=0;v<Nvols;v++)
+          {
+              total_yres +=   (1./(yresidue[v]*yresidue[v] + sigstdev[v]*sigstdev[v]));
+          }
+
+
+          for(int v=0;v<Nvols;v++)
+          {
+              weight[v] = (1./(yresidue[v]*yresidue[v] + sigstdev[v]*sigstdev[v]))* original_df/total_yres;
+          }
+
+         for(int v=0;v<b0_indices.size();v++)
+         {
+             weight[ b0_indices[v] ] =1;
+         }
+
+
+          //SET the weights
+
+          total_weight = weight.sum();
+          total_init_weight = init_weight.sum();
+
+          for(int v=0;v<Nvols;v++)
+          {
+              weight[v] = weight[v] * (total_init_weight/total_weight);
+          }
+
+
+
+          for(int mama=0;mama<weight.size();mama++)
+          {
+              weight[mama]=sqrt(weight[mama]);
+          }
+
+          my_struct.signal= &signal;
+          my_struct.weights=&weight;
+          my_struct.Bmat= &design_matrix;
+
+          p[0]= curr_A0_estimate;
+          p[1]= tensor_in[0]*1000.;
+          p[2]= tensor_in[1]*1000.;
+          p[3]= tensor_in[2]*1000.;
+          p[4]= tensor_in[3]*1000.;
+          p[5]= tensor_in[4]*1000.;
+          p[6]= tensor_in[5]*1000.;
+
+
+          // do a new fitting with new weights
+          int status = mpfit(myNLLS_with_derivs, design_matrix.rows(), 7, p, pars, &config, (void *) &my_struct, &my_results_struct);
+
+
+
+          double new_A0_estimate = p[0];
+          for(int v=0;v<Nvols;v++)
+          {
+              double exp_term = design_matrix(v,1)*p[1]+
+                                design_matrix(v,2)*p[2]+
+                                design_matrix(v,3)*p[3]+
+                                design_matrix(v,4)*p[4]+
+                                design_matrix(v,5)*p[5]+
+                                design_matrix(v,6)*p[6];
+
+              signal_estimate[v] = new_A0_estimate * exp(exp_term);
+
+          }
+
+
+
+          result[0]=p[1]/1000.;
+          result[1]=p[2]/1000.;
+          result[2]=p[3]/1000.;
+          result[3]=p[4]/1000.;
+          result[4]=p[5]/1000.;
+          result[5]=p[6]/1000.;
+
+
+
+          yresidue = signal - signal_estimate;
+          vnl_vector<double> tensor_out=result;
+
+          vnl_vector<double> din(7,0),dout(7,0);
+          din[0]=curr_A0_estimate;
+          din[1]=tensor_in[0]*1000.;
+          din[2]=tensor_in[1]*1000.;
+          din[3]=tensor_in[2]*1000.;
+          din[4]=tensor_in[3]*1000.;
+          din[5]=tensor_in[4]*1000.;
+          din[6]=tensor_in[5]*1000.;
+
+          dout[0]=new_A0_estimate;
+          dout[1]=tensor_out[0]*1000.;
+          dout[2]=tensor_out[1]*1000.;
+          dout[3]=tensor_out[2]*1000.;
+          dout[4]=tensor_out[3]*1000.;
+          dout[5]=tensor_out[4]*1000.;
+          dout[6]=tensor_out[5]*1000.;
+
+          vnl_vector<double> diff= din-dout;
+          double improvement = diff.magnitude()/din.magnitude();
+
+
+
+          curr_A0_estimate=new_A0_estimate;
+
+          ++rcounter;
+
+          if(improvement < tensor_improvement)
+              converged = true;
+
+      } //while converged
+
+
+      double current_threshold = threshold;
+      vnl_vector<double> check_array(Nvols);
+
+      for(int v=0;v<Nvols;v++)
+      {
+          check_array[v] = fabs(yresidue[v]) -current_threshold*sigstdev[v];
+      }
+
+      for(int v=0;v<b0_indices.size();v++)
+      {
+          check_array[b0_indices[v]] = -1;
+      }
+
+
+
+      int Nb0s = b0_indices.size();
+      int nn = 0;
+
+
+
+      std::vector<int> outlier_index_original;
+
+      int Noutliers=0;
+      for(int v=0;v<Nvols;v++)
+      {
+          if(check_array[v] > 0)
+          {
+              outlier_index_original.push_back(v);
+              Noutliers++;
+          }
+      }
+
+
+      if(Noutliers>0)
+      {
+          vnl_matrix<double> Bmatrix = design_matrix.extract(design_matrix.rows(),6,0,1);
+          Bmatrix = -Bmatrix;
+
+          double cn = check_condition_number(outlier_index_original,Bmatrix);
+
+          int new_Noutliers = outlier_index_original.size();
+
+          if(new_Noutliers>0)
+          {
+              outlier_index_original = check_gradient_direction(outlier_index_original,Bmatrix);
+          }
+      }
+
+
+
+      if(outlier_index_original.size()!=0)
+      {
+          vnl_vector<double> signal2(Nvols-outlier_index_original.size()), weight2(Nvols-outlier_index_original.size());
+          vnl_matrix<double> design_matrix2(Nvols-outlier_index_original.size(),7);
+
+
+          int cnt = -1;
+          for(int v=0;v<Nvols;v++)
+          {
+              bool is_outlier = false;
+              for(int v2=0;v2<outlier_index_original.size();v2++)
+              {
+                  if(v == outlier_index_original[v2])
+                  {
+                      is_outlier = true;
+                      break;
+                  }
+              }
+
+              if(!is_outlier)
+              {
+                  cnt++;
+
+                  signal2[cnt] = signal[v];
+                  design_matrix2.set_row(cnt,design_matrix.get_row(v));
+                  weight2[cnt] = 1./ sigstdev[v]/sigstdev[v];
+              }
+          }
+
+
+          for(int mama=0;mama<weight2.size();mama++)
+          {
+              weight2[mama] = sqrt(weight2[mama]);
+          }
+
+          my_struct.signal = &signal2;
+          my_struct.weights = &weight2;
+          my_struct.Bmat = &design_matrix2;
+
+          p[0]= curr_A0_estimate;
+          p[1]= result[0]*1000.;
+          p[2]= result[1]*1000.;
+          p[3]= result[2]*1000.;
+          p[4]= result[3]*1000.;
+          p[5]= result[4]*1000.;
+          p[6]= result[5]*1000.;
+
+
+          double  df= design_matrix2.rows()-7;
+
+          int status = mpfit(myNLLS_with_derivs, design_matrix2.rows(), 7, p, pars, &config, (void *) &my_struct, &my_results_struct);
+
+          CS_val = my_results_struct.bestnorm/df;
+
+          A0_estimate=p[0];
+
+          new_dt[0]=p[1]/1000.;
+          new_dt[1]=p[2]/1000.;
+          new_dt[2]=p[3]/1000.;
+          new_dt[3]=p[4]/1000.;
+          new_dt[4]=p[5]/1000.;
+          new_dt[5]=p[6]/1000.;
+
+      }
+      else
+      {
+          CS_val = -1;
+          A0_estimate=initial_A0_estimate;
+          new_dt[0]= initial_dt_estimate[0];
+          new_dt[1]= initial_dt_estimate[1];
+          new_dt[2]= initial_dt_estimate[2];
+          new_dt[3]= initial_dt_estimate[3];
+          new_dt[4]= initial_dt_estimate[4];
+          new_dt[5]= initial_dt_estimate[5];
+      }
+
+      outlier_index = outlier_index_original;
+
+      return new_dt;
+
+
+}
+
+
+
+
+
+float DTIModel::ComputeMedianB0MeanStDev(std::vector<int> b0_indices, float &median_signal_b0_std)
+{
+    std::vector<ImageType3D::Pointer> b0_images;
+    for(int v=0;v<b0_indices.size();v++)
+    {
+        ImageType3D::Pointer curr_b0_image = dwi_data[b0_indices[v]];
+        b0_images.push_back(curr_b0_image);
+    }
+
+
+    ImageType3D::Pointer b0_image = b0_images[0];
+
+    itk::ImageRegionIteratorWithIndex <ImageType3D> it(b0_image,b0_image->GetLargestPossibleRegion());
+    it.GoToBegin();
+    std::vector<float> b0vals,b0stdevs;
+    while(!it.IsAtEnd())
+    {
+       ImageType3D::IndexType index = it.GetIndex();
+       float mask_val = mask_img->GetPixel(index);
+       if(mask_val !=0)
+       {
+           double avg_b0_val=0;
+           for(int v=0;v<b0_indices.size();v++)
+           {
+               avg_b0_val += b0_images[v]-> GetPixel(index);
+           }
+           avg_b0_val/= b0_indices.size();
+           b0vals.push_back(avg_b0_val);
+
+           double var=0;
+           for(int v=0;v<b0_indices.size();v++)
+           {
+                double val =b0_images[v]-> GetPixel(index);
+                var+=(val - avg_b0_val)*(val - avg_b0_val);
+           }
+
+           double avg_stdev= sqrt(var/b0_indices.size());
+           b0stdevs.push_back(avg_stdev);
+
+       }
+
+       ++it;
+   }
+
+   float median_signal_b0 = median(b0vals);
+   median_signal_b0_std= median(b0stdevs);
+
+   return median_signal_b0;
+
+}
+
+
+
+void DTIModel::EstimateTensorRESTORE()
+{
+
+    if(!noise_img)
+    {
+        std::cerr<<"RESTORE fitting requires a noise image to be present. Currently, it does not exist..."<<std::endl;
+        std::cerr<<"Exiting..."<<std::endl;
+        exit(EXIT_FAILURE);
+    }
+    if(!mask_img)
+    {
+        std::cerr<<"RESTORE fitting requires a mask image to be present. Currently, it is not provided..."<<std::endl;
+        std::cerr<<"Exiting..."<<std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+
+
+    // compute the median noise value computed by MPPCA  within a brain mask
+    float median_noise_val=0;
+    {
+        std::vector<float> noise_vals;
+        itk::ImageRegionIteratorWithIndex<ImageType3D> it2(noise_img,noise_img->GetLargestPossibleRegion());
+        for(it2.GoToBegin();!it2.IsAtEnd();++it2)
+        {
+            ImageType3D::IndexType ind3= it2.GetIndex();
+            if(mask_img->GetPixel(ind3))
+                noise_vals.push_back(it2.Get());
+        }
+        median_noise_val= median(noise_vals);
+    }
+
+
+    float THR=5.;   //how many sigmas is considered outlier
+
+
+    // Estimate the tensor with nonlinear regression first
+    EstimateTensorNLLS();
+
+
+
+    //depending on which bvalues to use we might not need all volumes
+    int Nvols=Bmatrix.rows();
+    std::vector<int> all_indices;
+    if(indices_fitting.size()>0)
+        all_indices= indices_fitting;
+    else
+    {
+        for(int ma=0;ma<Nvols;ma++)
+            all_indices.push_back(ma);
+    }
+
+
+
+    std::cout<<"Computing Tensors NLLS RESTORE..."<<std::endl;
+
+    //Create the weight image if it is not provided
+    if(this->weight_imgs.size()==0)
+    {
+        this->weight_imgs.resize(Nvols);
+        for(int v=0;v<Nvols;v++)
+        {
+            this->weight_imgs[v]=ImageType3D::New();
+            this->weight_imgs[v]->SetRegions(A0_img->GetLargestPossibleRegion());
+            this->weight_imgs[v]->Allocate();
+            this->weight_imgs[v]->SetSpacing(A0_img->GetSpacing());
+            this->weight_imgs[v]->SetOrigin(A0_img->GetOrigin());
+            this->weight_imgs[v]->SetDirection(A0_img->GetDirection());
+            this->weight_imgs[v]->FillBuffer(1.);
+        }
+    }
+
+
+
+    ImageType3D::SizeType size = dwi_data[0]->GetLargestPossibleRegion().GetSize();
+
+
+    //Optimization parameters
+    mp_config_struct config;
+    config.maxiter=500;
+    config.ftol=1E-10;
+    config.xtol=1E-10;
+    config.gtol=1E-10;
+    config.epsfcn=MP_MACHEP0;
+    config.stepfactor=100;
+    config.covtol=1E-14;
+    config.maxfev=0;
+    config.nprint=1;
+    config.douserscale=0;
+    config.nofinitecheck=0;
+
+
+    //treat b=0s a little differently.  compute the median standard deviation of b0s
     vnl_vector<double> bvals= Bmatrix.get_column(0)+Bmatrix.get_column(3)+Bmatrix.get_column(5);
     double min_bval= bvals.min_value();
     std::vector<int> b0_indices;
-    for(int v=0;v<DT_indices.size();v++)
+    for(int v=0;v<all_indices.size();v++)
     {
-        int vol = DT_indices[v];
+        int vol = all_indices[v];
         double bval = bvals[vol];
         if ( fabs(bval-min_bval) < (0.05*min_bval+2)  )
             b0_indices.push_back(v);
     }
     float median_signal_b0_std=1;
-    float median_signal_b0 = ComputeMedianB0MeanStDev(median_signal_b0_std);
+    float median_signal_b0 = ComputeMedianB0MeanStDev(b0_indices, median_signal_b0_std);
+    float noise_kappa=1.;
+
+
 
 
     #pragma omp parallel for
     for(int k=0;k<size[2];k++)
     {
-        #ifndef NOTORTOISE
-        TORTOISE::EnableOMPThread();
-        #endif
         ImageType3D::IndexType ind3;
         ind3[2]=k;
-
 
         for(int j=0;j<size[1];j++)
         {
@@ -775,12 +1349,23 @@ void DTIModel::EstimateTensorRESTORE()
                 if(mask_img && mask_img->GetPixel(ind3)==0)
                     continue;
 
+                //compute the chi-squared value of the initial fit.
+                //nominator comes from the residuals
+                //denominator comes from the estimated noise by MPPCA
+                double CS_val = CS_img->GetPixel(ind3);
+                double curr_noise_val=noise_img->GetPixel(ind3);
+                if(curr_noise_val<median_noise_val/3.)
+                    curr_noise_val=median_noise_val;
+                CS_val/= curr_noise_val * curr_noise_val;
+
+
+
                 std::vector<int> curr_all_indices;
                 if(this->weight_imgs.size())
                 {
                     for(int v=0;v<all_indices.size();v++)
                     {
-                        int vol_id= curr_all_indices[v];
+                        int vol_id= all_indices[v];
                         if(this->weight_imgs[vol_id]->GetPixel(ind3)>0)
                             curr_all_indices.push_back(vol_id);
                     }
@@ -790,18 +1375,31 @@ void DTIModel::EstimateTensorRESTORE()
                     curr_all_indices=all_indices;
                 }
 
-                vnl_vector<double> curr_signal(curr_all_indices.size());
-                vnl_vector<double> curr_weights(curr_all_indices.size(),1.);
+
+                vnl_vector<double> signal(curr_all_indices.size());
+                vnl_vector<double> weights(curr_all_indices.size(),1.);
                 vnl_matrix<double> curr_design_matrix(curr_all_indices.size(),7);
+                vnl_vector<double> curr_sigstdev(curr_all_indices.size(),1.);
 
                 int degrees_of_freedom= curr_all_indices.size()-7;
                 double robust_thresh_chi_confidence=3.0;
                 double robust_thresh_chi = 1.0 + robust_thresh_chi_confidence*sqrt(2.0/degrees_of_freedom) ;
 
+                if(CS_val <= robust_thresh_chi )
+                    continue;
+
+
+                bool broken_voxel=false;
+                vnl_vector<double> sigstdev(curr_all_indices.size(),1.);
                 for(int vol=0;vol<curr_all_indices.size();vol++)
                 {
+                    curr_sigstdev[vol]=curr_noise_val;
+
                     int vol_id= curr_all_indices[vol];
                     double nval = dwi_data[vol_id]->GetPixel(ind3);
+
+
+                    //fix artifactual signals
                     if(nval <=0)
                     {
                         std::vector<float> data_for_median;
@@ -832,14 +1430,19 @@ void DTIModel::EstimateTensorRESTORE()
                         else
                         {
                             nval= 1E-3;
+                            broken_voxel=true;
                         }
                     }
+
+
                     signal[vol] = nval;
+                    curr_design_matrix(vol,0)=1;
                     if(this->weight_imgs.size())
                     {
                         weights[vol] =this->weight_imgs[vol_id]->GetPixel(ind3);
                     }
-                     curr_design_matrix(vol,0)=1;
+
+                    // consider the gradient nonlinearity information and generate voxelwise Bmatrices
                      if(graddev_img.size())
                      {
                          vnl_matrix_fixed<double,3,3> L, B;
@@ -881,60 +1484,73 @@ void DTIModel::EstimateTensorRESTORE()
 
                          }
                      }
+
+
+
                 } //for vol
 
-                DTImageType::PixelType dt_vec= this->output_img->GetPixel(ind3);
-                double p[7];
-                p[0]= this->A0_img->GetPixel(ind3);
-                p[1]= dt_vec[0]*1000.;
-                p[2]= dt_vec[1]*1000.;
-                p[3]= dt_vec[2]*1000.;
-                p[4]= dt_vec[3]*1000.;
-                p[5]= dt_vec[4]*1000.;
-                p[6]= dt_vec[5]*1000.;
+                if(broken_voxel)
+                    continue;
 
-                vars_struct my_struct;
-                my_struct.useWeights=true;
-
-                mp_result_struct my_results_struct;
-                vnl_vector<double> my_resids(curr_all_indices.size());
-                my_results_struct.resid= my_resids.data_block();
-                my_results_struct.xerror=nullptr;
-                my_results_struct.covar=nullptr;
-                my_struct.signal= &signal;
-                my_struct.weights=&weights;
-                my_struct.Bmat= &curr_design_matrix;
-
-                int status = mpfit(myNLLS_with_derivs, curr_design_matrix.rows(), 7, p, pars, &config, (void *) &my_struct, &my_results_struct);
-
-                double degrees_of_freedom= curr_all_indices.size()-7;
-                CS_img->SetPixel(ind3,my_results_struct.bestnorm/degrees_of_freedom);
-
-                dt_vec[0]= p[1]/1000.;
-                dt_vec[1]= p[2]/1000.;
-                dt_vec[2]= p[3]/1000.;
-                dt_vec[3]= p[4]/1000.;
-                dt_vec[4]= p[5]/1000.;
-                dt_vec[5]= p[6]/1000.;
-
-
-                if(p[1]> 3.2 || p[4] > 3.2 || p[6]>3.2)  //FLOW ARTIFACT
+                double mn=0;
+                for(int v=0;v<b0_indices.size();v++)
                 {
-                    dt_vec= output_img->GetPixel(ind3);
+                    mn+=dwi_data[b0_indices[v]]->GetPixel(ind3);
+                }
+                mn/=b0_indices.size();
+                double signal_ratio = mn / median_signal_b0;
+
+
+                if(b0_indices.size() !=1)
+                {
+                   if(signal_ratio >1)
+                   {
+                       for(int v=0;v<b0_indices.size();v++)
+                       {
+                           curr_sigstdev[b0_indices[v]] = noise_kappa * signal_ratio* median_signal_b0_std;
+                       }
+                   }
+                }
+                for(int mm=0;mm<curr_sigstdev.size();mm++)
+                {
+                    if(curr_sigstdev[mm]==0)
+                    {
+                        if(curr_noise_val!=0)
+                            curr_sigstdev=curr_noise_val;
+                        else
+                            broken_voxel=true;
+                    }
+                }
+                if(broken_voxel)
+                    continue;
+
+
+                //RESTORE fit a single voxel
+                double A0_estimate;
+                std::vector<int> outlier_index;
+                double CS_value=0;
+                DTImageType::PixelType dt_vec = RobustFit(curr_design_matrix,signal, A0_img->GetPixel(ind3), output_img->GetPixel(ind3),  curr_sigstdev,
+                                                          b0_indices,A0_estimate,outlier_index,CS_value,THR);
+
+                if(CS_value<0)
+                    CS_value=CS_val;
+
+                output_img->SetPixel(ind3,dt_vec);
+                A0_img->SetPixel(ind3,A0_estimate);
+                CS_img->SetPixel(ind3,CS_value);
+
+                //At the end, have the weights binary. Either inlier or  outlier
+                for(int v=0;v<outlier_index.size();v++)
+                {
+                    this->weight_imgs[outlier_index[v]]->SetPixel(ind3,0.);
                 }
 
-                 if(p[2]>1.1 || p[3]> 1.1 || p[5]>1.1)  //FLOW ARTIFACT
-                 {
-                     dt_vec= output_img->GetPixel(ind3);
-                 }
-
-                 output_img->SetPixel(ind3,dt_vec);
-                 A0_img->SetPixel(ind3,p[0]);
             } //for i
         } //for j
     } //for k
-*/
 }
+
+
 
 
 

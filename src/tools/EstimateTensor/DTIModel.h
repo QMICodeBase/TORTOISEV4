@@ -70,10 +70,17 @@ private:
     void EstimateTensorWLLSDiagonal();
     void EstimateTensorRESTORE();
 
+    double check_condition_number(std::vector<int> &outlier_index, vnl_matrix<double> Bmatrix);
+    std::vector<int> check_gradient_direction(std::vector<int> outlier_index_original,vnl_matrix<double> Bmatrix);
+    float ComputeMedianB0MeanStDev(std::vector<int> b0_indices, float &median_signal_b0_std);
+    DTImageType::PixelType  RobustFit(vnl_matrix<double> curr_design_matrix,vnl_vector<double> signal, double initial_A0_estimate,
+                                      DTImageType::PixelType initial_dt_estimate1,  vnl_vector<double> sigstdev,
+                                      std::vector<int> &b0_indices,double &A0_estimate,std::vector<int> &outlier_index,double &CS_val,float THR);
 
 private:
 
-    std::string fitting_mode;
+    std::string fitting_mode;    
+
     ImageType3D::Pointer CS_img{nullptr};
     ImageType3D::Pointer VF_img{nullptr};
     ImageType3D::Pointer VF_img2{nullptr};

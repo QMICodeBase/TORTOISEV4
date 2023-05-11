@@ -710,6 +710,47 @@ void TORTOISE::Process()
             std::ifstream json_file(this->proc_infos[PE].json_name);
             json_file >> this->my_jsons[PE];
             json_file.close();
+
+            if(this->my_jsons[PE]["PhaseEncodingDirection"]==json::value_t::null)
+            {
+                if(this->my_jsons[PE]["PhaseEncodingAxis"]!=json::value_t::null)
+                {
+                    this->my_jsons[PE]["PhaseEncodingDirection"]=this->my_jsons[PE]["PhaseEncodingAxis"];
+                }
+                else
+                {
+                    if(this->my_jsons[PE]["InPlanePhaseEncodingDirectionDICOM"]!=json::value_t::null)
+                    {
+                        if(this->my_jsons[PE]["InPlanePhaseEncodingDirectionDICOM"]=="COL")
+                        {
+                            this->my_jsons[PE]["PhaseEncodingDirection"]="j";
+                        }
+                        else
+                        {
+                            this->my_jsons[PE]["PhaseEncodingDirection"]="i";
+                        }
+                    }
+                    else
+                    {
+                        (*stream)<<"Phase encoding information not present in JSON file. Create a new json file for the dataset..."<<std::endl;
+                        (*stream)<<"Exiting"<<std::endl;
+                        exit(EXIT_FAILURE);
+                    }
+                }
+            }
+
+            if(this->my_jsons[PE]["PartialFourier"]==json::value_t::null)
+            {
+                if(this->my_jsons[PE]["PercentSampling"]!=json::value_t::null)
+                {
+                    int ps= this->my_jsons[PE]["PercentSampling"];
+                    float psf= 1.*ps/100;
+
+                    this->my_jsons[PE]["PartialFourier"]=psf;
+                }
+                else
+                    this->my_jsons[PE]["PartialFourier"]=1;
+            }
         }
     }
 

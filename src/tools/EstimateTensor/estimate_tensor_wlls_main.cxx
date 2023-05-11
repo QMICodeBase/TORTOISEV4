@@ -176,6 +176,11 @@ int main(int argc, char *argv[])
         }
     }
 
+    ImageType3D::Pointer noise_img=nullptr;
+    std::string noise_name= input_name.substr(0,input_name.rfind(".nii")) + "_noise.nii";
+    if(fs::exists(noise_name))
+        noise_img= readImageD<ImageType3D>(noise_name);
+
 
 
 
@@ -190,6 +195,7 @@ int main(int argc, char *argv[])
     dti_estimator.SetVolIndicesForFitting(bindices);
     dti_estimator.SetFittingMode(regresion_mode);
     dti_estimator.SetFreeWaterDiffusivity(parser->getFreeWaterDiffusivity());
+    dti_estimator.SetNoiseImg(noise_img);
     dti_estimator.PerformFitting();
 
 
