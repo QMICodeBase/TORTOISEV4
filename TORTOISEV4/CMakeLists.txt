@@ -233,6 +233,9 @@ target_link_libraries(CombineDWIs ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 add_executable(CombineDWIsWithBmatrix ../src/tools/CombineDWIs/combine_dwis_with_bmatrix_main.cxx  ${SOURCES})
 target_link_libraries(CombineDWIsWithBmatrix ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
+add_executable(Combine4DImages ../src/tools/CombineDWIs/combine_4dimages.cxx  ${SOURCES})
+target_link_libraries(Combine4DImages ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
 
 add_executable(ExtractDWISubset ../src/tools/ExtractDWISubset/extract_dwi_subset.cxx   ../src/tools/ExtractDWISubset/extract_dwi_subset_parser.cxx ${SOURCES})
 target_link_libraries(ExtractDWISubset ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
