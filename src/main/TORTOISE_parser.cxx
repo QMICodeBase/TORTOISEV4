@@ -189,6 +189,15 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
         this->AddOption( option );
     }
 
+    {
+        std::string description = std::string( "File name for the b=0 mask image. Optional. For in-vivo human brain, this is not needed. For other organs, or animal data, please provide it.  " );
+
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "b0_mask_img");
+        option->SetDescription( description );
+        option->SetModule(0);
+        this->AddOption( option );
+    }
 
 
 
@@ -1002,5 +1011,15 @@ int TORTOISE_PARSER::getPOW()
         return atoi(option->GetFunction(0)->GetName().c_str());
     else
        return 6;
+
+}
+
+std::string TORTOISE_PARSER::getB0MaskName()
+{
+    OptionType::Pointer option = this->GetOption( "b0_mask_img");
+    if(option->GetNumberOfFunctions())
+        return option->GetFunction(0)->GetName();
+    else
+       return "";
 
 }

@@ -14,7 +14,7 @@
 using  TransformType=itk::OkanQuadraticTransform<double,3,3>;
 
 
-TransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string phase, MeccSettings *mecc_settings, bool initialize,std::vector<float> lim_arr, TransformType::Pointer minit_trans=nullptr )
+TransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string phase, MeccSettings *mecc_settings, bool initialize,std::vector<float> lim_arr, int vol,  TransformType::Pointer minit_trans=nullptr )
 {    
     int NITK= TORTOISE::GetAvailableITKThreadFor();
 
@@ -104,9 +104,9 @@ TransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img, ImageTyp
         grd_scales[19]=  2*5.*res[2]*1. /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    );
         grd_scales[20]= 2* 5.*res[2]*1. /   ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    ) / ( sz[0]/2.*res[0]    );
 
-        grd_scales[21]= res[0]*1.25;
-        grd_scales[22]= res[1]*1.25;
-        grd_scales[23]= res[2]*1.25;
+        grd_scales[21]= res[0]/1.25;
+        grd_scales[22]= res[1]/1.25;
+        grd_scales[23]= res[2]/1.25;
     }  
 
     if(initialize)
@@ -178,11 +178,13 @@ TransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img, ImageTyp
           {
           std::cerr << "ExceptionObject caught inprerigid:!" << std::endl;
           std::cerr << err << std::endl;
+          std::cerr<< "In volume: "<< vol<<std::endl;
+          std::cerr<< initialTransform->GetParameters()<<std::endl;
           return nullptr;
           }        
     }    
 
-    TransformType::ParametersType finalParameters=initialTransform->GetParameters();
+    TransformType::ParametersType finalParameters=initialTransform->GetParameters();    
 
         {
             using OptimizerType= itk::DIFFPREPGradientDescentOptimizerv4<double> ;
@@ -232,6 +234,8 @@ TransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img, ImageTyp
               {
               std::cerr << "ExceptionObject caught !" << std::endl;
               std::cerr << err << std::endl;
+              std::cerr<< "In volume: "<< vol<<std::endl;
+              std::cerr<< initialTransform->GetParameters()<<std::endl;
               return nullptr;
               }            
             finalParameters =  initialTransform->GetParameters();

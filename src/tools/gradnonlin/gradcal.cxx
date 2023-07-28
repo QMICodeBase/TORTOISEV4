@@ -118,10 +118,20 @@ void GRADCAL::read_Siemens_format(std::string gradFilename){
     size_t posA1, posA2, posA3;
     int tempidx, idx1, idx2;
     float coeftemp;
+    float R0=250;
     while (!gradFile.eof())
     {
-        std::getline(gradFile, input,'\n');                
-        //position of A(int, int) or  B(int, int)
+        std::getline(gradFile, input,'\n');
+
+        int okpos= input.find("= R0");
+
+        if(okpos!=std::string::npos)
+        {
+            std::string sub= input.substr(1,5);
+            R0=atof(sub.c_str())*1000.;
+        }
+
+        //position of A(int, int) or  B(int, int)                        
         posA1 = input.find_first_of("(", 3, 3);
         if ((posA1 != std::string::npos) && (posA1 <10))
         {
@@ -167,6 +177,7 @@ void GRADCAL::read_Siemens_format(std::string gradFilename){
             }
         }
     }
+    grads_cal.R0=R0;
     gradFile.close();
     grads_cal.gradType="siemens";
 

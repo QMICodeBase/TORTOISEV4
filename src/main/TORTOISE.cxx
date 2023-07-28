@@ -414,6 +414,8 @@ void TORTOISE::UpdateSettingsFromCommandLine()
     RegistrationSettings::get().setValue<std::string>("step",parser->getStartStep());
     RegistrationSettings::get().setValue<bool>("do_QC",parser->getDoQC());
     RegistrationSettings::get().setValue<bool>("remove_temp",parser->getRemoveTempFolder());
+    RegistrationSettings::get().setValue<std::string>("b0_mask_img",parser->getB0MaskName());
+
 
     RegistrationSettings::get().setValue<std::string>("denoising",parser->getDenoising());
     RegistrationSettings::get().setValue<int>("denoising_kernel_size",parser->getDenoisingKernelSize());
@@ -879,7 +881,17 @@ void TORTOISE::DriftCorrect(std::string nii_name)
     //All tests passed. Doing signal drift estimation
 
     ImageType3D::Pointer b0_img = read_3D_volume_from_4D(nii_name,b0_ids[0]);
-    ImageType3D::Pointer mask_img= create_mask(b0_img,nullptr);
+    ImageType3D::Pointer mask_img= nullptr;
+    std::string b0_mask_img_fname = RegistrationSettings::get().getValue<std::string>("b0_mask_img");
+    if(b0_mask_img_fname=="")
+    {
+        mask_img= create_mask(b0_img,nullptr);
+    }
+    else
+    {
+        mask_img=readImageD<ImageType3D>(b0_mask_img_fname);
+    }
+
 
     std::string inc_name = nii_name.substr(0,nii_name.rfind(".nii")) + "_inc.nii";
 
@@ -998,7 +1010,8 @@ void TORTOISE::AlignB0ToReorientation()
         else
             b0_img= read_3D_volume_from_4D(this->proc_infos[0].nii_name,0);
 
-        b0_to_str_trans = RigidRegisterImagesEuler( target_img,  b0_img,parser->getRigidMetricType(),parser->getRigidLR());
+        //b0_to_str_trans = RigidRegisterImagesEuler( target_img,  b0_img,parser->getRigidMetricType(),parser->getRigidLR());
+        b0_to_str_trans = RigidRegisterImagesEuler( target_img,  b0_img,"MI",parser->getRigidLR());
     }
     else
     {

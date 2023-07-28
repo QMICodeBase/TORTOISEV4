@@ -74,7 +74,7 @@ private:            //Subfunctions the main processing functions use
     std::vector< std::vector<ImageType3D::Pointer> >  GenerateTransformedInterpolatedData();
     void GenerateGradNonlinOutput();
 
-    InternalMatrixType ComputeJacobianAtIndex(DisplacementFieldType::Pointer disp_field, DisplacementFieldType::IndexType index);
+
     ImageType3D::Pointer UnObliqueImage(ImageType3D::Pointer img);
 
     std::vector<ImageType3D::Pointer> ComputeVBMatImgFromCoeffs(int UPDOWN);

@@ -17,10 +17,20 @@ class CUDAIMAGE
 public:
     using DataType=float;
     using ImageType3D=itk::Image<DataType,3>;
+    using ImageType4D=itk::Image<DataType,4>;
     typedef itk::DisplacementFieldTransform<double,3> DisplacementTransformType;
     typedef itk::DisplacementFieldTransform<float,3> DisplacementTransformTypeFloat;
     typedef DisplacementTransformType::DisplacementFieldType DisplacementFieldType;
     typedef DisplacementTransformTypeFloat::DisplacementFieldType DisplacementFieldTypeFloat;
+
+    using  InternalMatrixType=vnl_matrix_fixed< double, 3, 3 >;
+    using DTMatrixImageType = itk::Image<InternalMatrixType,3>;
+
+    using TensorVectorType = itk::Vector<float,6>;
+    using TensorVectorImageType = itk::Image<TensorVectorType,3>;
+
+
+
 
     using Self = CUDAIMAGE;
     using Pointer = std::shared_ptr<Self>;
@@ -37,8 +47,10 @@ public:
     void DuplicateFromCUDAImage(CUDAIMAGE::Pointer cp_img);
     void SetImageFromITK(ImageType3D::Pointer itk_image, bool create_texture=false);
     void SetImageFromITK(DisplacementFieldType::Pointer itk_field);    
+    void SetTImageFromITK(DTMatrixImageType::Pointer tensor_img);
 
     ImageType3D::Pointer CudaImageToITKImage();
+    TensorVectorImageType::Pointer CudaImageToITKImage4D();
     DisplacementFieldType::Pointer CudaImageToITKField();
 
 

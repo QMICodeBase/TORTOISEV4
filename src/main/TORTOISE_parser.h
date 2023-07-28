@@ -67,6 +67,8 @@ public:
     int getOutlierNumberOfResidualClusters();
     int getOutlierReplacementModeAggessive();
     int getPOW();
+    std::string getB0MaskName();
+
 
     int getNiter();
     int getDTIBval();

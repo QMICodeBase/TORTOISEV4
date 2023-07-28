@@ -571,13 +571,13 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
                             TORTOISE::ReleaseGPU();
                         }
                         else
-                            curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
+                            curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol );
                     }
                     else
-                            curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
+                            curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol );
 
-                #else
-                        curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
+                #else                        
+                        curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol );
                 #endif
 
 
@@ -833,14 +833,17 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
     std::vector<int> volumes_per_shell;  volumes_per_shell.resize(shells.size(),0);
     for(int vol=0;vol<Nvols; vol++)
     {
+        float minval=1E10;
+        int minid=-1;
         for(int s=0;s<shells.size();s++)
         {
-            if(fabs(bvals[vol] -shells[s])<20)
+            if(fabs(bvals[vol] -shells[s])<minval)
             {
-                volumes_per_shell[s]++;
-                break;
+                minval=fabs(bvals[vol] -shells[s]);
+                minid=s;
             }
         }
+        volumes_per_shell[minid]++;
     }
 
 
@@ -854,15 +857,16 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
         //Outliers are computed shell by shell so
         //Get shell id of the volume.
         int shell_id=-1;
+        float minval=1E10;
         for(int s=0;s<shells.size();s++)
         {
-            if(fabs(bvals[vol] -shells[s])<20)
+            if(fabs(bvals[vol] -shells[s])<minval)
             {
+                minval=fabs(bvals[vol] -shells[s]);
                 shell_id=s;
-                shell_ids[vol]=shell_id;
-                break;
             }
         }
+        shell_ids[vol]=shell_id;
 
 
         using DupType =itk::ImageDuplicator<ImageType3D>;
@@ -1233,6 +1237,65 @@ void DIFFPREP::MotionAndEddy()
 
 
 
+/*
+        std::ofstream trans_text_file("/qmi_home/irfanogo/Desktop/BIOWULF_HCPDWI/processed_data_200_T4_062623/data/100610/100610_LR_temp_proc/aaa.txt");
+        for( int vol=0; vol<Nvols;vol++)
+        {
+            if(vol==this->b0_vol_id)
+            {
+                OkanQuadraticTransformType::Pointer dummy= OkanQuadraticTransformType::New();
+                dummy->SetPhase(this->PE_string);
+                dummy->SetIdentity();
+                trans_text_file<<dummy->GetParameters()<<std::endl;
+            }
+            else
+            {
+                trans_text_file<<dwi_transforms[vol]->GetParameters()<<std::endl;
+            }
+        }
+        trans_text_file.close();
+*/
+
+/*
+        this->dwi_transforms.resize(Nvols);
+        std::string moteddy_trans_name="/qmi_home/irfanogo/Desktop/BIOWULF_HCPDWI/processed_data_200_T4_062623/data/100610/100610_LR_temp_proc/aaa.txt";
+
+            std::ifstream moteddy_text_file(moteddy_trans_name);
+            for( int vol=0; vol<Nvols;vol++)
+            {
+                std::string line;
+                std::getline(moteddy_text_file,line);
+
+                OkanQuadraticTransformType::Pointer quad_trans= OkanQuadraticTransformType::New();
+                quad_trans->SetPhase(this->PE_string);
+                quad_trans->SetIdentity();
+
+                OkanQuadraticTransformType::ParametersType params=quad_trans->GetParameters();
+                line=line.substr(1);
+                for(int p=0;p<OkanQuadraticTransformType::NQUADPARAMS;p++)
+                {
+                    int npos = line.find(", ");
+                    std::string curr_p_string = line.substr(0,npos);
+
+                    double val = atof(curr_p_string.c_str());
+                    params[p]=val;
+                    line=line.substr(npos+2);
+                }
+                quad_trans->SetParameters(params);
+                OkanQuadraticTransformType::ParametersType flags;
+                flags.SetSize(OkanQuadraticTransformType::NQUADPARAMS);
+                flags.Fill(0);
+                flags[0]=flags[1]=flags[2]=flags[3]=flags[4]=flags[5]=1;
+                quad_trans->SetParametersForOptimizationFlags(flags);
+                this->dwi_transforms[vol] ->AddTransform(quad_trans);
+            }
+            moteddy_text_file.close();
+
+*/
+
+
+
+
 
 
     } // IF NOT ITERATIVE WE ARE DONE
@@ -1493,6 +1556,73 @@ void DIFFPREP::MotionAndEddy()
              } //if s2v
 
 
+/*
+
+             {
+                 fs::path s2v_txt_path = "/qmi_home/irfanogo/Desktop/BIOWULF_HCPDWI/processed_data_200_T4_062623/data/100610/100610_LR_temp_proc/bbb.txt";
+                 std::ofstream s2v_text_file(s2v_txt_path.string().c_str());
+                 ImageType3D::SizeType sz= this->b0_mask_img->GetLargestPossibleRegion().GetSize();
+
+                 for( int vol=0; vol<Nvols;vol++)
+                 {
+                     for(int k=0;k<sz[2];k++)
+                     {
+                         s2v_text_file<< s2v_transformations[vol][k] ->GetParameters()<<std::endl;
+                     }
+                 }
+                 s2v_text_file.close();
+             }
+*/
+
+/*
+             std::string s2v_trans_name= "/qmi_home/irfanogo/Desktop/BIOWULF_HCPDWI/processed_data_200_T4_062623/data/100610/100610_LR_temp_proc/bbb.txt";
+             if(fs::exists(s2v_trans_name) )
+             {
+                 this->s2v_transformations.resize(Nvols);
+                 ImageType3D::Pointer first_vol= this->b0_mask_img;
+                 ImageType3D::SizeType sz= first_vol->GetLargestPossibleRegion().GetSize();
+
+                 std::ifstream s2v_text_file(s2v_trans_name);
+                 for( int vol=0; vol<Nvols;vol++)
+                 {
+                     this->s2v_transformations[vol].resize(sz[2]);
+
+                     for(int k=0;k<sz[2];k++)
+                     {
+                         std::string line;
+                         std::getline(s2v_text_file,line);
+
+                         OkanQuadraticTransformType::Pointer quad_trans= OkanQuadraticTransformType::New();
+                         quad_trans->SetPhase(this->PE_string);
+                         quad_trans->SetIdentity();
+
+                         OkanQuadraticTransformType::ParametersType params=quad_trans->GetParameters();
+                         line=line.substr(1);
+                         for(int p=0;p<OkanQuadraticTransformType::NQUADPARAMS;p++)
+                         {
+                             int npos = line.find(", ");
+                             std::string curr_p_string = line.substr(0,npos);
+
+                             double val = atof(curr_p_string.c_str());
+                             params[p]=val;
+                             line=line.substr(npos+2);
+                         }
+                         quad_trans->SetParameters(params);
+                         OkanQuadraticTransformType::ParametersType flags;
+                         flags.SetSize(OkanQuadraticTransformType::NQUADPARAMS);
+                         flags.Fill(0);
+                         flags[0]=flags[1]=flags[2]=flags[3]=flags[4]=flags[5]=1;
+                         quad_trans->SetParametersForOptimizationFlags(flags);
+                         s2v_transformations[vol][k]    = quad_trans;
+
+                     }
+                 }
+                 s2v_text_file.close();
+             }
+*/
+
+
+
              (*stream)<<std::endl<<std::endl;
 
              if(outlier_replacement)
@@ -1502,7 +1632,7 @@ void DIFFPREP::MotionAndEddy()
                  #pragma omp parallel for
                  for(int vol=0;vol<Nvols;vol++)
                  {
-                     TORTOISE::EnableOMPThread();
+                     TORTOISE::EnableOMPThread();                     
 
                      // Create the native_native (i.e. mot&eddy and s2v uncorrected)
                      // space image
@@ -1547,7 +1677,7 @@ void DIFFPREP::MotionAndEddy()
                                  native_native_synth_dwis[vol]->SetPixel(ind3,interp_val);
                              }
                          }
-                     }
+                     }                     
                      TORTOISE::DisableOMPThread();
                  } //for vol
 
@@ -1555,6 +1685,9 @@ void DIFFPREP::MotionAndEddy()
                  // AT this point, we have the synthesized data computed in EVERYTHING corrected space
                  // transformed back to everything UNCORRECTED space.
                  // so,  we can now check for outliers by statistical analysis.
+
+
+
 
                  this->native_weight_img = ReplaceOutliers(native_native_synth_dwis, native_native_raw_dwis,shells,bvals,TR_map);
                  (*stream)<<"Replacing outliers...Done!"<<std::endl;
@@ -2136,14 +2269,24 @@ std::vector<ImageType3D::Pointer> DIFFPREP::TransformRepolData(std::string nii_f
 
 void DIFFPREP::DPCreateMask()
 {
-    ImageType3D::Pointer b0_img = read_3D_volume_from_4D(this->nii_name, this->b0_vol_id);
-    bool is_human_brain = RegistrationSettings::get().getValue<bool>(std::string("is_human_brain"));
+    std::string b0_mask_img_fname = RegistrationSettings::get().getValue<std::string>("b0_mask_img");
 
-    ImageType3D::Pointer noise_img=nullptr;
-    if(!is_human_brain)
-        noise_img= readImageD<ImageType3D>(this->nii_name.substr(0,this->nii_name.rfind(".nii"))+std::string("_noise.nii"));
 
-    this->b0_mask_img= create_mask(b0_img,noise_img);
+    if(b0_mask_img_fname=="")
+    {
+        ImageType3D::Pointer b0_img = read_3D_volume_from_4D(this->nii_name, this->b0_vol_id);
+        bool is_human_brain = RegistrationSettings::get().getValue<bool>(std::string("is_human_brain"));
+
+        ImageType3D::Pointer noise_img=nullptr;
+        if(!is_human_brain)
+            noise_img= readImageD<ImageType3D>(this->nii_name.substr(0,this->nii_name.rfind(".nii"))+std::string("_noise.nii"));
+
+        this->b0_mask_img= create_mask(b0_img,noise_img);
+    }
+    else
+    {
+        this->b0_mask_img=readImageD<ImageType3D>(b0_mask_img_fname);
+    }
 }
 
 

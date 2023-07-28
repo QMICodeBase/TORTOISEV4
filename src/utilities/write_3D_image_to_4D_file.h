@@ -89,6 +89,12 @@ void write_3D_image_to_4D_file(typename itk::Image<PixelType,3>::Pointer img, st
         if(diff_sq>0.5)
             mismatch=1;
 
+
+        auto datatype = myio->GetComponentType();
+        if( (std::is_same<PixelType, float>::value) && (datatype!= itk::IOComponentEnum::FLOAT) )
+            mismatch=1;
+        if( (std::is_same<PixelType, char>::value) && (datatype!= itk::IOComponentEnum::CHAR) )
+            mismatch=1;
     }
 
     if(!file_exists || mismatch)

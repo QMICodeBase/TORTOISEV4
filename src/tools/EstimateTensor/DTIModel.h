@@ -77,6 +77,8 @@ private:
                                       DTImageType::PixelType initial_dt_estimate1,  vnl_vector<double> sigstdev,
                                       std::vector<int> &b0_indices,double &A0_estimate,std::vector<int> &outlier_index,double &CS_val,float THR);
 
+    vnl_matrix<double>  getCurrentBmatrix(ImageType3D::IndexType ind3,std::vector<int> curr_all_indices);
+
 private:
 
     std::string fitting_mode;    

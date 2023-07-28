@@ -46,6 +46,7 @@ using MAPImageType=itk::VectorImage<PixelDataType,3>;
 using DisplacementFieldType = itk::DisplacementFieldTransform<CoordType,3>::DisplacementFieldType;
 
 using  InternalMatrixType=vnl_matrix_fixed< double, 3, 3 >;
+using DTMatrixImageType = itk::Image<InternalMatrixType,3>;
 
 
 

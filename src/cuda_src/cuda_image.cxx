@@ -102,7 +102,7 @@ void CUDAIMAGE::DuplicateFromCUDAImage(CUDAIMAGE::Pointer cp_img)
     this->components_per_voxel=cp_img->components_per_voxel;
     this->Allocate();
 
-    cudaExtent copy_extent = make_cudaExtent(this->sz.x*sizeof(float),this->sz.y,this->sz.z);
+    cudaExtent copy_extent = make_cudaExtent(cp_img->components_per_voxel*this->sz.x*sizeof(float),this->sz.y,this->sz.z);
     cudaMemcpy3DParms copyParams = {0};
     copyParams.srcPtr = cp_img->getFloatdata();
     copyParams.dstPtr = this->getFloatdata();
@@ -186,6 +186,96 @@ void CUDAIMAGE::SetImageFromITK(DisplacementFieldType::Pointer itk_field)
     auto field2= filter->GetOutput();
 
     copy3DHostToPitchedPtr((float*)field2->GetBufferPointer(),PitchedFloatData,this->components_per_voxel*sz.x,sz.y,sz.z);
+}
+
+void CUDAIMAGE::SetTImageFromITK(DTMatrixImageType::Pointer tensor_img)
+{
+
+    this->dir = tensor_img->GetDirection();
+
+    this->orig.x= tensor_img->GetOrigin()[0];
+    this->orig.y= tensor_img->GetOrigin()[1];
+    this->orig.z= tensor_img->GetOrigin()[2];
+
+    this->spc.x=  tensor_img->GetSpacing()[0];
+    this->spc.y=  tensor_img->GetSpacing()[1];
+    this->spc.z=  tensor_img->GetSpacing()[2];
+
+    ImageType3D::SizeType itk_size = tensor_img->GetLargestPossibleRegion().GetSize();
+    sz.x=itk_size[0];
+    sz.y=itk_size[1];
+    sz.z=itk_size[2];
+
+    this->components_per_voxel=6;
+    this->Allocate();
+
+
+    float *temp_data= new float[sz.x*sz.y*sz.z*6];
+    itk::ImageRegionIteratorWithIndex<DTMatrixImageType> it(tensor_img,tensor_img->GetLargestPossibleRegion());
+    for(it.GoToBegin();!it.IsAtEnd();++it)
+    {
+        DTMatrixImageType::IndexType ind3= it.GetIndex();
+        DTMatrixImageType::PixelType mat =it.Get();
+
+        long lin_ind = ind3[2]*sz.y*sz.x*6;
+        lin_ind+=ind3[1]*sz.x*6;
+        lin_ind+=ind3[0]*6;
+
+        temp_data[lin_ind+0] = mat(0,0);
+        temp_data[lin_ind+1] = mat(0,1);
+        temp_data[lin_ind+2] = mat(0,2);
+        temp_data[lin_ind+3] = mat(1,1);
+        temp_data[lin_ind+4] = mat(1,2);
+        temp_data[lin_ind+5] = mat(2,2);
+    }
+
+
+    copy3DHostToPitchedPtr((float*)temp_data,PitchedFloatData,this->components_per_voxel*sz.x,sz.y,sz.z);
+
+    delete[] temp_data;
+
+}
+
+
+CUDAIMAGE::TensorVectorImageType::Pointer CUDAIMAGE::CudaImageToITKImage4D()
+{
+    ImageType3D::SizeType sz2;
+    sz2[0]= this->sz.x;
+    sz2[1]= this->sz.y;
+    sz2[2]= this->sz.z;
+    ImageType3D::IndexType start;
+    start.Fill(0);
+    ImageType3D::RegionType reg(start,sz2);
+
+    ImageType3D::PointType orig;
+    orig[0]= this->orig.x;
+    orig[1]= this->orig.y;
+    orig[2]= this->orig.z;
+
+    ImageType3D::SpacingType spc;
+    spc[0]= this->spc.x;
+    spc[1]= this->spc.y;
+    spc[2]= this->spc.z;
+
+    float * itk_image_data2 = new float[(long)sz2[0]*sz2[1]*sz2[2]*this->components_per_voxel];
+    copy3DPitchedPtrToHost(PitchedFloatData,itk_image_data2,this->components_per_voxel*sz.x,sz.y,sz.z);
+
+    TensorVectorImageType::PixelType* itk_image_data = (TensorVectorImageType::PixelType*)itk_image_data2 ;
+
+    typedef itk::ImportImageFilter< TensorVectorImageType::PixelType , 3 >   ImportFilterType;
+    ImportFilterType::Pointer importFilter = ImportFilterType::New();
+    importFilter->SetRegion( reg );
+    importFilter->SetOrigin( orig );
+    importFilter->SetSpacing( spc );
+    importFilter->SetDirection(dir);
+
+    const bool importImageFilterWillOwnTheBuffer = true;
+    importFilter->SetImportPointer( itk_image_data, (long)sz2[0]*sz2[1]*sz2[2]*this->components_per_voxel,    importImageFilterWillOwnTheBuffer );
+    importFilter->Update();
+    TensorVectorImageType::Pointer itk_image_float= importFilter->GetOutput();
+
+    return itk_image_float;
+
 }
 
 

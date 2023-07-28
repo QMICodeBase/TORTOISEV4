@@ -464,7 +464,7 @@ float  DRBUDDI_PARSERBASE::getRigidLR()
     if(option->GetNumberOfFunctions())
          return atof(option->GetFunction(0)->GetName().c_str());
     else
-        return 0.5;
+        return 0.25;
 
 }
 int  DRBUDDI_PARSERBASE::getDWIBvalue()

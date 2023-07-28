@@ -35,6 +35,7 @@
 #include "itkBinaryErodeImageFilter.h"
 
 
+#include "../tools/DRTAMAS/DRTAMAS_utilities_cp.h"
 
 #include "vnl/vnl_cross.h"
 
@@ -190,11 +191,11 @@ ImageType3D::Pointer FINALDATA::GenerateFirstStructural()
 
     if(!target_img)
     {
-        if(fs::exists(this->temp_folder + std::string("/b0_corrected_final.nii")))
-            target_img = readImageD<ImageType3D>(this->temp_folder + std::string("/b0_corrected_final.nii"));
-        else if(fs::exists(this->temp_folder + std::string("/blip_up_b0_corrected_JAC.nii")))
-            target_img= readImageD<ImageType3D>(this->temp_folder + std::string("/blip_up_b0_corrected_JAC.nii"));
-        else
+        //if(fs::exists(this->temp_folder + std::string("/b0_corrected_final.nii")))
+        //    target_img = readImageD<ImageType3D>(this->temp_folder + std::string("/b0_corrected_final.nii"));
+        //else if(fs::exists(this->temp_folder + std::string("/blip_up_b0_corrected_JAC.nii")))
+        //    target_img= readImageD<ImageType3D>(this->temp_folder + std::string("/blip_up_b0_corrected_JAC.nii"));
+        //else
             target_img= read_3D_volume_from_4D(this->data_names[0],0);
     }
 
@@ -448,7 +449,7 @@ void FINALDATA::ReadOrigTransforms()
     float THR=RegistrationSettings::get().getValue<float>("outlier_prob");
 
 
-    if(fs::exists(this->temp_folder +"/b0_to_str_rigidtrans.hdf5"))
+    if(fs::exists(this->temp_folder +"/b0_to_str_rigidtrans.hdf5") && parser->getStructuralNames().size()!=0)
     {
         using TransformReaderType =itk::TransformFileReaderTemplate< double > ;
         TransformReaderType::Pointer reader = TransformReaderType::New();
@@ -1256,7 +1257,19 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
             raw_data[vol]= read_3D_volume_from_4D(data_names[PE],vol);
 
             if(vol==0)
-                orig_mask2= create_mask(raw_data[0]);
+            {
+                std::string b0_mask_img_fname = RegistrationSettings::get().getValue<std::string>("b0_mask_img");
+
+                if(b0_mask_img_fname=="")
+                {
+                    orig_mask2= create_mask(raw_data[0]);
+                }
+                else
+                {
+                    orig_mask2= readImageD<ImageType3D>(b0_mask_img_fname);
+                }
+
+            }
             if(this->native_weight_img[PE].size())
             {
                 ImageType3D::Pointer synth_img = read_3D_volume_from_4D(native_synth_name,vol);
@@ -1690,14 +1703,23 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
             //Get average b=0 image and mask it
             vnl_vector<double> bvals = Bmatrix.get_column(0) + Bmatrix.get_column(3)+ Bmatrix.get_column(5);
 
+            ImageType3D::Pointer orig_mask=nullptr;
+            std::string b0_mask_img_fname = RegistrationSettings::get().getValue<std::string>("b0_mask_img");
+            if(b0_mask_img_fname=="")
+            {
+                orig_mask= create_mask(raw_data[0]);
+            }
+            else
+            {
+                orig_mask=readImageD<ImageType3D>(b0_mask_img_fname);
+            }
+
+            orig_mask->SetDirection(this->native_weight_img[PE][0]->GetDirection());
+
             #pragma omp parallel for
             for(int vol=0;vol<Nvols[PE];vol++)
             {
                 TORTOISE::EnableOMPThread();
-
-
-                ImageType3D::Pointer orig_mask= create_mask(raw_data[0]);
-                orig_mask->SetDirection(this->native_weight_img[PE][vol]->GetDirection());
 
                 //Generate a final mask that includes both the brain mask and outlier mask
                 using FilterType = itk::MultiplyImageFilter<ImageType3D, ImageType3D, ImageType3D>;
@@ -2201,45 +2223,6 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
 
 
-
-InternalMatrixType FINALDATA::ComputeJacobianAtIndex(DisplacementFieldType::Pointer disp_field, DisplacementFieldType::IndexType index)
-{
-    InternalMatrixType A;
-    A.fill(0);
-
-    for(int d=0;d<3;d++)
-        if(index[d]<=0 || index[d]>= disp_field->GetLargestPossibleRegion().GetSize()[d]-1)
-            return A;
-
-
-
-    DisplacementFieldType::IndexType Nind=index;
-    for(int dim=0;dim<3;dim++)   // derivative w.r.t.
-    {
-        DisplacementFieldType::PixelType val,val1,val2;
-        Nind[dim]++;
-        val1 = disp_field->GetPixel(Nind);
-        disp_field->TransformPhysicalVectorToLocalVector(val1,val);
-        Nind[dim]-=2;
-        val1=disp_field->GetPixel(Nind);
-        disp_field->TransformPhysicalVectorToLocalVector(val1,val2);
-        val-=val2;
-        Nind[dim]++;
-        val*=0.5/disp_field->GetSpacing()[dim];
-
-        A.set_column(dim,val.GetVnlVector());
-    }
-
-  //  A= A* disp_field->GetDirection().GetVnlMatrix().transpose();
-
-
-
-
-
-    return A;
-}
-
-
 InternalMatrixType  FINALDATA::pixel_bmatrix(const GradCoef &E, ImageType3D::PointType point,const vnl_vector<double> &norms)
 {
     std::vector <int> xkeys = E.Xkeys;
@@ -2252,9 +2235,9 @@ InternalMatrixType  FINALDATA::pixel_bmatrix(const GradCoef &E, ImageType3D::Poi
     nzkey = zkeys.size()/2;
     na = nxkey + nykey + nzkey;
 
-    double x1 = point[0]/250.;
-    double y1 = point[1]/250.;
-    double z1 = point[2]/250.;
+    double x1 = point[0]/E.R0;
+    double y1 = point[1]/E.R0;
+    double z1 = point[2]/E.R0;
 
     double rr = std::sqrt(x1*x1 + y1 *y1 + z1*z1);
     double phi = std::atan2(y1,x1);
@@ -2276,6 +2259,7 @@ InternalMatrixType  FINALDATA::pixel_bmatrix(const GradCoef &E, ImageType3D::Poi
         ll = E.Xkeys.at(2*kk);
         mm = E.Xkeys.at(2*kk+1);
 
+
         int mma =abs(mm);
         if(E.gradType=="siemens" && mma>0 && ll>1)
         {
@@ -2294,12 +2278,15 @@ InternalMatrixType  FINALDATA::pixel_bmatrix(const GradCoef &E, ImageType3D::Poi
             continue;
         ll = E.Ykeys.at(2*kk);
         mm = E.Ykeys.at(2*kk+1);
+
+
         int mma =abs(mm);
         if(E.gradType=="siemens" && mma>0 && ll>1)
         {
             temp/= sqrt(2 * factorial(ll-mma) / factorial(ll+mma)) ;
             temp*=  sqrt(double((2 * ll + 1) * factorial(ll - mma)) / double(2. * factorial(ll + mma)));
         }
+
 
         axy+= temp * dshdx('X',ll, mm, rr,phi,zz,0 )/norms(1);
         ayy+= temp * dshdx('Y',ll, mm, rr, phi, zz,0)/norms(1);
@@ -2313,6 +2300,7 @@ InternalMatrixType  FINALDATA::pixel_bmatrix(const GradCoef &E, ImageType3D::Poi
         ll = E.Zkeys.at(2*kk);
         mm = E.Zkeys.at(2*kk+1);
 
+
         int mma =abs(mm);
         if(E.gradType=="siemens" && mma>0 && ll>1)
         {
@@ -2325,15 +2313,17 @@ InternalMatrixType  FINALDATA::pixel_bmatrix(const GradCoef &E, ImageType3D::Poi
         azz+= temp * dshdx('Z', ll, mm, rr, phi,zz,0)/norms(2);
     }
 
+    /*
+    axx= \del_f^x / \del x   ; axy= \del_f^y / \del x  ;  axz= \del_f^z / \del x
+    ayx= \del_f^x / \del y   ; ayy= \del_f^y / \del y  ;  ayz= \del_f^z / \del y
+    azx= \del_f^x / \del z   ; azy= \del_f^y / \del z  ;  azz= \del_f^z / \del z
+    */
 
     InternalMatrixType trans_mat;
     trans_mat(0,0)=axx; trans_mat(0,1)=axy; trans_mat(0,2)=axz;
     trans_mat(1,0)=ayx; trans_mat(1,1)=ayy; trans_mat(1,2)=ayz;
     trans_mat(2,0)=azx; trans_mat(2,1)=azy; trans_mat(2,2)=azz;
     trans_mat=trans_mat.transpose();
-
-
-
 
     /*
     vnl_matrix_fixed<double,6,6> trans_mat;
@@ -2347,7 +2337,6 @@ InternalMatrixType  FINALDATA::pixel_bmatrix(const GradCoef &E, ImageType3D::Poi
     */
 
     return  trans_mat;
-
 }
 
 
@@ -2382,10 +2371,17 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromCoeffs(int PE)
     ImageType3D::Pointer first_vol_grad=first_vol;
 
 
-    vnl_matrix<double> dicom_to_it_transformation(3,3);
-    dicom_to_it_transformation.set_identity();
-    dicom_to_it_transformation(0,0)=-1;
-    dicom_to_it_transformation(1,1)=-1;
+    //for siemens
+    InternalMatrixType lps2lai;lps2lai.set_identity();
+    lps2lai(1,1)=-1;
+    lps2lai(2,2)=-1;
+
+    //for ge and philips
+    InternalMatrixType lps2ras;lps2ras.set_identity();
+    lps2ras(1,1)=-1;
+    lps2ras(0,0)=-1;
+
+
 
     if (is_GE)
     {
@@ -2431,10 +2427,6 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromCoeffs(int PE)
 
     ImageType3D::SizeType sz= this->template_structural->GetLargestPossibleRegion().GetSize();
 
-    vnl_matrix_fixed<double,3,3> RAS_to_LPS; RAS_to_LPS.set_identity();
-    RAS_to_LPS(0,0)=-1;
-    RAS_to_LPS(1,1)=1;
-    vnl_matrix<double> flip_mat= template_structural->GetDirection().GetVnlMatrix() * first_vol->GetDirection().GetVnlMatrix().transpose();
 
     vnl_vector<double> norms(3,1);
     vnl_matrix_fixed<double,3,3> id_trans; id_trans.set_identity();
@@ -2464,6 +2456,7 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromCoeffs(int PE)
                 itk::ContinuousIndex<double,3> cind;
                 first_vol->TransformPhysicalPointToContinuousIndex(pt_trans,cind);
 
+
                 ImageType3D::PointType pt_DP;
                 first_vol_DP->TransformContinuousIndexToPhysicalPoint(cind,pt_DP);
 
@@ -2492,14 +2485,14 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromCoeffs(int PE)
                     first_vol_DP->TransformPhysicalPointToContinuousIndex(pt_DP_trans,cind);
                     first_vol->TransformContinuousIndexToPhysicalPoint(cind,pt_trans);
 
-                    ImageType3D::PointType pt_scanner_space= pt_trans;
 
+                    ImageType3D::PointType pt_scanner_space= pt_trans;
                     vnl_matrix_fixed<double,1,6> curr_bmat_row = Bmatrix.get_n_rows(vol,1);
                     OkanQuadraticTransformType::MatrixType  R; R.SetIdentity();
                     if(this->s2v_transformations[PE].size())
                     {
                         ImageType3D::IndexType ind3_n;
-                        for(int ti=0;ti<3;ti++)
+                        for(int ti=0;ti<ImageType3D::ImageDimension;ti++)
                         {
                             if(cind[ti]<0)
                                 ind3_n[ti]=0;
@@ -2523,31 +2516,64 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromCoeffs(int PE)
                         first_vol->TransformPhysicalPointToContinuousIndex(pt_scanner_space,cind);
                     }
 
+
                     if(grads)
                     {
-                        first_vol_grad->TransformContinuousIndexToPhysicalPoint(cind,pt_scanner_space);
-                        vnl_vector<double> temp=  dicom_to_it_transformation * pt_scanner_space.GetVnlVector();
-                        pt_scanner_space[0]=temp[0];
-                        pt_scanner_space[1]=temp[1];
-                        pt_scanner_space[2]=temp[2];
-                        // This is the final physical point in NIFTI coordinate system
+                        InternalMatrixType Lmat; Lmat.set_identity();
+
+                        ImageType3D::PointType pt_itk_space, pt_scanner_space;
+                        first_vol_grad->TransformContinuousIndexToPhysicalPoint(cind,pt_itk_space);
+                        // pt_itk_space is in ITK xyz coordinate system
+
+                        if(E.gradType=="siemens")
+                        {
+                            auto pt_scanner_vnl = lps2lai * pt_itk_space.GetVnlVector();
+                            pt_scanner_space[0]= pt_scanner_vnl[0];
+                            pt_scanner_space[1]= pt_scanner_vnl[1];
+                            pt_scanner_space[2]= pt_scanner_vnl[2];
+
+                            //Lmat is in whatever scanner coordinate space
+                            Lmat= pixel_bmatrix(E,pt_scanner_space,norms);
+
+                            // to ITK
+                            Lmat = lps2lai * Lmat * lps2lai;
+                        }
+                        else
+                        {
+                            auto pt_scanner_vnl = lps2ras * pt_itk_space.GetVnlVector();
+                            pt_scanner_space[0]= pt_scanner_vnl[0];
+                            pt_scanner_space[1]= pt_scanner_vnl[1];
+                            pt_scanner_space[2]= pt_scanner_vnl[2];
+
+                            //Lmat is in whatever scanner coordinate space
+                            Lmat= pixel_bmatrix(E,pt_scanner_space,norms);
+
+                            // to ITK
+                            Lmat = lps2ras * Lmat * lps2ras;
+                        }
 
 
+                        //We have output Lmat in its correct form as Jacobian
+                        //Howerver, because forward backward nature of the transformation
+                        //we should have taken its transpose (actually inverse but noone does it that way, which I think is incorrect)
+                        //so to make it directly applicable to Bmatrix, we have to take another transpose
+                        Lmat=Lmat.transpose();
+
+                        // now let's transform Lmat to ijk space  of the native space image
+                        Lmat = first_vol_grad->GetDirection().GetTranspose() *
+                               Lmat  *
+                               first_vol_grad->GetDirection().GetVnlMatrix();
+
+
+                        //curr_bmat_mat is in native ijk space
                         vnl_matrix_fixed<double,3,3> curr_bmat_mat;
                         curr_bmat_mat(0,0)=curr_bmat_row(0,0);curr_bmat_mat(0,1)=curr_bmat_row(0,1)/2; curr_bmat_mat(0,2)=curr_bmat_row(0,2)/2;
                         curr_bmat_mat(1,0)=curr_bmat_row(0,1)/2;curr_bmat_mat(1,1)=curr_bmat_row(0,3); curr_bmat_mat(1,2)=curr_bmat_row(0,4)/2;
                         curr_bmat_mat(2,0)=curr_bmat_row(0,2)/2;curr_bmat_mat(2,1)=curr_bmat_row(0,4)/2; curr_bmat_mat(2,2)=curr_bmat_row(0,5);
-                        //curr_bmat_mat= first_vol->GetDirection().GetVnlMatrix() * curr_bmat_mat * first_vol->GetDirection().GetTranspose();
-                        //curr_bmat_mat is in xyz coordinates now
 
-                        curr_bmat_mat= RAS_to_LPS * curr_bmat_mat * RAS_to_LPS.transpose();
-                        //curr_bmat_mat is in old TORTOISE coordinate now
-
-
-                        InternalMatrixType RotMat= pixel_bmatrix(E,pt_scanner_space,norms);
-                        curr_bmat_mat =  RotMat * curr_bmat_mat * RotMat.transpose();
-                        curr_bmat_mat= RAS_to_LPS.transpose() * curr_bmat_mat * RAS_to_LPS;
-
+                         // let's transform the Bmatrix
+                        curr_bmat_mat =  Lmat * curr_bmat_mat *  Lmat.transpose();
+                        //curr_bmat_mat is still in native ijk space so is curr_bmat_row
 
                         curr_bmat_row(0,0)=curr_bmat_mat(0,0);
                         curr_bmat_row(0,1)=curr_bmat_mat(0,1)*2;
@@ -2555,31 +2581,15 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromCoeffs(int PE)
                         curr_bmat_row(0,3)=curr_bmat_mat(1,1);
                         curr_bmat_row(0,4)=curr_bmat_mat(1,2)*2;
                         curr_bmat_row(0,5)=curr_bmat_mat(2,2);
-
                     }
 
+                    // Let's rotate the Bmatrix with ALL the transforms, i.e. s2v, moteddy, structural alignment
                     if(this->s2v_transformations[PE].size())
                         curr_bmat_row= RotateBMatrix(curr_bmat_row,R.GetTranspose(),first_vol->GetDirection().GetVnlMatrix(),first_vol->GetDirection().GetVnlMatrix());
                     curr_bmat_row= RotateBMatrix(curr_bmat_row,dwi_transforms[PE][vol]->GetMatrix().GetVnlMatrix(),id_trans,id_trans);
                     if(this->b0_t0_str_trans)
                         curr_bmat_row= RotateBMatrix(curr_bmat_row,this->b0_t0_str_trans->GetMatrix().GetVnlMatrix(),this->template_structural->GetDirection().GetVnlMatrix(),first_vol->GetDirection().GetVnlMatrix());
-
-                    /*
-                    vnl_vector<double> rot_Bmat_vec= curr_bmat_row.get_row(0);
-                    vnl_matrix_fixed<double,3,3> rot_Bmat_vec_mat;
-                    rot_Bmat_vec_mat(0,0)=rot_Bmat_vec[0];rot_Bmat_vec_mat(0,1)=rot_Bmat_vec[1]/2; rot_Bmat_vec_mat(0,2)=rot_Bmat_vec[2]/2;
-                    rot_Bmat_vec_mat(1,0)=rot_Bmat_vec[1]/2;rot_Bmat_vec_mat(1,1)=rot_Bmat_vec[3]; rot_Bmat_vec_mat(1,2)=rot_Bmat_vec[4]/2;
-                    rot_Bmat_vec_mat(2,0)=rot_Bmat_vec[2]/2;rot_Bmat_vec_mat(2,1)=rot_Bmat_vec[4]/2; rot_Bmat_vec_mat(2,2)=rot_Bmat_vec[5];
-
-                    rot_Bmat_vec_mat= flip_mat * rot_Bmat_vec_mat * flip_mat.transpose();
-                    rot_Bmat_vec[0]=rot_Bmat_vec_mat(0,0);
-                    rot_Bmat_vec[1]=rot_Bmat_vec_mat(0,1)*2;
-                    rot_Bmat_vec[2]=rot_Bmat_vec_mat(0,2)*2;
-                    rot_Bmat_vec[3]=rot_Bmat_vec_mat(1,1);
-                    rot_Bmat_vec[4]=rot_Bmat_vec_mat(1,2)*2;
-                    rot_Bmat_vec[5]=rot_Bmat_vec_mat(2,2);
-                    curr_bmat_row.set_row(0,rot_Bmat_vec);
-                    */
+                    //curr_bmat_row is now in ijk space of template
 
                     for(int vv=0;vv<6;vv++)
                         vbmat[6*vol+vv]->SetPixel(ind3,curr_bmat_row(0,vv));
@@ -2613,10 +2623,15 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeLImgFromCoeffs()
     ImageType3D::Pointer first_vol = read_3D_volume_from_4D(data_names[0],0);
     ImageType3D::Pointer first_vol_grad=first_vol;
 
-    vnl_matrix<double> dicom_to_it_transformation(3,3);
-    dicom_to_it_transformation.set_identity();
-    dicom_to_it_transformation(0,0)=-1;
-    dicom_to_it_transformation(1,1)=-1;
+    //for siemens
+    InternalMatrixType lps2lai;lps2lai.set_identity();
+    lps2lai(1,1)=-1;
+    lps2lai(2,2)=-1;
+
+    //for ge and philips
+    InternalMatrixType lps2ras;lps2ras.set_identity();
+    lps2ras(1,1)=-1;
+    lps2ras(0,0)=-1;
 
     if (is_GE)
     {
@@ -2660,10 +2675,6 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeLImgFromCoeffs()
 
     ImageType3D::SizeType sz= this->template_structural->GetLargestPossibleRegion().GetSize();
 
-    vnl_matrix_fixed<double,3,3> RAS_to_LPS; RAS_to_LPS.set_identity();
-    RAS_to_LPS(0,0)=-1;
-    RAS_to_LPS(1,1)=1;
-    vnl_matrix<double> flip_mat= template_structural->GetDirection().GetVnlMatrix() * first_vol->GetDirection().GetVnlMatrix().transpose();
 
     vnl_vector<double> norms(3,1);
     vnl_matrix_fixed<double,3,3> id_trans; id_trans.set_identity();
@@ -2690,42 +2701,90 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeLImgFromCoeffs()
                 itk::ContinuousIndex<double,3> cind;
                 first_vol->TransformPhysicalPointToContinuousIndex(pt_trans,cind);
 
-                InternalMatrixType RotMat; RotMat.set_identity();
+                InternalMatrixType Lmat; Lmat.set_identity();
                 if(grads)
                 {
-                    ImageType3D::PointType pt_scanner_space;
-                    first_vol_grad->TransformContinuousIndexToPhysicalPoint(cind,pt_scanner_space);
-                    vnl_vector<double> temp=  dicom_to_it_transformation * pt_scanner_space.GetVnlVector();
-                    pt_scanner_space[0]=temp[0];
-                    pt_scanner_space[1]=temp[1];
-                    pt_scanner_space[2]=temp[2];
-                    // This is the final physical point in NIFTI coordinate system
+                    ImageType3D::PointType pt_itk_space, pt_scanner_space;
+                    first_vol_grad->TransformContinuousIndexToPhysicalPoint(cind,pt_itk_space);
+                    // pt_scanner_space is in ITK xyz coordinate system
 
-                    RotMat= pixel_bmatrix(E,pt_scanner_space,norms);
-                    RotMat=RAS_to_LPS.transpose() * RotMat  * RAS_to_LPS;
+                    if(E.gradType=="siemens")
+                    {
+                        auto pt_scanner_vnl = lps2lai * pt_itk_space.GetVnlVector();
+                        pt_scanner_space[0]= pt_scanner_vnl[0];
+                        pt_scanner_space[1]= pt_scanner_vnl[1];
+                        pt_scanner_space[2]= pt_scanner_vnl[2];
+
+                        //Lmat is in whatever scanner coordinate space
+                        Lmat= pixel_bmatrix(E,pt_scanner_space,norms);                        
+
+                        // to ITK
+                        Lmat = lps2lai * Lmat * lps2lai;
+                    }
+                    else
+                    {
+                        auto pt_scanner_vnl = lps2ras * pt_itk_space.GetVnlVector();
+                        pt_scanner_space[0]= pt_scanner_vnl[0];
+                        pt_scanner_space[1]= pt_scanner_vnl[1];
+                        pt_scanner_space[2]= pt_scanner_vnl[2];
+
+                        //Lmat is in whatever scanner coordinate space
+                        Lmat= pixel_bmatrix(E,pt_scanner_space,norms);
+
+                        // to ITK
+                        Lmat = lps2ras * Lmat * lps2ras;
+                    }
+
+                    //What pixel_bmatrix outputs is the backward Jacobian
+                    //Let's make it forward Jacobian
+                    //I know this is wrong, it sohuldnt be transpose but inverse.
+                    //everyone does it this way though
+                    Lmat=Lmat.transpose();
+
+                    // now let's transform Lmat to ijk space  of the native space image
+                    Lmat = first_vol_grad->GetDirection().GetTranspose() *
+                           Lmat  *
+                           first_vol_grad->GetDirection().GetVnlMatrix();
                 }
 
-                if(this->b0_t0_str_trans)
+                //It doesnt matter if subtract Id before this.. It is identical
+                // but we cant subtract it after template warping so we do it here
+
+                //  Lmat= Lmat - id_trans;
+
+                // ON 07/27/23, I decided to NOT output in HCP format with id subtracted so commented the above line
+                // Mathematically it makes things insanely complicated if we want to save L in ijk space
+                // That is why HCP people save it in xyz space but I dont want to do it that way.
+                // The Bmatrix AND Lmat should live in the same space
+                // so NO ID subtracted.
+
+
+                //Now get L from native ijk space to template ijk space
+                //yes some double unnecessary operations that cancel each other out here
+                // but makes reading wrt math easier
+                if(this->template_structural)
                 {
-                    vnl_matrix<double> dirmat= first_vol->GetDirection().GetVnlMatrix();
-                  //  vnl_matrix_fixed<double,3,3> rotmat2= dirmat.transpose()*this->b0_t0_str_trans->GetMatrix().GetVnlMatrix()*dirmat;
-                      vnl_matrix_fixed<double,3,3> rotmat2= this->b0_t0_str_trans->GetMatrix().GetVnlMatrix();
-
-                    RotMat= rotmat2 * RotMat * rotmat2.transpose();
-
+                    Lmat= first_vol_grad->GetDirection().GetVnlMatrix() *Lmat;
+                    if(this->b0_t0_str_trans)
+                    {
+                        Lmat= this->b0_t0_str_trans->GetMatrix().GetTranspose() *Lmat;
+                    }
+                    Lmat = this->template_structural->GetDirection().GetTranspose() *Lmat;
                 }
 
-                Limg[0]->SetPixel(ind3,RotMat(0,0)-1);
-                Limg[1]->SetPixel(ind3,RotMat(0,1));
-                Limg[2]->SetPixel(ind3,RotMat(0,2));
-                Limg[3]->SetPixel(ind3,RotMat(1,0));
-                Limg[4]->SetPixel(ind3,RotMat(1,1)-1);
-                Limg[5]->SetPixel(ind3,RotMat(1,2));
-                Limg[6]->SetPixel(ind3,RotMat(2,0));
-                Limg[7]->SetPixel(ind3,RotMat(2,1));
-                Limg[8]->SetPixel(ind3,RotMat(2,2)-1);
+                //convert to HCP format ordering of tensor elements
+                Lmat=Lmat.transpose();
 
 
+                Limg[0]->SetPixel(ind3,Lmat(0,0));
+                Limg[1]->SetPixel(ind3,Lmat(0,1));
+                Limg[2]->SetPixel(ind3,Lmat(0,2));
+                Limg[3]->SetPixel(ind3,Lmat(1,0));
+                Limg[4]->SetPixel(ind3,Lmat(1,1));
+                Limg[5]->SetPixel(ind3,Lmat(1,2));
+                Limg[6]->SetPixel(ind3,Lmat(2,0));
+                Limg[7]->SetPixel(ind3,Lmat(2,1));
+                Limg[8]->SetPixel(ind3,Lmat(2,2));
             } //for i
         } //for j
     } //for k
@@ -2896,8 +2955,6 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromField(int PE)
         inverse_slice_id_img= ComputeS2VInverse(PE);
     }
 
-
-
     std::string nii_name= data_names[PE];
     std::string bmtxt_name = nii_name.substr(0,nii_name.rfind(".nii"))+".bmtxt";
     vnl_matrix<double> Bmatrix = read_bmatrix_file(bmtxt_name);
@@ -2905,8 +2962,6 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromField(int PE)
 
     ImageType3D::Pointer first_vol = read_3D_volume_from_4D(data_names[PE],0);
     ImageType3D::Pointer first_vol_DP = ChangeImageHeaderToDP<ImageType3D>(first_vol);
-
-
 
     int nvols= Bmatrix.rows();
     std::vector<ImageType3D::Pointer> vbmat;
@@ -2925,8 +2980,6 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromField(int PE)
 
     ImageType3D::SizeType sz= this->template_structural->GetLargestPossibleRegion().GetSize();
 
-
-    vnl_matrix<double> flip_mat= template_structural->GetDirection().GetVnlMatrix() * first_vol->GetDirection().GetVnlMatrix().transpose();
     vnl_vector<double> norms(3,1);
     vnl_matrix_fixed<double,3,3> id_trans; id_trans.set_identity();
 
@@ -3011,12 +3064,12 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromField(int PE)
                         vnl_vector<double>  pt_scanner_space_vnl= R.GetVnlMatrix().transpose() *  (pt_trans.GetVnlVector() - T.GetVnlVector());
                         pt_scanner_space[0]=pt_scanner_space_vnl[0];
                         pt_scanner_space[1]=pt_scanner_space_vnl[1];
-                        pt_scanner_space[2]=pt_scanner_space_vnl[2];
+                        pt_scanner_space[2]=pt_scanner_space_vnl[2];                                                
                     }
 
-                    if(this->gradwarp_field_forward)
+                    if(this->gradwarp_field)
                     {
-                        this->gradwarp_field_forward->TransformPhysicalPointToContinuousIndex(pt_scanner_space,cind);
+                        this->gradwarp_field->TransformPhysicalPointToContinuousIndex(pt_scanner_space,cind);
                         ImageType3D::IndexType jac_ind3;
 
 
@@ -3028,20 +3081,25 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromField(int PE)
                                 jac_ind3[yy]= (unsigned int)std::round(cind[yy]);
                         }
 
+                        // A is in ITK xyz space
+                        InternalMatrixType A= ComputeJacobian(this->gradwarp_field,jac_ind3);
+
+                        //A is still in backward convention, so let's take its transopose
+                        // for the millionth time should have been inverse
+                        A=A.transpose();
+
+                        // now let's transform A to ijk space  of the native space image
+                        A = first_vol->GetDirection().GetTranspose() *  A   * first_vol->GetDirection().GetVnlMatrix();
+
+                        //curr_bmat_mat is in native ijk space
                         vnl_matrix_fixed<double,3,3> curr_bmat_mat;
                         curr_bmat_mat(0,0)=curr_bmat_row(0,0);curr_bmat_mat(0,1)=curr_bmat_row(0,1)/2; curr_bmat_mat(0,2)=curr_bmat_row(0,2)/2;
                         curr_bmat_mat(1,0)=curr_bmat_row(0,1)/2;curr_bmat_mat(1,1)=curr_bmat_row(0,3); curr_bmat_mat(1,2)=curr_bmat_row(0,4)/2;
                         curr_bmat_mat(2,0)=curr_bmat_row(0,2)/2;curr_bmat_mat(2,1)=curr_bmat_row(0,4)/2; curr_bmat_mat(2,2)=curr_bmat_row(0,5);
-                      //  curr_bmat_mat= first_vol->GetDirection().GetVnlMatrix() * curr_bmat_mat * first_vol->GetDirection().GetTranspose();
 
-                        InternalMatrixType A= ComputeJacobianAtIndex(this->gradwarp_field,jac_ind3);
-                      //  A=first_vol->GetDirection().GetTranspose() * A ;
 
-                        A(0,0)+=1;A(1,1)+=1;A(2,2)+=1;
-
-                        curr_bmat_mat = A* curr_bmat_mat * A.transpose();
-
-                        //curr_bmat_mat= first_vol->GetDirection().GetTranspose() * curr_bmat_mat * first_vol->GetDirection().GetVnlMatrix();
+                        // generate the voxelwise Bmatrix
+                        curr_bmat_mat = A* curr_bmat_mat * A.transpose();                        
 
                         curr_bmat_row(0,0)=curr_bmat_mat(0,0);
                         curr_bmat_row(0,1)=curr_bmat_mat(0,1)*2;
@@ -3052,28 +3110,12 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeVBMatImgFromField(int PE)
 
                     }
 
+                    // Let's rotate the Bmatrix with ALL the transforms, i.e. s2v, moteddy, structural alignment
                     if(this->s2v_transformations[PE].size())
                         curr_bmat_row= RotateBMatrix(curr_bmat_row,R.GetTranspose(),first_vol->GetDirection().GetVnlMatrix(),first_vol->GetDirection().GetVnlMatrix());
                     curr_bmat_row= RotateBMatrix(curr_bmat_row,dwi_transforms[PE][vol]->GetMatrix().GetVnlMatrix(),id_trans,id_trans);
                     if(this->b0_t0_str_trans)
                         curr_bmat_row= RotateBMatrix(curr_bmat_row,this->b0_t0_str_trans->GetMatrix().GetVnlMatrix(),template_structural->GetDirection().GetVnlMatrix(),first_vol->GetDirection().GetVnlMatrix());
-
-                    /*
-                    vnl_vector<double> rot_Bmat_vec= curr_bmat_row.get_row(0);
-                    vnl_matrix_fixed<double,3,3> rot_Bmat_vec_mat;
-                    rot_Bmat_vec_mat(0,0)=rot_Bmat_vec[0];rot_Bmat_vec_mat(0,1)=rot_Bmat_vec[1]/2; rot_Bmat_vec_mat(0,2)=rot_Bmat_vec[2]/2;
-                    rot_Bmat_vec_mat(1,0)=rot_Bmat_vec[1]/2;rot_Bmat_vec_mat(1,1)=rot_Bmat_vec[3]; rot_Bmat_vec_mat(1,2)=rot_Bmat_vec[4]/2;
-                    rot_Bmat_vec_mat(2,0)=rot_Bmat_vec[2]/2;rot_Bmat_vec_mat(2,1)=rot_Bmat_vec[4]/2; rot_Bmat_vec_mat(2,2)=rot_Bmat_vec[5];
-
-                    rot_Bmat_vec_mat= flip_mat * rot_Bmat_vec_mat * flip_mat.transpose();
-                    rot_Bmat_vec[0]=rot_Bmat_vec_mat(0,0);
-                    rot_Bmat_vec[1]=rot_Bmat_vec_mat(0,1)*2;
-                    rot_Bmat_vec[2]=rot_Bmat_vec_mat(0,2)*2;
-                    rot_Bmat_vec[3]=rot_Bmat_vec_mat(1,1);
-                    rot_Bmat_vec[4]=rot_Bmat_vec_mat(1,2)*2;
-                    rot_Bmat_vec[5]=rot_Bmat_vec_mat(2,2);
-                    curr_bmat_row.set_row(0,rot_Bmat_vec);
-                    */
 
                     for(int vv=0;vv<6;vv++)
                         vbmat[6*vol+vv]->SetPixel(ind3,curr_bmat_row(0,vv));
@@ -3091,14 +3133,6 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeLImgFromField()
 {
     ImageType3D::Pointer first_vol = read_3D_volume_from_4D(data_names[0],0);
 
-    vnl_matrix<double> dicom_to_it_transformation(3,3);
-    dicom_to_it_transformation.set_identity();
-    dicom_to_it_transformation(0,0)=-1;
-    dicom_to_it_transformation(1,1)=-1;
-
-    vnl_matrix_fixed<double,3,3> RAS_to_LPS; RAS_to_LPS.set_identity();
-    RAS_to_LPS(0,0)=-1;
-    RAS_to_LPS(1,1)=1;
 
     std::vector<ImageType3D::Pointer> Limg;
     Limg.resize(9);
@@ -3116,7 +3150,6 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeLImgFromField()
     ImageType3D::SizeType sz= this->template_structural->GetLargestPossibleRegion().GetSize();
 
 
-    vnl_matrix<double> flip_mat= template_structural->GetDirection().GetVnlMatrix() * first_vol->GetDirection().GetVnlMatrix().transpose();
     vnl_vector<double> norms(3,1);
     vnl_matrix_fixed<double,3,3> id_trans; id_trans.set_identity();
 
@@ -3156,25 +3189,40 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeLImgFromField()
                         else
                             jac_ind3[yy]= (unsigned int)std::round(cind[yy]);
                     }
+                    A=ComputeJacobian(this->gradwarp_field,jac_ind3);  //A is in ITK xyz space
 
-                    A= ComputeJacobianAtIndex(this->gradwarp_field,jac_ind3);
-                    //A is now in IJK space
-                    A= this->gradwarp_field->GetDirection().GetVnlMatrix() * A * this->gradwarp_field->GetDirection().GetTranspose();
-                    //A is now in ITK XYZ space
-                    A= dicom_to_it_transformation * A * dicom_to_it_transformation.transpose();
-                    //A is now in NIFTI XYZ space
-                    A=RAS_to_LPS.transpose() * A  * RAS_to_LPS;
+
+                    // I really think the following is WRONG..
+                    // I think it should be the inverse, NOT transpose
+                    // but everyone does it this way so I will do it this way too.
+                    //A= vnl_matrix_inverse<double>(A);
+
+                    //A is the backward Jacobian
+                    //Let's make it forward Jacobian
+                    //I know this is wrong, it sohuldnt be transpose but inverse.
+                    //everyone does it this way though
+                    A=A.transpose();
+
+                    // now let's transform A to ijk space  of the native space image
+                    A= first_vol->GetDirection().GetTranspose() *  A  * first_vol->GetDirection().GetVnlMatrix();
 
                 }
 
-                if(this->b0_t0_str_trans)
+                //Now get L from native ijk space to template ijk space
+                //yes some double unnecessary operations that cancel each other out here
+                // but makes reading wrt math easier
+                if(this->template_structural)
                 {
-                    vnl_matrix<double> dirmat= first_vol->GetDirection().GetVnlMatrix();
-                //  vnl_matrix_fixed<double,3,3> rotmat2= dirmat.transpose()*this->b0_t0_str_trans->GetMatrix().GetVnlMatrix()*dirmat;
-                    vnl_matrix_fixed<double,3,3> rotmat2= this->b0_t0_str_trans->GetMatrix().GetVnlMatrix();
-
-                    A= rotmat2 * A * rotmat2.transpose();
+                    A= first_vol->GetDirection().GetVnlMatrix() *A;
+                    if(this->b0_t0_str_trans)
+                    {
+                        A= this->b0_t0_str_trans->GetMatrix().GetTranspose() *A;
+                    }
+                    A = this->template_structural->GetDirection().GetTranspose() *A;
                 }
+
+                //convert to HCP format ordering of tensor elements
+                A=A.transpose();
 
                 Limg[0]->SetPixel(ind3,A(0,0));
                 Limg[1]->SetPixel(ind3,A(0,1));
@@ -3313,13 +3361,16 @@ void FINALDATA::Generate()
     this->template_structural = GenerateStructurals();
     ReadOrigTransforms();
 
-    std::vector< std::vector<ImageType3D::Pointer> > trans_interp_DWIs = GenerateTransformedInterpolatedData();
-    GenerateFinalData(trans_interp_DWIs);
-
     if(this->gradwarp_field || this->s2v_transformations[0].size())
     {
+        std::cout<<"Generating gradient nonlinearity information..."<<std::endl;
         GenerateGradNonlinOutput();
+        std::cout<<"Done..."<<std::endl;
     }
+
+
+    std::vector< std::vector<ImageType3D::Pointer> > trans_interp_DWIs = GenerateTransformedInterpolatedData();
+    GenerateFinalData(trans_interp_DWIs);
 
 
 

@@ -53,7 +53,7 @@ ImageType4D::Pointer get_bruker_image_data(std::string twodseq_file,RECO_struct 
     long total_els= (long)final_dims[0]*final_dims[1]*final_dims[2]*Nechoes*cycle*method_struct.N_reps*N_input_channel;
 
 
-    if(visu_struct.word_type==std::string("_16BIT_SGN_INT"))
+    if(reco_struct.RECO_WORDTYPE==std::string("_16BIT_SGN_INT"))
     {
         image_data_short = new short[total_els];
     }
@@ -70,7 +70,7 @@ ImageType4D::Pointer get_bruker_image_data(std::string twodseq_file,RECO_struct 
     }
 
     FILE *fp=fopen(twodseq_file.c_str(),"rb");
-    if( visu_struct.word_type !=std::string("_16BIT_SGN_INT"))
+    if( reco_struct.RECO_WORDTYPE !=std::string("_16BIT_SGN_INT"))
     {
         fread(image_data_int,sizeof(int),total_els,fp);
     }
@@ -869,6 +869,8 @@ bool convert_bruker(std::string input_folder, std::string output_folder, std::ve
 
             ++it;
         }
+        else
+            ++it;
     }
 
     std::cout<<"Done importing " <<input_folder<<std::endl;

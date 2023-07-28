@@ -78,7 +78,7 @@ int main( int argc , char * argv[] )
     {
         std::string extension = filename.substr(idx+1);
         std::string basename= filename.substr(mypos+1,idx-mypos-1);
-        if(extension == string("nii"))
+        if( (extension == string("nii")) || (extension == string("gz")) )
         {
             typedef itk::ImageFileReader<DisplacementFieldType> FieldReaderType;
             typename FieldReaderType::Pointer mreader=FieldReaderType::New();
@@ -89,27 +89,7 @@ int main( int argc , char * argv[] )
             
             DisplacementFieldType::Pointer disp_field_inv= InvertDisplacementField(disp_field);
             
-            std::string output_name;
-            int minv_pos=basename.rfind("_MINV.nii");
-            if(minv_pos!=-1)
-            {
-                std::string base_basename= basename.substr(0,minv_pos);
-                output_name=currdir + base_basename + std::string("_FINV.nii");
-            }
-            else
-            {
-                minv_pos=basename.rfind("_FINV.nii");
-                if(minv_pos!=-1)
-                {
-                    std::string base_basename= basename.substr(0,minv_pos);
-                    output_name=currdir + base_basename + std::string("_MINV.nii");
-                }
-                else
-                {
-                   output_name=currdir + basename + std::string("_inv.nii");
-                }
-            }            
-            
+            std::string output_name= filename.substr(0,filename.rfind(".nii"))+"_inv.nii";
             typedef itk::ImageFileWriter<DisplacementFieldType> WriterType;
             WriterType::Pointer writer= WriterType::New();
             writer->SetFileName(output_name);
@@ -139,12 +119,7 @@ int main( int argc , char * argv[] )
         }
     }
     
-   
-    
 
-    
-    
 
-    
-    return 1;
+    return EXIT_SUCCESS;
 }

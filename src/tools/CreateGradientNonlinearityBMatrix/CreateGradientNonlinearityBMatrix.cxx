@@ -8,6 +8,7 @@
 #include "../tools/gradnonlin/gradcal.h"
 #include "../tools/gradnonlin/init_iso_gw.h"
 #include "../tools/gradnonlin/mk_displacementMaps.h"
+#include "../tools/DRTAMAS/DRTAMAS_utilities_cp.h"
 
 
 InternalMatrixType  pixel_bmatrix(const GradCoef &E, ImageType3D::PointType point,const vnl_vector<double> &norms)
@@ -22,9 +23,9 @@ InternalMatrixType  pixel_bmatrix(const GradCoef &E, ImageType3D::PointType poin
     nzkey = zkeys.size()/2;
     na = nxkey + nykey + nzkey;
 
-    double x1 = point[0]/250.;
-    double y1 = point[1]/250.;
-    double z1 = point[2]/250.;
+    double x1 = point[0]/E.R0;
+    double y1 = point[1]/E.R0;
+    double z1 = point[2]/E.R0;
 
     double rr = std::sqrt(x1*x1 + y1 *y1 + z1*z1);
     double phi = std::atan2(y1,x1);
@@ -46,6 +47,15 @@ InternalMatrixType  pixel_bmatrix(const GradCoef &E, ImageType3D::PointType poin
         ll = E.Xkeys.at(2*kk);
         mm = E.Xkeys.at(2*kk+1);
 
+        /*
+        int mma =abs(mm);
+        double normfact=1.;
+        if(E.gradType=="siemens" && mma>0 && ll>1 )
+        {
+            normfact = pow(-1, mma) *    sqrt(double((2 * ll + 1) * factorial(ll - mma))   / double(2 * factorial(ll + mma)));
+        }
+        temp*=normfact;
+        */
         int mma =abs(mm);
         if(E.gradType=="siemens" && mma>0 && ll>1)
         {
@@ -64,12 +74,15 @@ InternalMatrixType  pixel_bmatrix(const GradCoef &E, ImageType3D::PointType poin
             continue;
         ll = E.Ykeys.at(2*kk);
         mm = E.Ykeys.at(2*kk+1);
+
+
         int mma =abs(mm);
         if(E.gradType=="siemens" && mma>0 && ll>1)
         {
             temp/= sqrt(2 * factorial(ll-mma) / factorial(ll+mma)) ;
             temp*=  sqrt(double((2 * ll + 1) * factorial(ll - mma)) / double(2. * factorial(ll + mma)));
         }
+
 
         axy+= temp * dshdx('X',ll, mm, rr,phi,zz,0 )/norms(1);
         ayy+= temp * dshdx('Y',ll, mm, rr, phi, zz,0)/norms(1);
@@ -83,6 +96,7 @@ InternalMatrixType  pixel_bmatrix(const GradCoef &E, ImageType3D::PointType poin
         ll = E.Zkeys.at(2*kk);
         mm = E.Zkeys.at(2*kk+1);
 
+
         int mma =abs(mm);
         if(E.gradType=="siemens" && mma>0 && ll>1)
         {
@@ -95,6 +109,11 @@ InternalMatrixType  pixel_bmatrix(const GradCoef &E, ImageType3D::PointType poin
         azz+= temp * dshdx('Z', ll, mm, rr, phi,zz,0)/norms(2);
     }
 
+    /*
+    axx= \del_f^x / \del x   ; axy= \del_f^y / \del x  ;  axz= \del_f^z / \del x
+    ayx= \del_f^x / \del y   ; ayy= \del_f^y / \del y  ;  ayz= \del_f^z / \del y
+    azx= \del_f^x / \del z   ; azy= \del_f^y / \del z  ;  azz= \del_f^z / \del z
+    */
 
     InternalMatrixType trans_mat;
     trans_mat(0,0)=axx; trans_mat(0,1)=axy; trans_mat(0,2)=axz;
@@ -102,7 +121,211 @@ InternalMatrixType  pixel_bmatrix(const GradCoef &E, ImageType3D::PointType poin
     trans_mat(2,0)=azx; trans_mat(2,1)=azy; trans_mat(2,2)=azz;
     trans_mat=trans_mat.transpose();
 
+    /*
+    vnl_matrix_fixed<double,6,6> trans_mat;
+    // bxx                      bxy                               bxz                             byy                         byz                             bzz
+    trans_mat(0,0) =axx*axx    ;trans_mat(0,1) =axx*axy          ;trans_mat(0,2) =axx*axz         ;trans_mat(0,3) =axy*axy   ;trans_mat(0,4) =axy*axz         ;trans_mat(0,5) =axz*axz;
+    trans_mat(1,0) =2*axx*ayx  ;trans_mat(1,1) =axx*ayy+axy+ayx  ;trans_mat(1,2) =axx*ayz+axz*ayx ;trans_mat(1,3) =2*axy*ayy ;trans_mat(1,4) =axy*ayz+ayy*axz ;trans_mat(1,5) =2*axz*ayz;
+    trans_mat(2,0) =2*axx*azx  ;trans_mat(2,1) =axx*azy+axy*azx  ;trans_mat(2,2) =axx*azz+axz*azx ;trans_mat(2,3) =2*axy*azy ;trans_mat(2,4) =axy*azz+axz*azy ;trans_mat(2,5) =2*axz*azz;
+    trans_mat(3,0) =ayx*ayx    ;trans_mat(3,1) =ayx*ayy          ;trans_mat(3,2) =ayx*ayz         ;trans_mat(3,3) =ayy*ayy   ;trans_mat(3,4) =ayy*ayz         ;trans_mat(3,5) =ayz*ayz;
+    trans_mat(4,0) =2*ayx*azx  ;trans_mat(4,1) =ayx*azy+ayy*azx  ;trans_mat(4,2) =ayx*azz+ayz*azx ;trans_mat(4,3) =2*ayy*azy ;trans_mat(4,4) =ayy*azz+ayz*azy ;trans_mat(4,5) =2*ayz*azz;
+    trans_mat(5,0) =azx*azx    ;trans_mat(5,1) =azx*azy          ;trans_mat(5,2) =azx*azz         ;trans_mat(5,3) =azy*azy   ;trans_mat(5,4) =azy*azz         ;trans_mat(5,5) =azz*azz;
+    */
+
     return  trans_mat;
+}
+
+
+DisplacementFieldType::PixelType  GradWarpDispAtPoint(GradCoef &E,ImageType3D::PointType xyz )
+{
+    xyz[0]+=0.0001;
+    double r= sqrt(xyz[0]*xyz[0]+xyz[1]*xyz[1]+xyz[2]*xyz[2]);
+    double theta= std::acos(xyz[2]/r);
+    double phi= std::atan2(xyz[1]/r,xyz[0]/r);
+
+    DisplacementFieldType::PixelType vec;
+
+    {
+        int nx = E.Xkeys.size()/2;
+        vnl_vector<double> ls(nx);
+        vnl_vector<double> ms(nx);
+
+        for(int i=0;i<nx;i++)
+        {
+            ls[i]= E.Xkeys[2*i];
+            ms[i]= E.Xkeys[2*i+1];
+        }
+
+        int lmax= ls.max_value();
+        vnl_matrix<double> alpha(lmax+1,lmax+1,0);
+        vnl_matrix<double> beta(lmax+1,lmax+1,0);
+
+        for(int i=0;i<nx;i++)
+        {
+            double l= ls[i];
+            double m= ms[i];
+
+            if(m >=0)
+            {
+                if(l==1 && m==1)
+                    alpha(l,m)= E.gradX_coef[i]-1;
+                else
+                    alpha(l,m)= E.gradX_coef[i];
+            }
+            else
+                beta(l,(int)fabs(m))= E.gradX_coef[i];
+        }
+
+        double b=0;
+        for(int l=0;l<=lmax;l++)
+        {
+            double f= pow(r/E.R0,l);
+            for(int m=0;m<=l;m++)
+            {
+                if(alpha(l,m)==0 && beta(l,m)==0)
+                    continue;
+
+                double f2=0;
+                if(alpha(l,m)!=0)
+                    f2= alpha(l,m) * std::cos(m*phi);
+                if(beta(l,m)!=0)
+                    f2+= beta(l,m) * std::sin(m*phi);
+
+                double ptemp = plgndr(l, m, std::cos(theta));
+                double nrmfact=1.;
+                if(m>0)
+                {
+                    nrmfact= pow(-1,m) * sqrt(double((2 * l + 1) * factorial(l - m)) / double(2. * factorial(l + m)));
+                }
+                double p= nrmfact*ptemp;
+                b+=f*p*f2;
+            }
+        }
+        vec[0]=E.R0*b;
+    }
+
+    {
+        int ny = E.Ykeys.size()/2;
+        vnl_vector<double> ls(ny);
+        vnl_vector<double> ms(ny);
+
+        for(int i=0;i<ny;i++)
+        {
+            ls[i]= E.Ykeys[2*i];
+            ms[i]= E.Ykeys[2*i+1];
+        }
+
+        int lmax= ls.max_value();
+        vnl_matrix<double> alpha(lmax+1,lmax+1,0);
+        vnl_matrix<double> beta(lmax+1,lmax+1,0);
+
+        for(int i=0;i<ny;i++)
+        {
+            double l= ls[i];
+            double m= ms[i];
+
+            if(m >=0)
+            {
+                alpha(l,m)= E.gradY_coef[i];
+            }
+            else
+            {
+                if(l==1 && m==-1)
+                    beta(l,(int)fabs(m))= E.gradY_coef[i]-1;
+                else
+                    beta(l,(int)fabs(m))= E.gradY_coef[i];
+            }
+        }
+
+        double b=0;
+        for(int l=0;l<=lmax;l++)
+        {
+            double f= pow(r/E.R0,l);
+            for(int m=0;m<=l;m++)
+            {
+                if(alpha(l,m)==0 && beta(l,m)==0)
+                    continue;
+
+                double f2=0;
+                if(alpha(l,m)!=0)
+                    f2= alpha(l,m) * std::cos(m*phi);
+                if(beta(l,m)!=0)
+                    f2+= beta(l,m) * std::sin(m*phi);
+
+                double ptemp = plgndr(l, m, std::cos(theta));
+                double nrmfact=1.;
+                if(m>0)
+                {
+                    nrmfact= pow(-1,m) * sqrt(double((2 * l + 1) * factorial(l - m)) / double(2. * factorial(l + m)));
+                }
+                double p= nrmfact*ptemp;
+                b+=f*p*f2;
+            }
+        }
+        vec[1]=E.R0*b;
+
+    }
+
+    {
+        int nz = E.Zkeys.size()/2;
+        vnl_vector<double> ls(nz);
+        vnl_vector<double> ms(nz);
+
+        for(int i=0;i<nz;i++)
+        {
+            ls[i]= E.Zkeys[2*i];
+            ms[i]= E.Zkeys[2*i+1];
+        }
+
+        int lmax= ls.max_value();
+        vnl_matrix<double> alpha(lmax+1,lmax+1,0);
+        vnl_matrix<double> beta(lmax+1,lmax+1,0);
+
+        for(int i=0;i<nz;i++)
+        {
+            double l= ls[i];
+            double m= ms[i];
+
+            if(m >=0)
+            {
+                if(l==1 && m==0)
+                    alpha(l,m)= E.gradZ_coef[i]-1;
+                else
+                    alpha(l,m)= E.gradZ_coef[i];
+            }
+            else
+                beta(l,(int)fabs(m))= E.gradZ_coef[i];
+        }
+
+        double b=0;
+        for(int l=0;l<=lmax;l++)
+        {
+            double f= pow(r/E.R0,l);
+            for(int m=0;m<=l;m++)
+            {
+                if(alpha(l,m)==0 && beta(l,m)==0)
+                    continue;
+
+                double f2=0;
+                if(alpha(l,m)!=0)
+                    f2= alpha(l,m) * std::cos(m*phi);
+                if(beta(l,m)!=0)
+                    f2+= beta(l,m) * std::sin(m*phi);
+
+                double ptemp = plgndr(l, m, std::cos(theta));
+                double nrmfact=1.;
+                if(m>0)
+                {
+                    nrmfact= pow(-1,m) * sqrt(double((2 * l + 1) * factorial(l - m)) / double(2. * factorial(l + m)));
+                }
+                double p= nrmfact*ptemp;
+                b+=f*p*f2;
+            }
+        }
+        vec[2]=E.R0*b;
+    }
+
+    return vec;
 
 }
 
@@ -113,7 +336,6 @@ ComputeLImgFromCoeffs(ImageType3D::Pointer final_b0, ImageType3D::Pointer initia
     GRADCAL *grads =new GRADCAL(coeffs_file);
     GradCoef E= grads->get_struct();
 
-
     ImageType3D::Pointer first_vol_grad=initial_b0;
     ImageType3D::Pointer first_vol=initial_b0;
 
@@ -123,11 +345,15 @@ ComputeLImgFromCoeffs(ImageType3D::Pointer final_b0, ImageType3D::Pointer initia
         first_vol= final_b0;
     }
 
-    vnl_matrix<double> dicom_to_it_transformation(3,3);
-    dicom_to_it_transformation.set_identity();
-    dicom_to_it_transformation(0,0)=-1;
-    dicom_to_it_transformation(1,1)=-1;
+    //for siemens
+    InternalMatrixType lps2lai;lps2lai.set_identity();
+    lps2lai(1,1)=-1;
+    lps2lai(2,2)=-1;
 
+    //for ge and philips
+    InternalMatrixType lps2ras;lps2ras.set_identity();
+    lps2ras(1,1)=-1;
+    lps2ras(0,0)=-1;
 
     if (is_GE)
     {
@@ -171,13 +397,43 @@ ComputeLImgFromCoeffs(ImageType3D::Pointer final_b0, ImageType3D::Pointer initia
 
     ImageType3D::SizeType sz= final_b0->GetLargestPossibleRegion().GetSize();
 
-    vnl_matrix_fixed<double,3,3> RAS_to_LPS; RAS_to_LPS.set_identity();
-    RAS_to_LPS(0,0)=-1;
-    RAS_to_LPS(1,1)=1;
-    vnl_matrix<double> flip_mat= final_b0->GetDirection().GetVnlMatrix() * first_vol_grad->GetDirection().GetVnlMatrix().transpose();
-
     vnl_vector<double> norms(3,1);
     vnl_matrix_fixed<double,3,3> id_trans; id_trans.set_identity();
+
+
+    //The next part is for debugging purposes. Numerical and analytical derivations should be identical.
+    /*
+    InternalMatrixType Lmat; Lmat.set_identity();
+    ImageType3D::PointType  pt_scanner_space;
+    pt_scanner_space.Fill(-100);
+
+    Lmat= pixel_bmatrix(E,pt_scanner_space,norms);
+
+    InternalMatrixType Lmat2; Lmat2.set_identity();
+
+    double EPS=0.1;
+    for(int d=0;d<3;d++)
+    {
+        pt_scanner_space[d]+=EPS;
+        DisplacementFieldType::PixelType vec_p = GradWarpDispAtPoint(E,pt_scanner_space );
+        pt_scanner_space[d]-=2*EPS;
+        DisplacementFieldType::PixelType vec_m = GradWarpDispAtPoint(E,pt_scanner_space );
+        pt_scanner_space[d]+=EPS;
+
+
+        Lmat2(0,d)= (vec_p[0]-vec_m[0])/(2*EPS);
+        Lmat2(1,d)= (vec_p[1]-vec_m[1])/(2*EPS);
+        Lmat2(2,d)= (vec_p[2]-vec_m[2])/(2*EPS);
+    }
+    Lmat2=Lmat2+ id_trans;
+
+    std::cout<<"Lmat: "<<std::endl;
+    std::cout<<Lmat<<std::endl<<std::endl;
+    std::cout<<"Lmat2: "<<std::endl;
+    std::cout<<Lmat2<<std::endl<<std::endl;
+    int ma=0;
+    */
+
 
 
     #pragma omp parallel for
@@ -202,77 +458,86 @@ ComputeLImgFromCoeffs(ImageType3D::Pointer final_b0, ImageType3D::Pointer initia
                 itk::ContinuousIndex<double,3> cind;
                 first_vol->TransformPhysicalPointToContinuousIndex(pt_trans,cind);
 
-                InternalMatrixType RotMat; RotMat.set_identity();
+                InternalMatrixType Lmat; Lmat.set_identity();
                 if(grads)
                 {
-                    ImageType3D::PointType pt_scanner_space;
-                    first_vol_grad->TransformContinuousIndexToPhysicalPoint(cind,pt_scanner_space);
-                    vnl_vector<double> temp=  dicom_to_it_transformation * pt_scanner_space.GetVnlVector();
-                    pt_scanner_space[0]=temp[0];
-                    pt_scanner_space[1]=temp[1];
-                    pt_scanner_space[2]=temp[2];
-                    // This is the final physical point in NIFTI coordinate system
+                    ImageType3D::PointType pt_itk_space, pt_scanner_space;
+                    first_vol_grad->TransformContinuousIndexToPhysicalPoint(cind,pt_itk_space);
+                    // pt_itk_space is in ITK xyz coordinate system
 
-                    RotMat= pixel_bmatrix(E,pt_scanner_space,norms);
-                    RotMat=RAS_to_LPS.transpose() * RotMat  * RAS_to_LPS;
+
+                    if(E.gradType=="siemens")
+                    {
+                        auto pt_scanner_vnl = lps2lai * pt_itk_space.GetVnlVector();
+                        pt_scanner_space[0]= pt_scanner_vnl[0];
+                        pt_scanner_space[1]= pt_scanner_vnl[1];
+                        pt_scanner_space[2]= pt_scanner_vnl[2];
+
+                        //Lmat is in whatever scanner coordinate space
+                        Lmat= pixel_bmatrix(E,pt_scanner_space,norms);
+
+                        // to ITK
+                        Lmat = lps2lai * Lmat * lps2lai;
+                    }
+                    else
+                    {
+                        auto pt_scanner_vnl = lps2ras * pt_itk_space.GetVnlVector();
+                        pt_scanner_space[0]= pt_scanner_vnl[0];
+                        pt_scanner_space[1]= pt_scanner_vnl[1];
+                        pt_scanner_space[2]= pt_scanner_vnl[2];
+
+                        //Lmat is in whatever scanner coordinate space
+                        Lmat= pixel_bmatrix(E,pt_scanner_space,norms);
+
+                        // to ITK
+                        Lmat = lps2ras * Lmat * lps2ras;
+                    }
+
+
+                    //What pixel_bmatrix outputs is the backward Jacobian
+                    //Let's make it forward Jacobian
+                    //I know this is wrong, it sohuldnt be transpose but inverse.
+                    //everyone does it this way though
+                    Lmat=Lmat.transpose();
+
+                    // now let's transform Lmat to ijk space  of the native space image
+                    Lmat = first_vol_grad->GetDirection().GetTranspose() *
+                           Lmat  *
+                           first_vol_grad->GetDirection().GetVnlMatrix();
+
                 }
 
                 if(rigid_trans)
-                {
-                    vnl_matrix<double> dirmat= first_vol->GetDirection().GetVnlMatrix();
-                    vnl_matrix_fixed<double,3,3> rotmat2= rigid_trans->GetMatrix().GetVnlMatrix();
-
-                    RotMat= rotmat2 * RotMat * rotmat2.transpose();
+                {                    
+                    Lmat= first_vol_grad->GetDirection().GetVnlMatrix() *Lmat;
+                    Lmat= rigid_trans->GetMatrix().GetTranspose() *Lmat;
+                    Lmat = final_b0->GetDirection().GetTranspose() *Lmat;
                 }
 
-                Limg[0]->SetPixel(ind3,RotMat(0,0)-1);
-                Limg[1]->SetPixel(ind3,RotMat(0,1));
-                Limg[2]->SetPixel(ind3,RotMat(0,2));
-                Limg[3]->SetPixel(ind3,RotMat(1,0));
-                Limg[4]->SetPixel(ind3,RotMat(1,1)-1);
-                Limg[5]->SetPixel(ind3,RotMat(1,2));
-                Limg[6]->SetPixel(ind3,RotMat(2,0));
-                Limg[7]->SetPixel(ind3,RotMat(2,1));
-                Limg[8]->SetPixel(ind3,RotMat(2,2)-1);
+                //convert to HCP format ordering of tensor elements
+                Lmat=Lmat.transpose();
+
+                Limg[0]->SetPixel(ind3,Lmat(0,0));
+                Limg[1]->SetPixel(ind3,Lmat(0,1));
+                Limg[2]->SetPixel(ind3,Lmat(0,2));
+                Limg[3]->SetPixel(ind3,Lmat(1,0));
+                Limg[4]->SetPixel(ind3,Lmat(1,1));
+                Limg[5]->SetPixel(ind3,Lmat(1,2));
+                Limg[6]->SetPixel(ind3,Lmat(2,0));
+                Limg[7]->SetPixel(ind3,Lmat(2,1));
+                Limg[8]->SetPixel(ind3,Lmat(2,2));
 
 
             } //for i
         } //for j
     } //for k
 
+
+
     delete grads;
     return Limg;
 }
 
-
-
-InternalMatrixType ComputeJacobianAtIndex(DisplacementFieldType::Pointer disp_field, DisplacementFieldType::IndexType index)
-{
-    InternalMatrixType A;
-    A.fill(0);
-
-    for(int d=0;d<3;d++)
-        if(index[d]<=0 || index[d]>= disp_field->GetLargestPossibleRegion().GetSize()[d]-1)
-            return A;
-
-    DisplacementFieldType::IndexType Nind=index;
-    for(int dim=0;dim<3;dim++)   // derivative w.r.t.
-    {
-        DisplacementFieldType::PixelType val,val1,val2;
-        Nind[dim]++;
-        val1 = disp_field->GetPixel(Nind);
-        disp_field->TransformPhysicalVectorToLocalVector(val1,val);
-        Nind[dim]-=2;
-        val1=disp_field->GetPixel(Nind);
-        disp_field->TransformPhysicalVectorToLocalVector(val1,val2);
-        val-=val2;
-        Nind[dim]++;
-        val*=0.5/disp_field->GetSpacing()[dim];
-
-        A.set_column(dim,val.GetVnlVector());
-    }
-    return A;
-}
 
 
 std::vector<ImageType3D::Pointer> ComputeLImgFromField(ImageType3D::Pointer final_b0, ImageType3D::Pointer initial_b0, TORTOISE::OkanQuadraticTransformType::Pointer rigid_trans, DisplacementFieldType::Pointer gw_field, bool is_GE)
@@ -286,14 +551,7 @@ std::vector<ImageType3D::Pointer> ComputeLImgFromField(ImageType3D::Pointer fina
         first_vol= final_b0;
     }
 
-    vnl_matrix<double> dicom_to_it_transformation(3,3);
-    dicom_to_it_transformation.set_identity();
-    dicom_to_it_transformation(0,0)=-1;
-    dicom_to_it_transformation(1,1)=-1;
 
-    vnl_matrix_fixed<double,3,3> RAS_to_LPS; RAS_to_LPS.set_identity();
-    RAS_to_LPS(0,0)=-1;
-    RAS_to_LPS(1,1)=1;
 
     std::vector<ImageType3D::Pointer> Limg;
     Limg.resize(9);
@@ -310,8 +568,6 @@ std::vector<ImageType3D::Pointer> ComputeLImgFromField(ImageType3D::Pointer fina
 
     ImageType3D::SizeType sz= final_b0->GetLargestPossibleRegion().GetSize();
 
-
-    vnl_matrix<double> flip_mat= final_b0->GetDirection().GetVnlMatrix() * first_vol->GetDirection().GetVnlMatrix().transpose();
     vnl_vector<double> norms(3,1);
     vnl_matrix_fixed<double,3,3> id_trans; id_trans.set_identity();
 
@@ -352,22 +608,32 @@ std::vector<ImageType3D::Pointer> ComputeLImgFromField(ImageType3D::Pointer fina
                             jac_ind3[yy]= (unsigned int)std::round(cind[yy]);
                     }
 
-                    A= ComputeJacobianAtIndex(gw_field,jac_ind3);
-                    //A is now in IJK space
-                    A= gw_field->GetDirection().GetVnlMatrix() * A * gw_field->GetDirection().GetTranspose();
-                    //A is now in ITK XYZ space
-                    A= dicom_to_it_transformation * A * dicom_to_it_transformation.transpose();
-                    //A is now in NIFTI XYZ space
-                    A=RAS_to_LPS.transpose() * A  * RAS_to_LPS;
+                    A=ComputeJacobian(gw_field,jac_ind3);  //A is in ITK xyz space
+
+
+                    // I really think the following is WRONG..
+                    // I think it should be the inverse, NOT transpose
+                    // but everyone does it this way so I will do it this way too.
+                    //A= vnl_matrix_inverse<double>(A);
+
+                    //A is the backward Jacobian
+                    //Let's make it forward Jacobian
+                    //I know this is wrong, it sohuldnt be transpose but inverse.
+                    //everyone does it this way though
+                    A=A.transpose();
+
+                    // now let's transform A to ijk space  of the native space image
+                    A= first_vol->GetDirection().GetTranspose() *  A  * first_vol->GetDirection().GetVnlMatrix();
                 }
 
                 if(rigid_trans)
                 {
-                    vnl_matrix<double> dirmat= first_vol->GetDirection().GetVnlMatrix();
-                    vnl_matrix_fixed<double,3,3> rotmat2= rigid_trans->GetMatrix().GetVnlMatrix();
-
-                    A= rotmat2 * A * rotmat2.transpose();
+                    A= first_vol->GetDirection().GetVnlMatrix() *A;
+                    A= rigid_trans->GetMatrix().GetTranspose() *A;
+                    A = final_b0->GetDirection().GetTranspose() *A;
                 }
+                //convert to HCP format ordering of tensor elements
+                A=A.transpose();
 
                 Limg[0]->SetPixel(ind3,A(0,0));
                 Limg[1]->SetPixel(ind3,A(0,1));
@@ -409,8 +675,9 @@ int main(int argc, char*argv[])
     rigid_trans->SetIdentity();
 
 
-    ImageType3D::Pointer initial_b0=nullptr;
+
     ImageType3D::Pointer final_b0 = readImageD<ImageType3D>(final_img_name);
+    ImageType3D::Pointer initial_b0=final_b0;
     if(initial_img_name!="")
     {
         initial_b0 = readImageD<ImageType3D>(initial_img_name);
@@ -419,17 +686,20 @@ int main(int argc, char*argv[])
     }
 
 
+    std::string outname= final_img_name.substr(0,final_img_name.rfind(".nii"))+"_graddev";
     std::vector<ImageType3D::Pointer> graddev_vbmat_img;
     DisplacementFieldType::Pointer gradwarp_field_inv=nullptr;
     if(nonlinearity_file_name.find(".nii")!=std::string::npos)
     {
         gradwarp_field_inv = readImageD<DisplacementFieldType>(nonlinearity_file_name);
         graddev_vbmat_img= ComputeLImgFromField(final_b0,initial_b0,rigid_trans,gradwarp_field_inv,isGE);
+        outname=outname + "_f.nii";
     }
     else
     {
         gradwarp_field_inv= mk_displacement(nonlinearity_file_name,initial_b0,isGE);
         graddev_vbmat_img= ComputeLImgFromCoeffs(final_b0,initial_b0,rigid_trans,nonlinearity_file_name,isGE);
+        outname=outname + "_c.nii";
     }
 
     std::string gradwarp_name= final_img_name.substr(0,final_img_name.rfind(".nii"))+"_gradwarp_field.nii";
@@ -437,8 +707,6 @@ int main(int argc, char*argv[])
 
 
 
-
-    std::string outname= final_img_name.substr(0,final_img_name.rfind(".nii"))+"_graddev.nii";
     for(int v=0;v<9;v++)
     {
         write_3D_image_to_4D_file<float>(graddev_vbmat_img[v],outname,v,9);

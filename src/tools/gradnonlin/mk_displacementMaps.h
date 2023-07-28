@@ -118,31 +118,35 @@ DisplacementFieldType::Pointer mk_displacement_siemens(GradCoef &E,ImageType3D::
     vnl_matrix_fixed<double,3,3> spc_mat; spc_mat.fill(0);
     spc_mat(0,0)=spc[0];spc_mat(1,1)=spc[1]; spc_mat(2,2)=spc[2];
 
-    vnl_matrix_fixed<double,4,4> itk_ijk_to_xyz_matrix;
-    itk_ijk_to_xyz_matrix.set_identity();
-    itk_ijk_to_xyz_matrix.update(dir.GetVnlMatrix()*spc_mat,0,0);
-    itk_ijk_to_xyz_matrix(0,3)=origin[0];
-    itk_ijk_to_xyz_matrix(1,3)=origin[1];
-    itk_ijk_to_xyz_matrix(2,3)=origin[2];
-
-    vnl_matrix_fixed<double,4,4> itk_to_RAS_transformation;
-    itk_to_RAS_transformation.set_identity();
-    itk_to_RAS_transformation(0,0)=-1;
-    itk_to_RAS_transformation(1,1)=-1;
-
-    vnl_matrix_fixed<double,4,4> RAS_to_LAI_transformation;
-    RAS_to_LAI_transformation.set_identity();
-    RAS_to_LAI_transformation(0,0)=-1;
-    RAS_to_LAI_transformation(2,2)=-1;
-
-    vnl_matrix_fixed<double,3,3> xyz_to_LPS_trans;
-    xyz_to_LPS_trans.set_identity();
-    xyz_to_LPS_trans(0,0)=-1;
-    xyz_to_LPS_trans(1,1)=-1;
-    //xyz_to_LPS_trans(2,2)=-1;
+    auto temp = dir.GetVnlMatrix() * spc_mat;
+    vnl_matrix_fixed<double,4,4> ijk_to_itk_lps_mat; ijk_to_itk_lps_mat.set_identity();
+    ijk_to_itk_lps_mat(0,0)= temp(0,0);ijk_to_itk_lps_mat(0,1)= temp(0,1);ijk_to_itk_lps_mat(0,2)= temp(0,2);ijk_to_itk_lps_mat(0,3)=origin[0];
+    ijk_to_itk_lps_mat(1,0)= temp(1,0);ijk_to_itk_lps_mat(1,1)= temp(1,1);ijk_to_itk_lps_mat(1,2)= temp(1,2);ijk_to_itk_lps_mat(1,3)=origin[1];
+    ijk_to_itk_lps_mat(2,0)= temp(2,0);ijk_to_itk_lps_mat(2,1)= temp(2,1);ijk_to_itk_lps_mat(2,2)= temp(2,2);ijk_to_itk_lps_mat(2,3)=origin[2];
+    // this is from ijk to ITK LPS coordinates
 
 
-    vnl_matrix_fixed<double,4,4> ijk_to_xyz_transformation=   itk_to_RAS_transformation* itk_ijk_to_xyz_matrix;
+
+    vnl_matrix_fixed<double,4,4> lps_to_ras_mat; lps_to_ras_mat.set_identity();
+    lps_to_ras_mat(0,0)=-1;
+    lps_to_ras_mat(1,1)=-1;
+    // this is to convert ITK LPS xyz coordinates to DICOM RAS
+
+
+    vnl_matrix_fixed<double,4,4> ras_to_lai_mat; ras_to_lai_mat.set_identity();
+    ras_to_lai_mat(0,0)=-1;
+    ras_to_lai_mat(2,2)=-1;
+    // this is to convert DICOM RAI coordinates to Siemens LAI xyz
+
+
+    vnl_matrix_fixed<double,4,4> ijk_to_lai_mat = ras_to_lai_mat * lps_to_ras_mat * ijk_to_itk_lps_mat ;
+    // this is to convert directly from ijk to Siemens LAI xyz
+
+    vnl_matrix_fixed<double,4,4> halfvox; halfvox.fill(0);
+    halfvox(0,3)= ijk_to_lai_mat(0,0)/2.;
+    halfvox(1,3)= ijk_to_lai_mat(1,1)/2.;
+    ijk_to_lai_mat = ijk_to_lai_mat  + halfvox;
+
 
     ImageType3D::Pointer R_img= ImageType3D::New();
     R_img->SetRegions(b0_image->GetLargestPossibleRegion());
@@ -169,6 +173,7 @@ DisplacementFieldType::Pointer mk_displacement_siemens(GradCoef &E,ImageType3D::
     phi_img->FillBuffer(0);
 
 
+    #pragma omp parallel for
     for(int k=0;k<sizes[2];k++)
     {
         vnl_vector<double> ijk(4);
@@ -185,7 +190,8 @@ DisplacementFieldType::Pointer mk_displacement_siemens(GradCoef &E,ImageType3D::
                 ijk[0]=i;
                 ind3[0]=i;
 
-                vnl_vector<double> xyz= ijk_to_xyz_transformation * ijk;
+
+                vnl_vector<double> xyz= ijk_to_lai_mat  * ijk;
                 xyz[0]+=0.0001;
 
                 double r= sqrt(xyz[0]*xyz[0]+xyz[1]*xyz[1]+xyz[2]*xyz[2]);
@@ -251,7 +257,6 @@ DisplacementFieldType::Pointer mk_displacement_siemens(GradCoef &E,ImageType3D::
                 {
                     ind3[0]=i;
 
-
                     double b=0;
                     for(int l=0;l<=lmax;l++)
                     {
@@ -283,7 +288,9 @@ DisplacementFieldType::Pointer mk_displacement_siemens(GradCoef &E,ImageType3D::
                 }
             }
         }
-    }
+    } //for x
+
+
 
 
 
@@ -443,11 +450,10 @@ DisplacementFieldType::Pointer mk_displacement_siemens(GradCoef &E,ImageType3D::
                     }
                     DisplacementFieldType::PixelType vec = fieldImage->GetPixel(ind3);
                     vec[2]=E.R0*b;
-
-
-                    vnl_vector<double> vec2= xyz_to_LPS_trans * vec.GetVnlVector();
-                  //  vec2=-vec2;
-                    vec.SetVnlVector(vec2);
+                    // now vec is in Siemens LAI space.
+                    //Lets convert it to ITK LPS
+                    vec[1]=-vec[1];
+                    vec[2]=-vec[2];
 
                     fieldImage->SetPixel(ind3,vec);
                 }
@@ -470,13 +476,13 @@ DisplacementFieldType::Pointer mk_displacement_nonsiemens(GradCoef &E,ImageType3
        orig_vec[1]=origin[1];
        orig_vec[2]=origin[2];
 
-       vnl_matrix<double> dicom_to_it_transformation(3,3);
-       dicom_to_it_transformation.set_identity();
-       dicom_to_it_transformation(0,0)=-1;
-       dicom_to_it_transformation(1,1)=-1;
+       vnl_matrix<double> dicom_to_itk_transformation(3,3);
+       dicom_to_itk_transformation.set_identity();
+       dicom_to_itk_transformation(0,0)=-1;
+       dicom_to_itk_transformation(1,1)=-1;
 
-       vnl_matrix<double> new_direction = dicom_to_it_transformation * dir.GetVnlMatrix();
-       vnl_vector<double> new_orig_vec= dicom_to_it_transformation * orig_vec;
+       vnl_matrix<double> new_direction = dicom_to_itk_transformation * dir.GetVnlMatrix();
+       vnl_vector<double> new_orig_vec= dicom_to_itk_transformation * orig_vec;
        vnl_matrix<double> spc_mat(3,3);
        spc_mat.fill(0);
        spc_mat(0,0)= spc[0];
@@ -509,8 +515,10 @@ DisplacementFieldType::Pointer mk_displacement_nonsiemens(GradCoef &E,ImageType3
        std::vector<double>zcoef = E.gradZ_coef;
        /* Computing the mkbasis part */
             /* Fine non-linear terms */
-       for (int nn = 0; nn < nx ; nn++){
-           if ((E.Xkeys.at(2*nn) == 1) & (E.Xkeys.at(2*nn+1) == 1)){
+       for (int nn = 0; nn < nx ; nn++)
+       {
+           if ((E.Xkeys.at(2*nn) == 1) & (E.Xkeys.at(2*nn+1) == 1))
+           {
                normtemp = E.gradX_coef.at(nn);
                continue;
            }
@@ -574,9 +582,16 @@ DisplacementFieldType::Pointer mk_displacement_nonsiemens(GradCoef &E,ImageType3
        {
            DisplacementFieldType::IndexType index= it.GetIndex();
            DisplacementFieldType::PixelType vec;
-           vec[0]= E.R0* xbasis(countID,0);
-           vec[1]= E.R0* ybasis(countID,0);
-           vec[2]= E.R0* zbasis(countID,0);
+           vnl_vector<double> vec2(3);
+           vec2[0]= E.R0* xbasis(countID,0);
+           vec2[1]= E.R0* ybasis(countID,0);
+           vec2[2]= E.R0* zbasis(countID,0);
+
+           vec2= dicom_to_itk_transformation*vec2;
+           vec[0]=vec2[0];
+           vec[1]=vec2[1];
+           vec[2]=vec2[2];
+
 
            it.Set(vec);
            ++it;
