@@ -119,6 +119,7 @@ void ComputeDetImg_cuda(cudaPitchedPtr img, cudaPitchedPtr field,
                         cudaPitchedPtr output);
 
 
-
+float SumImage(CUDAIMAGE::Pointer im1);
+float SumImage_cuda(cudaPitchedPtr im1, const int3 data_sz,const int ncomp);
 
 #endif

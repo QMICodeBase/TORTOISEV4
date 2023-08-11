@@ -287,6 +287,52 @@ void IntegrateVelocityFieldGPU(std::vector<CUDAIMAGE::Pointer> velocity_field, f
 
 
 
+float  ComputeFieldScale(CUDAIMAGE::Pointer  field)
+{
+    return ComputeFieldScale_cuda(field->getFloatdata(), field->sz, field->spc );
+
+}
+
+CUDAIMAGE::Pointer DivideImages(CUDAIMAGE::Pointer im1, CUDAIMAGE::Pointer im2)
+{
+    cudaPitchedPtr d_output={0};
+
+    cudaExtent extent =  make_cudaExtent(im1->components_per_voxel*sizeof(float)*im1->sz.x,im1->sz.y,im1->sz.z);
+    cudaMalloc3D(&d_output, extent);
+
+    DivideImages_cuda(im1->getFloatdata(),im2->getFloatdata(), d_output,  im1->sz,im1->components_per_voxel);
+
+    CUDAIMAGE::Pointer output = CUDAIMAGE::New();
+    output->sz=im1->sz;
+    output->dir=im1->dir;
+    output->orig=im1->orig;
+    output->spc=im1->spc;
+    output->components_per_voxel= im1->components_per_voxel;
+    output->SetFloatDataPointer( d_output);
+    return output;
+
+}
+
+
+CUDAIMAGE::Pointer MultiplyImages(CUDAIMAGE::Pointer im1, CUDAIMAGE::Pointer im2)
+{
+    cudaPitchedPtr d_output={0};
+
+    cudaExtent extent =  make_cudaExtent(im1->components_per_voxel*sizeof(float)*im1->sz.x,im1->sz.y,im1->sz.z);
+    cudaMalloc3D(&d_output, extent);
+
+    MultiplyImages_cuda(im1->getFloatdata(),im2->getFloatdata(), d_output,  im1->sz,im1->components_per_voxel);
+
+    CUDAIMAGE::Pointer output = CUDAIMAGE::New();
+    output->sz=im1->sz;
+    output->dir=im1->dir;
+    output->orig=im1->orig;
+    output->spc=im1->spc;
+    output->components_per_voxel= im1->components_per_voxel;
+    output->SetFloatDataPointer( d_output);
+    return output;
+
+}
 
 
 

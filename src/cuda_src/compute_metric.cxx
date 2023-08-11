@@ -293,4 +293,9 @@ CUDAIMAGE::Pointer ComputeDetImgMain(CUDAIMAGE::Pointer img, CUDAIMAGE::Pointer 
 }
 
 
+float SumImage(CUDAIMAGE::Pointer im1)
+{
+    return SumImage_cuda(im1->getFloatdata(), im1->sz,im1->components_per_voxel);
+}
+
 #endif

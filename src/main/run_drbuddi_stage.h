@@ -71,6 +71,7 @@ public:
 
 protected:
     void CreateVirtualImage();
+    float ComputeBeta(CurrentFieldType::Pointer cfield,CurrentFieldType::Pointer pfield);
 
 
     DRBUDDIStageSettings *settings;

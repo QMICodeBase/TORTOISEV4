@@ -47,15 +47,7 @@ InternalMatrixType  pixel_bmatrix(const GradCoef &E, ImageType3D::PointType poin
         ll = E.Xkeys.at(2*kk);
         mm = E.Xkeys.at(2*kk+1);
 
-        /*
-        int mma =abs(mm);
-        double normfact=1.;
-        if(E.gradType=="siemens" && mma>0 && ll>1 )
-        {
-            normfact = pow(-1, mma) *    sqrt(double((2 * ll + 1) * factorial(ll - mma))   / double(2 * factorial(ll + mma)));
-        }
-        temp*=normfact;
-        */
+
         int mma =abs(mm);
         if(E.gradType=="siemens" && mma>0 && ll>1)
         {
@@ -509,9 +501,9 @@ ComputeLImgFromCoeffs(ImageType3D::Pointer final_b0, ImageType3D::Pointer initia
 
                 if(rigid_trans)
                 {                    
-                    Lmat= first_vol_grad->GetDirection().GetVnlMatrix() *Lmat;
-                    Lmat= rigid_trans->GetMatrix().GetTranspose() *Lmat;
-                    Lmat = final_b0->GetDirection().GetTranspose() *Lmat;
+                    Lmat= first_vol_grad->GetDirection().GetVnlMatrix() *Lmat * first_vol_grad->GetDirection().GetTranspose();
+                    Lmat= rigid_trans->GetMatrix().GetTranspose() *Lmat * rigid_trans->GetMatrix().GetVnlMatrix();
+                    Lmat = final_b0->GetDirection().GetTranspose() *Lmat* final_b0->GetDirection().GetVnlMatrix();
                 }
 
                 //convert to HCP format ordering of tensor elements

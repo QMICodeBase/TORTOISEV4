@@ -56,8 +56,9 @@ public:
     }
     
 private:
-    std::vector<CurrentFieldType::Pointer> velocity_field;    
-    int NTimePoints{5};
+    std::vector<CurrentFieldType::Pointer> velocity_field;
+public:
+    int NTimePoints{11};
 };
 
 

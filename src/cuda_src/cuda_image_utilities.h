@@ -84,6 +84,20 @@ void IntegrateVelocityField_cuda(cudaPitchedPtr *velocity_field,
 
 
 
+float ComputeFieldScale_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 spc);
+float ComputeFieldScale(CUDAIMAGE::Pointer  field);
+
+
+CUDAIMAGE::Pointer DivideImages(CUDAIMAGE::Pointer im1, CUDAIMAGE::Pointer im2);
+void  DivideImages_cuda(cudaPitchedPtr im1,cudaPitchedPtr im2, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp);
+
+
+
+CUDAIMAGE::Pointer MultiplyImages(CUDAIMAGE::Pointer im1, CUDAIMAGE::Pointer im2);
+void  MultiplyImages_cuda(cudaPitchedPtr im1,cudaPitchedPtr im2, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp);
+
+
+
 
 
 #endif

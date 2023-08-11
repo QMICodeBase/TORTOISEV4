@@ -2762,14 +2762,16 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeLImgFromCoeffs()
                 //Now get L from native ijk space to template ijk space
                 //yes some double unnecessary operations that cancel each other out here
                 // but makes reading wrt math easier
+
+
                 if(this->template_structural)
                 {
-                    Lmat= first_vol_grad->GetDirection().GetVnlMatrix() *Lmat;
+                    Lmat= first_vol_grad->GetDirection().GetVnlMatrix() *Lmat * first_vol_grad->GetDirection().GetTranspose();
                     if(this->b0_t0_str_trans)
                     {
-                        Lmat= this->b0_t0_str_trans->GetMatrix().GetTranspose() *Lmat;
+                        Lmat= this->b0_t0_str_trans->GetMatrix().GetTranspose() *Lmat * this->b0_t0_str_trans->GetMatrix().GetVnlMatrix();
                     }
-                    Lmat = this->template_structural->GetDirection().GetTranspose() *Lmat;
+                    Lmat = this->template_structural->GetDirection().GetTranspose() *Lmat *this->template_structural->GetDirection().GetVnlMatrix() ;
                 }
 
                 //convert to HCP format ordering of tensor elements
@@ -3213,12 +3215,12 @@ std::vector<ImageType3D::Pointer> FINALDATA::ComputeLImgFromField()
                 // but makes reading wrt math easier
                 if(this->template_structural)
                 {
-                    A= first_vol->GetDirection().GetVnlMatrix() *A;
+                    A= first_vol->GetDirection().GetVnlMatrix() *A * first_vol->GetDirection().GetTranspose();
                     if(this->b0_t0_str_trans)
                     {
-                        A= this->b0_t0_str_trans->GetMatrix().GetTranspose() *A;
+                        A= this->b0_t0_str_trans->GetMatrix().GetTranspose() *A * this->b0_t0_str_trans->GetMatrix().GetVnlMatrix();
                     }
-                    A = this->template_structural->GetDirection().GetTranspose() *A;
+                    A = this->template_structural->GetDirection().GetTranspose() *A *this->template_structural->GetDirection().GetVnlMatrix() ;
                 }
 
                 //convert to HCP format ordering of tensor elements
@@ -3368,6 +3370,7 @@ void FINALDATA::Generate()
         std::cout<<"Done..."<<std::endl;
     }
 
+    exit(EXIT_SUCCESS);
 
     std::vector< std::vector<ImageType3D::Pointer> > trans_interp_DWIs = GenerateTransformedInterpolatedData();
     GenerateFinalData(trans_interp_DWIs);

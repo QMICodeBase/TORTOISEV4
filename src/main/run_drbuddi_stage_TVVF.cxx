@@ -15,6 +15,8 @@
 #include "../cuda_src/cuda_image_utilities.h"
 #include "../cuda_src/compute_metric.h"
 
+//#include "itkTimeVaryingVelocityFieldIntegrationImageFilter.h"
+
 
 void DRBUDDIStage_TVVF::PreprocessImagesAndFields()
 {
@@ -238,17 +240,6 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
     Goper.CreateDirectional();
 
     std::vector<CurrentFieldType::Pointer> update_velocity_field; update_velocity_field.resize(NTimePoints);
-    std::vector<CurrentFieldType::Pointer> last_update_velocity_field; last_update_velocity_field.resize(NTimePoints);
-    for(int T=0;T<NTimePoints;T++)
-    {
-        last_update_velocity_field[T] = CurrentFieldType::New();
-        last_update_velocity_field[T]->sz = this->velocity_field[0]->sz;
-        last_update_velocity_field[T]->dir = this->velocity_field[0]->dir;
-        last_update_velocity_field[T]->orig = this->velocity_field[0]->orig;
-        last_update_velocity_field[T]->spc = this->velocity_field[0]->spc;
-        last_update_velocity_field[T]->components_per_voxel = 3;
-        last_update_velocity_field[T]->Allocate();
-    }
 
     for(int m=0;m<this->settings->metrics.size();m++)
     {
@@ -266,6 +257,26 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
     while( iter++ < this->settings->niter *2 && !converged )
     {
         CurrentFieldType::Pointer updateFieldF= nullptr,updateFieldM= nullptr;
+
+        if(iter%5==0)
+        {
+            CurrentFieldType::Pointer field_up=IntegrateVelocityField(0.5,0);
+            CurrentFieldType::Pointer field_down=IntegrateVelocityField(0.5,1);
+
+            if(settings->init_finv_const!=nullptr)
+            {
+                field_up= ComposeFields(settings->init_finv_const,field_up);
+                field_down= ComposeFields(settings->init_minv_const,field_down);
+
+                settings->init_finv_const=field_up;
+                settings->init_minv_const=field_down;
+            }
+            cudaExtent extent =  make_cudaExtent(this->velocity_field[0]->components_per_voxel*sizeof(float)*this->velocity_field[0]->sz.x,this->velocity_field[0]->sz.y,this->velocity_field[0]->sz.z);
+            for(int T=0;T<NTimePoints;T++)
+            {
+                cudaMemset3D(this->velocity_field[T]->getFloatdata(),0,extent);
+            }
+        }
 
 
         std::vector<float> metric_values;
@@ -301,9 +312,17 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
             CurrentFieldType::Pointer field_down=IntegrateVelocityField(t,1);
             CurrentFieldType::Pointer field_str=IntegrateVelocityField(t,0.5);
 
+            if(settings->init_finv_const!=nullptr)
+            {
+                field_up= ComposeFields(settings->init_finv_const,field_up);
+                field_down= ComposeFields(settings->init_minv_const,field_down);
+            }
+
+
+
 
             for(int met=0; met< Nmetrics;met++)
-            {                            
+            {
                 CurrentImageType::Pointer warped_up_img = WarpImage(this->resampled_smoothed_up_images[met],field_up);
                 CurrentImageType::Pointer  warped_down_img = WarpImage(this->resampled_smoothed_down_images[met],field_down);
                 CurrentImageType::Pointer warped_str_img=nullptr, warped_str_img_jac=nullptr;
@@ -324,16 +343,25 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
 
                 if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::MSJac)
                 {
+                    this->settings->metrics[met].weight=1.;
                     metric_value = ComputeMetric_MSJac(warped_up_img,warped_down_img,
                                                        field_up , field_down ,
                                                        updateFieldF_temp,  updateFieldM_temp,
                                                        this->up_phase_vector,
                                                        Goper );
+
+                    updateFieldF_temp=CurrentFieldType::New();
+                    updateFieldF_temp->sz = this->velocity_field[0]->sz;
+                    updateFieldF_temp->dir = this->velocity_field[0]->dir;
+                    updateFieldF_temp->orig = this->velocity_field[0]->orig;
+                    updateFieldF_temp->spc = this->velocity_field[0]->spc;
+                    updateFieldF_temp->components_per_voxel = 3;
+                    updateFieldF_temp->Allocate();
+
                 }
                 if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCSK)
                 {
-                    metric_value = ComputeMetric_CCSK(warped_up_img,warped_down_img, warped_str_img,updateFieldF_temp,updateFieldM_temp,0.5 );
-
+                    metric_value = ComputeMetric_CCSK(warped_up_img,warped_down_img, warped_str_img_jac,updateFieldF_temp,updateFieldM_temp,0.5 );
                 }
                 if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CC)
                 {
@@ -341,13 +369,11 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
                 }
                 if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCJacS)
                 {
-                    metric_value = ComputeMetric_CCJacS(warped_up_img,warped_down_img,warped_str_img_jac,
+                    metric_value = ComputeMetric_CCJacS(warped_up_img,warped_down_img,warped_str_img,
                                                               field_up, field_down,
                                                               updateFieldF_temp,  updateFieldM_temp,
                                                               this->up_phase_vector,
                                                               Goper );
-
-
                 }
 
                 if(t==0.5)
@@ -356,47 +382,59 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
                 if(Nmetrics>1)
                 {
                     AddToUpdateField(updateFieldF,updateFieldF_temp,this->settings->metrics[met].weight);
-                    AddToUpdateField(updateFieldM,updateFieldM_temp,this->settings->metrics[met].weight);
-
+               //     AddToUpdateField(updateFieldM,updateFieldM_temp,this->settings->metrics[met].weight);
                 }
                 else
                 {
                     updateFieldF=updateFieldF_temp;
-                    updateFieldM=updateFieldM_temp;
+                //    updateFieldM=updateFieldM_temp;
                 }
 
             } //for met
 
+            updateFieldF=GaussianSmoothImage(updateFieldF,this->settings->update_gaussian_sigma);
+         //   updateFieldM=GaussianSmoothImage(updateFieldM,this->settings->update_gaussian_sigma);
 
-            updateFieldF=GaussianSmoothImage(updateFieldF,this->settings->update_gaussian_sigma*1.5);
-            updateFieldM=GaussianSmoothImage(updateFieldM,this->settings->update_gaussian_sigma*1.5);
             if(this->settings->restrct)
             {
                 RestrictPhase(updateFieldF,this->up_phase_vector);
-                RestrictPhase(updateFieldM,this->down_phase_vector);
+            //    RestrictPhase(updateFieldM,this->down_phase_vector);
             }
 
             ScaleUpdateField(updateFieldF,1);
-            ScaleUpdateField(updateFieldM,1);
+          //  ScaleUpdateField(updateFieldM,1);
 
-            updateFieldM= MultiplyImage(updateFieldM,-1);
-            updateFieldF= AddImages(updateFieldF,updateFieldM);
-            updateFieldF=MultiplyImage(updateFieldF,0.5);
-            ScaleUpdateField(updateFieldF,1);
 
-            float sf= 1;
+            CurrentFieldType::Pointer updateFieldF_inv= InvertField(updateFieldF );
+         //   CurrentFieldType::Pointer updateFieldM_inv= InvertField(updateFieldM );
 
-            update_velocity_field[T]= AddImages(updateFieldF, last_update_velocity_field[T]);
-            update_velocity_field[T]= MultiplyImage(update_velocity_field[T],0.5);
-            ScaleUpdateField(update_velocity_field[T],sf);
-            last_update_velocity_field[T]=update_velocity_field[T];
+            if(this->settings->constrain)
+            {
+             //   ContrainDefFields(updateFieldF,updateFieldM);
+            }
+
+            updateFieldF=InvertField(updateFieldF_inv );
+          //  updateFieldM=InvertField(updateFieldM_inv );
+
+            update_velocity_field[T]=updateFieldF;
 
 
         } //T loop
 
+        for(int T=0;T<NTimePoints;T++)
+        {
+            update_velocity_field[T]= MultiplyImage(update_velocity_field[T],0.1);
+            this->velocity_field[T]= AddImages(this->velocity_field[T],update_velocity_field[T]);
+        }
+
+
+
+
         for(int met=0; met< Nmetrics;met++)
            all_ConvergenceMonitoring[met]->AddEnergyValue( metric_values[met]);
 
+
+/*
         if(this->settings->constrain)
         {
             for(int T=0;T<NTimePoints/2;T++)
@@ -420,7 +458,7 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
             this->velocity_field[T] = AddImages(this->velocity_field[T],field1);
             this->velocity_field[T] = GaussianSmoothImage(this->velocity_field[T],this->settings->total_gaussian_sigma*1.5);
         }
-
+*/
 
 
         double average_convergence=0;
@@ -479,8 +517,8 @@ DRBUDDIStage_TVVF::CurrentFieldType::Pointer DRBUDDIStage_TVVF::IntegrateVelocit
     if(lowt!=hight)
     {
         IntegrateVelocityFieldGPU(this->velocity_field, lowt,hight,dfield);
-/*
 
+/*
         using VelocityFieldType =itk::Image<DisplacementFieldType::PixelType,4>;
         DisplacementFieldType::Pointer aaa= this->GetVelocityfield()[0]->CudaImageToITKField();
 
@@ -547,8 +585,8 @@ DRBUDDIStage_TVVF::CurrentFieldType::Pointer DRBUDDIStage_TVVF::IntegrateVelocit
           CUDAIMAGE::Pointer dfield2=CUDAIMAGE::New();
           dfield2->SetImageFromITK(field);
           dfield=dfield2;
-
 */
+
     }
 
     return dfield;

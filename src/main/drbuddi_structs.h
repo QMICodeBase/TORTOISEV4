@@ -67,11 +67,19 @@ struct DRBUDDIStageSettings
         CUDAIMAGE::Pointer init_minv{nullptr};
         CUDAIMAGE::Pointer output_finv{nullptr};
         CUDAIMAGE::Pointer output_minv{nullptr};
+
+        CUDAIMAGE::Pointer init_finv_const{nullptr};
+        CUDAIMAGE::Pointer init_minv_const{nullptr};
+
     #else
         DisplacementFieldType::Pointer init_finv{nullptr};
         DisplacementFieldType::Pointer init_minv{nullptr};
         DisplacementFieldType::Pointer output_finv{nullptr};
         DisplacementFieldType::Pointer output_minv{nullptr};
+
+        DisplacementFieldType::Pointer init_finv_const{nullptr};
+        DisplacementFieldType::Pointer init_minv_const{nullptr};
+
     #endif
 
     std::vector<DRBUDDIMetric> metrics;

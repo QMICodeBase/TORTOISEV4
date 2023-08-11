@@ -360,6 +360,26 @@ void ScaleUpdateField_cuda(cudaPitchedPtr field, const int3 data_sz,float3 spc, 
 }
 
 
+float ComputeFieldScale_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 spc)
+{
+    float magnitude=0;
+
+        float* dev_out;
+        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+        FieldFindMaxLocalNorm<<<gSize, bSize>>>((float *)field.ptr, field.pitch/sizeof(float)/3*data_sz.y*data_sz.z,spc,dev_out);
+        ScalarFindMax<<<1, bSize>>>(dev_out, gSize, dev_out);
+        cudaDeviceSynchronize();
+
+
+        cudaMemcpy(&magnitude, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+        cudaFree(dev_out);
+
+        return  magnitude;
+
+}
+
+
 
 __global__ void
 RestrictPhase_kernel(cudaPitchedPtr field, const int3 d_sz, float3 phase)
@@ -1485,6 +1505,116 @@ void IntegrateVelocityField_cuda(cudaPitchedPtr *velocity_field,
     gpuErrchk(cudaDeviceSynchronize());
 
 }
+
+
+__global__ void
+DivideImages_kernel(cudaPitchedPtr im1, cudaPitchedPtr im2,cudaPitchedPtr output,  const int3 d_sz, const int Ncomponents)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+            {
+                size_t im1pitch= im1.pitch;
+                size_t im1slicePitch= im1pitch*d_sz.y*k;
+                size_t im1colPitch= j*im1pitch;
+                char *im1_ptr= (char *)(im1.ptr);
+                char * slice_im1= im1_ptr+  im1slicePitch;
+                float * row_im1= (float *)(slice_im1+ im1colPitch);
+
+                size_t im2pitch= im2.pitch;
+                size_t im2slicePitch= im2pitch*d_sz.y*k;
+                size_t im2colPitch= j*im2pitch;
+                char *im2_ptr= (char *)(im2.ptr);
+                char * slice_im2= im2_ptr+  im2slicePitch;
+                float * row_im2= (float *)(slice_im2+ im2colPitch);
+
+                size_t opitch= output.pitch;
+                size_t oslicePitch= opitch*d_sz.y*k;
+                size_t ocolPitch= j*opitch;
+                char *o_ptr= (char *)(output.ptr);
+                char * slice_o= o_ptr+  oslicePitch;
+                float * row_o= (float *)(slice_o+ ocolPitch);
+
+
+                for(int m=0;m<Ncomponents;m++)
+                {
+                    if(row_im2[Ncomponents*i+m]!=0)
+                        row_o[Ncomponents*i+m]= row_im1[Ncomponents*i+m] / row_im2[Ncomponents*i+m];
+                }
+           }
+    }
+}
+
+
+void  DivideImages_cuda(cudaPitchedPtr im1,cudaPitchedPtr im2, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp)
+{
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+
+    DivideImages_kernel<<< blockSize,gridSize>>>(im1,im2,d_output,data_sz,ncomp);
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+}
+
+
+__global__ void
+MultiplyImages_kernel(cudaPitchedPtr im1, cudaPitchedPtr im2,cudaPitchedPtr output,  const int3 d_sz, const int Ncomponents)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+            {
+                size_t im1pitch= im1.pitch;
+                size_t im1slicePitch= im1pitch*d_sz.y*k;
+                size_t im1colPitch= j*im1pitch;
+                char *im1_ptr= (char *)(im1.ptr);
+                char * slice_im1= im1_ptr+  im1slicePitch;
+                float * row_im1= (float *)(slice_im1+ im1colPitch);
+
+                size_t im2pitch= im2.pitch;
+                size_t im2slicePitch= im2pitch*d_sz.y*k;
+                size_t im2colPitch= j*im2pitch;
+                char *im2_ptr= (char *)(im2.ptr);
+                char * slice_im2= im2_ptr+  im2slicePitch;
+                float * row_im2= (float *)(slice_im2+ im2colPitch);
+
+                size_t opitch= output.pitch;
+                size_t oslicePitch= opitch*d_sz.y*k;
+                size_t ocolPitch= j*opitch;
+                char *o_ptr= (char *)(output.ptr);
+                char * slice_o= o_ptr+  oslicePitch;
+                float * row_o= (float *)(slice_o+ ocolPitch);
+
+
+                for(int m=0;m<Ncomponents;m++)
+                {
+                        row_o[Ncomponents*i+m]= row_im1[Ncomponents*i+m] * row_im2[Ncomponents*i+m];
+                }
+           }
+    }
+}
+
+
+void  MultiplyImages_cuda(cudaPitchedPtr im1,cudaPitchedPtr im2, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp)
+{
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+
+    MultiplyImages_kernel<<< blockSize,gridSize>>>(im1,im2,d_output,data_sz,ncomp);
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+}
+
 
 
 

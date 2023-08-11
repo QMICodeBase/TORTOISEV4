@@ -425,7 +425,19 @@ void DRBUDDIStage::PreprocessImagesAndFields()
 
 
 
+float DRBUDDIStage::ComputeBeta(CurrentFieldType::Pointer cfield,CurrentFieldType::Pointer pfield)
+{
+    auto pmfield= MultiplyImage(pfield,-1);
+    auto diff= AddImages(cfield,pmfield);
+    auto nom= SumImage(MultiplyImages(cfield,diff));
+    auto denom = SumImage(MultiplyImages(pfield,pfield));
 
+    float Bpr=0;
+    if(denom!=0)
+        Bpr=nom/denom;
+
+    return (0 < Bpr) ? Bpr : 0;
+}
 
 
 
@@ -467,6 +479,10 @@ void DRBUDDIStage::RunDRBUDDIStage()
     int iter=0;
     bool converged=false;
     float curr_convergence =1;
+
+    CurrentFieldType::Pointer prev_updateFieldF= nullptr,prev_updateFieldM= nullptr;
+    CurrentFieldType::Pointer conjugateFieldF= nullptr,conjugateFieldM= nullptr;
+
     while( iter++ < this->settings->niter && !converged )
     {
         CurrentFieldType::Pointer updateFieldF= nullptr,updateFieldM= nullptr;
@@ -515,14 +531,22 @@ void DRBUDDIStage::RunDRBUDDIStage()
         Goper.CreateDirectional();
 
 
+        CurrentFieldType::Pointer tot_finv= this->def_FINV;
+        CurrentFieldType::Pointer tot_minv= this->def_MINV;
+        if(settings->init_finv_const!=nullptr)
+        {
+            tot_finv= ComposeFields(settings->init_finv_const,this->def_FINV);
+            tot_minv= ComposeFields(settings->init_minv_const,this->def_MINV);
+        }
 
 
+        CurrentImageType::Pointer str_img=nullptr;
         std::vector<float> metric_values;
         metric_values.resize(Nmetrics);
         for(int met=0; met< Nmetrics;met++)
         {
-            CurrentImageType::Pointer warped_up_img = WarpImage(this->resampled_smoothed_up_images[met],this->def_FINV);
-            CurrentImageType::Pointer warped_down_img = WarpImage(this->resampled_smoothed_down_images[met],this->def_MINV);
+            CurrentImageType::Pointer warped_up_img = WarpImage(this->resampled_smoothed_up_images[met],tot_finv);
+            CurrentImageType::Pointer warped_down_img = WarpImage(this->resampled_smoothed_down_images[met],tot_minv);
 
             float metric_value=0;            
             CurrentFieldType::Pointer  updateFieldF_temp=nullptr,updateFieldM_temp=nullptr;
@@ -530,13 +554,15 @@ void DRBUDDIStage::RunDRBUDDIStage()
             if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCSK)
             {
                 metric_value = ComputeMetric_CCSK(warped_up_img,warped_down_img, this->resampled_smoothed_str_images[met],updateFieldF_temp,updateFieldM_temp );
+                if(!str_img)
+                    str_img=this->resampled_smoothed_str_images[met];
             }
 
             if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCJacS)
             {
                 {
                     metric_value = ComputeMetric_CCJacS(warped_up_img,warped_down_img,this->resampled_smoothed_str_images[met],
-                                                              this->def_FINV, this->def_MINV,
+                                                              tot_finv, tot_minv,
                                                               updateFieldF_temp,  updateFieldM_temp,
                                                               this->up_phase_vector,
                                                               Goper );
@@ -548,7 +574,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
 
 
                     metric_value = ComputeMetric_MSJac(warped_up_img,warped_down_img,
-                                                   this->def_FINV , this->def_MINV ,
+                                                   tot_finv , tot_minv ,
                                                    updateFieldF_temp,  updateFieldM_temp,
                                                    this->up_phase_vector,
                                                    Goper );
@@ -586,22 +612,130 @@ void DRBUDDIStage::RunDRBUDDIStage()
             RestrictPhase(updateFieldM,this->down_phase_vector);
         }
 
+        ScaleUpdateField(updateFieldF,1);
+        ScaleUpdateField(updateFieldM,1);
 
-        ScaleUpdateField(updateFieldF,this->settings->learning_rate);
-        ScaleUpdateField(updateFieldM,this->settings->learning_rate);
+        //ScaleUpdateField(updateFieldF,this->settings->learning_rate);
+        //ScaleUpdateField(updateFieldM,this->settings->learning_rate);
+
+        float beta_f=0,beta_m=0;
+        if(prev_updateFieldF)
+        {
+            beta_f= ComputeBeta(updateFieldF,prev_updateFieldF);
+            beta_m= ComputeBeta(updateFieldM,prev_updateFieldM);
+
+            if(beta_f>2)
+                beta_f=1;
+            if(beta_m>2)
+                beta_m=1;
+
+        }
+        prev_updateFieldF=CurrentFieldType::New();
+        prev_updateFieldF->DuplicateFromCUDAImage(updateFieldF);
+        prev_updateFieldM=CurrentFieldType::New();
+        prev_updateFieldM->DuplicateFromCUDAImage(updateFieldM);
+
+        if(conjugateFieldF)
+        {
+            conjugateFieldF=MultiplyImage(conjugateFieldF,beta_f);
+            conjugateFieldF=AddImages(conjugateFieldF,updateFieldF);
+            conjugateFieldM=MultiplyImage(conjugateFieldM,beta_m);
+            conjugateFieldM=AddImages(conjugateFieldM,updateFieldM);
+        }
+        else
+        {
+            conjugateFieldF=CurrentFieldType::New();
+            conjugateFieldF->DuplicateFromCUDAImage(updateFieldF);
+            conjugateFieldM=CurrentFieldType::New();
+            conjugateFieldM->DuplicateFromCUDAImage(updateFieldM);
+        }
 
 
+        float best_mv1=std::numeric_limits<float>::max();
+        float best_mv2=std::numeric_limits<float>::max();
+
+        float best_lr=this->settings->learning_rate;
+        for(float lr=this->settings->learning_rate/4;lr<= this->settings->learning_rate; lr*=2)
+        {
+            ScaleUpdateField(conjugateFieldF,lr);
+            ScaleUpdateField(conjugateFieldM,lr);
+
+            {
+                CurrentFieldType::Pointer f2midtmp=nullptr,f2midtmp_inv=nullptr;
+                CurrentFieldType::Pointer m2midtmp=nullptr,m2midtmp_inv=nullptr;
+
+
+                f2midtmp  = ComposeFields(this->def_F,conjugateFieldF);
+                f2midtmp = GaussianSmoothImage(f2midtmp,this->settings->total_gaussian_sigma);
+                CurrentFieldType::Pointer f2midtotal_inv= InvertField(f2midtmp, this->def_FINV );
+
+                m2midtmp  = ComposeFields(this->def_M,conjugateFieldM);
+                m2midtmp = GaussianSmoothImage(m2midtmp,this->settings->total_gaussian_sigma);
+                CurrentFieldType::Pointer m2midtotal_inv= InvertField(m2midtmp, this->def_MINV );
+
+                if(this->settings->constrain)
+                {
+                    ContrainDefFields(f2midtotal_inv,m2midtotal_inv);
+                }
+
+                if(settings->init_finv_const!=nullptr)
+                {
+                    f2midtotal_inv= ComposeFields(settings->init_finv_const,f2midtotal_inv);
+                    m2midtotal_inv= ComposeFields(settings->init_minv_const,m2midtotal_inv);
+                }
+
+                CurrentFieldType::Pointer dummyf,dummym;
+                CurrentImageType::Pointer warped_up_temp = WarpImage(this->resampled_smoothed_up_images[0],f2midtotal_inv);
+                CurrentImageType::Pointer warped_down_temp = WarpImage(this->resampled_smoothed_down_images[0],m2midtotal_inv);
+
+
+
+                float mv1,mv2;
+                if(str_img)
+                {
+
+                    //mv2=ComputeMetric_CCSK(warped_up_temp,warped_down_temp, str_img,dummyf,dummym );
+                    mv2 = ComputeMetric_CCJacS(warped_up_temp,warped_down_temp,str_img,
+                                               f2midtotal_inv , m2midtotal_inv ,
+                                               dummyf,  dummym,
+                                               this->up_phase_vector,
+                                               Goper );
+
+                    if(mv2<best_mv2)
+                    {
+                        best_mv2=mv2;
+                        best_lr=lr;
+                    }
+                }
+                else
+                {
+                    mv1 = ComputeMetric_MSJac(warped_up_temp,warped_down_temp,
+                                                   f2midtotal_inv , m2midtotal_inv ,
+                                                   dummyf,  dummym,
+                                                   this->up_phase_vector,
+                                                   Goper );
+                    if(mv1<best_mv1)
+                    {
+                        best_mv1=mv1;
+                        best_lr=lr;
+                    }
+                }
+            }
+        }
+
+        ScaleUpdateField(conjugateFieldF,best_lr);
+        ScaleUpdateField(conjugateFieldM,best_lr);
 
         {
             CurrentFieldType::Pointer f2midtmp=nullptr,f2midtmp_inv=nullptr;
             CurrentFieldType::Pointer m2midtmp=nullptr,m2midtmp_inv=nullptr;
 
 
-            f2midtmp  = ComposeFields(this->def_F,updateFieldF);
+            f2midtmp  = ComposeFields(this->def_F,conjugateFieldF);
             f2midtmp = GaussianSmoothImage(f2midtmp,this->settings->total_gaussian_sigma);
             CurrentFieldType::Pointer f2midtotal_inv= InvertField(f2midtmp, this->def_FINV );
 
-            m2midtmp  = ComposeFields(this->def_M,updateFieldM);
+            m2midtmp  = ComposeFields(this->def_M,conjugateFieldM);
             m2midtmp = GaussianSmoothImage(m2midtmp,this->settings->total_gaussian_sigma);
             CurrentFieldType::Pointer m2midtotal_inv= InvertField(m2midtmp, this->def_MINV );
 
@@ -617,6 +751,8 @@ void DRBUDDIStage::RunDRBUDDIStage()
             this->def_MINV=m2midtotal_inv;
             this->def_M=m2midtotal;
         }
+
+
 
 
         double average_convergence=0;
@@ -650,7 +786,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
          for(int i=0;i<metric_values.size()-1;i++)
              (*stream)<<"Metric " << i<< ": " << std::setprecision(8)<<metric_values[i]<<", ";
 
-         (*stream)<<"Metric " << metric_values.size()-1<< ": " << std::setprecision(8)<<metric_values[metric_values.size()-1]<< " LR: " << this->settings->learning_rate<<std::endl;
+         (*stream)<<"Metric " << metric_values.size()-1<< ": " << std::setprecision(8)<<metric_values[metric_values.size()-1]<< " LR: " << best_lr<<" betaf: "<<beta_f << " beta_m: "<<beta_m <<std::endl;
          m_lastTotalTime = now;
          m_clock.Start();
 
@@ -659,6 +795,12 @@ void DRBUDDIStage::RunDRBUDDIStage()
 
     this->settings->output_finv= this->def_FINV;
     this->settings->output_minv= this->def_MINV;
+    if(settings->init_finv_const!=nullptr)
+    {
+        this->settings->output_finv= ComposeFields(settings->init_finv_const,this->def_FINV);
+        this->settings->output_minv= ComposeFields(settings->init_minv_const,this->def_MINV);
+    }
+
 }
 
 

@@ -11,7 +11,7 @@
 #define LIMCC (1E-10)
 #define LIMCCJAC (1E-5)
 
-#define WIN_RAD 4
+#define WIN_RAD 7
 #define WIN_RAD_Z 2
 
 #define WIN_RAD_JAC 9
@@ -52,23 +52,26 @@ ComputeMetric_CC_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                            cudaPitchedPtr metric_img);
 
 __device__ float mf(float det)
-{
-    float logd = log(det);
-    float ly = logd / (sqrt(1+0.2*logd*logd));
-    float y= exp(ly);
-    return y;
+{    
+    return det;
+
+//    float logd = log(det);
+//    float ly = logd / (sqrt(1+0.25*logd*logd));
+//    float y= exp(ly);
+ //   return y;
 }
 
 
 __device__ float dmf(float x)
-{
-    float y= mf(x);
-    float lx= log(x);
+{    
+    return 1;
+//    float y= mf(x);
+//    float lx= log(x);
 
-    float nom = 1./x * sqrt(1+0.2* lx*lx) - lx *  1./sqrt(1+0.2*lx*lx) *0.2* lx *1./x;
-    float denom = 1+0.2* lx*lx;
+ //   float nom = 1./x * sqrt(1+0.25* lx*lx) - lx *  1./sqrt(1+0.25*lx*lx) *0.25* lx *1./x;
+ //   float denom = 1+0.25* lx*lx;
 
-    return y*nom/denom;
+ //   return y*nom/denom;
 
 
 }
@@ -1428,8 +1431,21 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
 
 
 
+__device__ float c_wi(float x)
+{
+    return 1;
 
+  //  const float MXX=4E9;
+  //  return 0.999*exp(-30*x/MXX)+0.001;
+}
 
+__device__ float c_dwi_dx(float x)
+{
+    return 0;
+
+  //  const float MXX=4E9;
+  //  return 0.999*exp(-30*x/MXX)* -30/MXX;
+}
 
 
 
@@ -1468,6 +1484,8 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
                 float a_b= a/b;
                 a_b=0;
+
+
 
 
                 ////////////////////////   at x ///////////////////////////////////////////
@@ -1509,14 +1527,19 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                     float valf = row_up[i]*detf;
                     float valm = row_down[i]*detm;
                     float K= valf-valm;
-                    row_metric[i]= K*K;
-                    
-                    updateF[0]= 2*K*gradI2.x*detf;
-                    updateF[1]= 2*K*gradI2.y*detf;
-                    updateF[2]= 2*K*gradI2.z*detf;
-                    updateM[0]= -2*K*gradJ2.x*detm;
-                    updateM[1]= -2*K*gradJ2.y*detm;
-                    updateM[2]= -2*K*gradJ2.z*detm;
+
+                    float wi = c_wi(valf*valm);
+                    float dwi = c_dwi_dx(valf*valm);
+
+
+                    row_metric[i]= wi*K*K;
+
+                    updateF[0]= 2*K*gradI2.x*detf *wi  + K*K*dwi* detf*valm * gradI2.x;
+                    updateF[1]= 2*K*gradI2.y*detf *wi  + K*K*dwi* detf*valm * gradI2.y;
+                    updateF[2]= 2*K*gradI2.z*detf *wi  + K*K*dwi* detf*valm * gradI2.z;
+                    updateM[0]= -2*K*gradJ2.x*detm *wi + K*K*dwi* detm*valf * gradJ2.x;
+                    updateM[1]= -2*K*gradJ2.y*detm *wi + K*K*dwi* detm*valf * gradJ2.y;
+                    updateM[2]= -2*K*gradJ2.z*detm *wi + K*K*dwi* detm*valf * gradJ2.z;
                 }
 
 
@@ -1534,6 +1557,7 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                                 a= c_Kernel[mid_ind-h];
                             else
                                 a=0;
+                            a_b=a/b;
                             a_b=0;
 
                             float detf2 = ComputeSingleJacobianMatrixAtIndex(def_FINV,nindex[0],nindex[1],nindex[2],h,phase,phase_xyz)+1;
@@ -1570,12 +1594,20 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
                             float fval = row_up[nindex[0]];
                             float mval = row_down[nindex[0]];
+                            float valf = fval*detf;
+                            float valm = mval*detm;
 
+                            float K= valf-valm;
 
-                            float K =(fval*detf -mval*detm);
-                            updateF[phase_xyz]+= 2 * K *  ( gradI[phase_xyz]*detf*a_b  + d_new_phase[phase_xyz]*dmf(detf2)* fval* -0.5/d_spc[phase]/h) ;
-                            updateM[phase_xyz]-= 2*  K *  ( gradJ[phase_xyz]*detm*a_b  + d_new_phase[phase_xyz]*dmf(detm2)* mval* -0.5/d_spc[phase]/h);
-                                                        
+                            float wi = c_wi(valf*valm);
+                            float dwi = c_dwi_dx(valf*valm);
+
+                            updateF[phase_xyz]+=  2 * K * wi*  ( gradI[phase_xyz]*detf*a_b  + d_new_phase[phase_xyz]*dmf(detf2)* fval* -0.5/d_spc[phase]/h);
+                            updateM[phase_xyz]+= -2*  K * wi* ( gradJ[phase_xyz]*detm*a_b  + d_new_phase[phase_xyz]*dmf(detm2)* mval* -0.5/d_spc[phase]/h);
+
+                            updateF[phase_xyz]+= K*K*dwi*(valm*fval*d_new_phase[phase_xyz]*-0.5/d_spc[phase]/h);
+                            updateM[phase_xyz]+= K*K*dwi*(valf*mval*d_new_phase[phase_xyz]*-0.5/d_spc[phase]/h);
+
                         }
                     }
              } // x+1
@@ -1596,6 +1628,7 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                                 a= c_Kernel[mid_ind-h];
                             else
                                 a=0;
+                            a_b=a/b;
                             a_b=0;
 
                             float detf2 = ComputeSingleJacobianMatrixAtIndex(def_FINV,nindex[0],nindex[1],nindex[2],h,phase,phase_xyz)+1;
@@ -1631,12 +1664,19 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
                             float fval = row_up[nindex[0]];
                             float mval = row_down[nindex[0]];
+                            float valf = fval*detf;
+                            float valm = mval*detm;
 
+                            float K= valf-valm;
 
-                            float K =(fval*detf -mval*detm);
-                            updateF[phase_xyz]+=  2*  K*  ( gradI[phase_xyz]*detf*a_b  + d_new_phase[phase_xyz]*dmf(detf2)*fval*  0.5/d_spc[phase]/h);
-                            updateM[phase_xyz]-=  2*  K*  ( gradJ[phase_xyz]*detm*a_b  + d_new_phase[phase_xyz]*dmf(detm2)* mval* 0.5/d_spc[phase]/h);
-                            
+                            float wi = c_wi(valf*valm);
+                            float dwi = c_dwi_dx(valf*valm);
+
+                            updateF[phase_xyz]+=  2* K* wi* ( gradI[phase_xyz]*detf*a_b  + d_new_phase[phase_xyz]*dmf(detf2)*fval*  0.5/d_spc[phase]/h);
+                            updateM[phase_xyz]+= -2* K* wi* ( gradJ[phase_xyz]*detm*a_b  + d_new_phase[phase_xyz]*dmf(detm2)* mval* 0.5/d_spc[phase]/h);
+
+                            updateF[phase_xyz]+= K*K*dwi*(valm*fval*d_new_phase[phase_xyz]*0.5/d_spc[phase]/h);
+                            updateM[phase_xyz]+= K*K*dwi*(valf*mval*d_new_phase[phase_xyz]*0.5/d_spc[phase]/h);
                         }
                     }
                } // x-1
@@ -1713,6 +1753,24 @@ void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     else phase_xyz=2;
 
 
+/*
+    float* dev_up_max, *dev_down_max;
+    float up_max,down_max;
+    cudaMalloc((void**)&dev_up_max, sizeof(float)*gSize);
+    cudaMalloc((void**)&dev_down_max, sizeof(float)*gSize);
+    ScalarFindMax<<<gSize, bSize>>>((float *)up_img.ptr, up_img.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_up_max);
+    cudaDeviceSynchronize();
+    ScalarFindMax<<<gSize, bSize>>>((float *)down_img.ptr, down_img.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_down_max);
+    cudaDeviceSynchronize();
+
+    ScalarFindMax<<<1, bSize>>>(dev_up_max, gSize, dev_up_max);
+    cudaDeviceSynchronize();
+    ScalarFindMax<<<1, bSize>>>(dev_down_max, gSize, dev_down_max);
+    cudaDeviceSynchronize();
+*/
+
+
+
     
     const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
     const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
@@ -1726,11 +1784,11 @@ void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     float* dev_out;
     float out;
     cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
-
     ScalarFindSum<<<gSize, bSize>>>((float *)metric_image.ptr, metric_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
     cudaDeviceSynchronize();
     ScalarFindSum<<<1, bSize>>>(dev_out, gSize, dev_out);
     cudaDeviceSynchronize();
+
 
     cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
     cudaFree(dev_out);
@@ -2669,6 +2727,25 @@ void ComputeDetImg_cuda(cudaPitchedPtr img, cudaPitchedPtr field,
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
+
+}
+
+
+
+float SumImage_cuda(cudaPitchedPtr im1, const int3 data_sz,const int ncomp)
+{
+    float* dev_out;
+    float out;
+    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+    ScalarFindSum<<<gSize, bSize>>>((float *)im1.ptr, im1.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+    cudaDeviceSynchronize();
+    ScalarFindSum<<<1, bSize>>>(dev_out, gSize, dev_out);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+    cudaFree(dev_out);
+    return out;
 
 }
 
