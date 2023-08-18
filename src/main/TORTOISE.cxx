@@ -1011,7 +1011,59 @@ void TORTOISE::AlignB0ToReorientation()
             b0_img= read_3D_volume_from_4D(this->proc_infos[0].nii_name,0);
 
         //b0_to_str_trans = RigidRegisterImagesEuler( target_img,  b0_img,parser->getRigidMetricType(),parser->getRigidLR());
+        auto b0_to_str_trans_CC = RigidRegisterImagesEuler( target_img,  b0_img,"CC",parser->getRigidLR());
+        auto params_CC=b0_to_str_trans_CC->GetParameters();
+        std::cout<<"CC: " << params_CC<<std::endl;
         b0_to_str_trans = RigidRegisterImagesEuler( target_img,  b0_img,"MI",parser->getRigidLR());
+        auto params_MI=b0_to_str_trans->GetParameters();
+        std::cout<<"MI: " << params_MI<<std::endl;
+
+        auto p1=params_CC-params_MI;
+        double diff=0;
+        diff+= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] +
+               p1[3]*p1[3]/400. + p1[4]*p1[4]/400. + p1[5]*p1[5]/400. ;
+
+        if(diff>0.01)
+        {
+            ImageType3D::IndexType target_center, b0_center;
+            target_center[0]=(target_img->GetLargestPossibleRegion().GetSize()[0]-1)/2.;
+            target_center[1]=(target_img->GetLargestPossibleRegion().GetSize()[1]-1)/2.;
+            target_center[2]=(target_img->GetLargestPossibleRegion().GetSize()[2]-1)/2.;
+            b0_center[0]=(b0_img->GetLargestPossibleRegion().GetSize()[0]-1)/2.;
+            b0_center[1]=(b0_img->GetLargestPossibleRegion().GetSize()[1]-1)/2.;
+            b0_center[2]=(b0_img->GetLargestPossibleRegion().GetSize()[2]-1)/2.;
+
+            vnl_vector<double> center_diff(3);
+            center_diff[0]= b0_center[0]-target_center[0];
+            center_diff[1]= b0_center[1]-target_center[1];
+            center_diff[2]= b0_center[2]-target_center[2];
+
+            double CC_diff= (params_CC[3]- center_diff[3])*(params_CC[3]- center_diff[3]) +
+                            (params_CC[4]- center_diff[4])*(params_CC[4]- center_diff[4]) +
+                            (params_CC[5]- center_diff[5])*(params_CC[5]- center_diff[5]) ;
+            double MI_diff= (params_MI[3]- center_diff[3])*(params_MI[3]- center_diff[3]) +
+                            (params_MI[4]- center_diff[4])*(params_MI[4]- center_diff[4]) +
+                            (params_MI[5]- center_diff[5])*(params_MI[5]- center_diff[5]) ;
+
+            RigidTransformType::Pointer new_rigid= RigidTransformType::New();
+            new_rigid->SetIdentity();
+            auto pp = new_rigid->GetParameters();
+            if(CC_diff<MI_diff)
+            {
+                pp[3]=params_CC[3];
+                pp[4]=params_CC[4];
+                pp[5]=params_CC[5];
+            }
+            else
+            {
+                pp[3]=params_MI[3];
+                pp[4]=params_MI[4];
+                pp[5]=params_MI[5];
+            }
+            new_rigid->SetParameters(pp);
+            b0_to_str_trans = RigidRegisterImagesEuler( target_img,  b0_img,"MI",parser->getRigidLR(),new_rigid);
+            std::cout<<"Final trans: "<<b0_to_str_trans->GetParameters()<<std::endl;
+        }
     }
     else
     {

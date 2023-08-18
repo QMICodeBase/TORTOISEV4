@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.20)
 PROJECT(TORTOISEV4  )
 
 SET(USEOPENMP 1)
-#   SET(CMAKE_BUILD_TYPE Debug)
-#   SET(ISDEBUG 1)
+ #  SET(CMAKE_BUILD_TYPE Debug)
+ #  SET(ISDEBUG 1)
 
 
 
@@ -473,8 +473,8 @@ target_link_libraries(Combine3DImagesTo4D  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  
 
 
 
-#add_executable(AnhApplyTransformationstoGhostImages  ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/AnhApplyTransformationstoGhostImages/AnhApplyTransformationstoGhostImages.cxx ${SOURCES})
-#target_link_libraries(AnhApplyTransformationstoGhostImages ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+add_executable(AnhApplyTransformationstoGhostImages  ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/AnhApplyTransformationstoGhostImages/AnhApplyTransformationstoGhostImages.cxx ${SOURCES})
+target_link_libraries(AnhApplyTransformationstoGhostImages ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 

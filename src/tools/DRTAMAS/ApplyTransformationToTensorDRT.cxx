@@ -28,7 +28,7 @@ int main( int argc , char * argv[] )
 
 
     std::string filename(argv[2]);
-    std::string::size_type idx=filename.find('.');
+    std::string::size_type idx=filename.rfind('.');
     std::string extension = filename.substr(idx+1);
     std::string output_nii_name=argv[3];
 
@@ -38,7 +38,7 @@ int main( int argc , char * argv[] )
 
     if(idx != std::string::npos)
     {
-        if(extension == "nii"  || extension == "nii.gz" )
+        if(filename.find(".nii")!=std::string::npos  )
         {
             typedef itk::ImageFileReader<DisplacementFieldType> FieldReaderType;
             typename FieldReaderType::Pointer mreader=FieldReaderType::New();

@@ -51,7 +51,7 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
 
     typedef itk::MattesMutualInformationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType3;
     MetricType3::Pointer m= MetricType3::New();
-    m->SetNumberOfHistogramBins(50);
+    m->SetNumberOfHistogramBins(60);
     m->SetMaximumNumberOfWorkUnits(NITK);       
 
 
@@ -99,31 +99,28 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
 
 
     RigidRegistrationType::ShrinkFactorsArrayType shrinkFactorsPerLevel;
-    shrinkFactorsPerLevel.SetSize( 5 );
-    shrinkFactorsPerLevel[0] = 8;
-    shrinkFactorsPerLevel[1] = 6;
-    shrinkFactorsPerLevel[2] = 4;
-    shrinkFactorsPerLevel[3] = 2;
-    shrinkFactorsPerLevel[4] = 1;
+    shrinkFactorsPerLevel.SetSize( 4 );
+    shrinkFactorsPerLevel[0] = 6;
+    shrinkFactorsPerLevel[1] = 4;
+    shrinkFactorsPerLevel[2] = 2;
+    shrinkFactorsPerLevel[3] = 1;
 
     RigidRegistrationType::SmoothingSigmasArrayType smoothingSigmasPerLevel;
-    smoothingSigmasPerLevel.SetSize( 5 );
-    smoothingSigmasPerLevel[0] = 3.;
-    smoothingSigmasPerLevel[1] = 2.5;
-    smoothingSigmasPerLevel[2] = 2.;
-    smoothingSigmasPerLevel[3] = 1.;
-    smoothingSigmasPerLevel[4] = 0.;
+    smoothingSigmasPerLevel.SetSize( 4 );
+    smoothingSigmasPerLevel[0] = 2.5;
+    smoothingSigmasPerLevel[1] = 2.;
+    smoothingSigmasPerLevel[2] = 1.;
+    smoothingSigmasPerLevel[3] = 0.1;
 
     std::vector<unsigned int> currentStageIterations;
-    currentStageIterations.push_back(10000);
-    currentStageIterations.push_back(10000);
+    currentStageIterations.push_back(10000);    
     currentStageIterations.push_back(1000);
     currentStageIterations.push_back(1000);
     currentStageIterations.push_back(100);
 
 
 
-    rigidRegistration->SetNumberOfLevels( 5 );
+    rigidRegistration->SetNumberOfLevels( 4 );
     rigidRegistration->SetSmoothingSigmasPerLevel( smoothingSigmasPerLevel );
     rigidRegistration->SetShrinkFactorsPerLevel( shrinkFactorsPerLevel );
     rigidRegistration->SetSmoothingSigmasAreSpecifiedInPhysicalUnits(false);

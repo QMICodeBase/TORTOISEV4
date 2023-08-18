@@ -3370,7 +3370,6 @@ void FINALDATA::Generate()
         std::cout<<"Done..."<<std::endl;
     }
 
-    exit(EXIT_SUCCESS);
 
     std::vector< std::vector<ImageType3D::Pointer> > trans_interp_DWIs = GenerateTransformedInterpolatedData();
     GenerateFinalData(trans_interp_DWIs);
