@@ -253,8 +253,7 @@ void DRTAMASStage::RunDRTAMASStage()
         }
     }
 
-    static int st=-1;
-    st++;
+
 
     int iter=0;
     bool converged=false;
@@ -295,7 +294,7 @@ void DRTAMASStage::RunDRTAMASStage()
             {
 
                 CurrentImageType::Pointer warped_fixed_img = WarpImage(resampled_smoothed_fixed_structurals[str_id],this->def_FINV);
-                CurrentImageType::Pointer warped_moving_img = WarpImage(resampled_smoothed_fixed_structurals[str_id],this->def_MINV);
+                CurrentImageType::Pointer warped_moving_img = WarpImage(resampled_smoothed_moving_structurals[str_id],this->def_MINV);
                 str_id++;
 
                 metric_value = ComputeMetric_CC(warped_fixed_img,warped_moving_img, updateFieldF_temp,updateFieldM_temp );

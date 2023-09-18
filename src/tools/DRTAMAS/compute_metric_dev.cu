@@ -259,11 +259,11 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                             cudaPitchedPtr metric_image)
 
 {
-    uint ii = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint ii2 = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
     uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
     uint k = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
 
-    for(int i=PER_GROUP*ii;i<PER_GROUP*ii+PER_GROUP;i++)
+    for(int i=PER_GROUP*ii2;i<PER_GROUP*ii2+PER_GROUP;i++)
     {
         if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2])
         {
@@ -492,9 +492,9 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                                     Af[px][1]-= DPHI *SD[dim][1];
                                     Af[px][2]-= DPHI *SD[dim][2];
 
-                                    Rpos[0][0]= 0.5*(Rpos[0][0]-Rneg[0][0]);Rpos[0][1]= 0.5*(Rpos[0][1]-Rneg[0][1]);Rpos[0][2]= 0.5*(Rpos[0][2]-Rneg[0][2]);
-                                    Rpos[1][0]= 0.5*(Rpos[1][0]-Rneg[1][0]);Rpos[1][1]= 0.5*(Rpos[1][1]-Rneg[1][1]);Rpos[1][2]= 0.5*(Rpos[1][2]-Rneg[1][2]);
-                                    Rpos[2][0]= 0.5*(Rpos[2][0]-Rneg[2][0]);Rpos[2][1]= 0.5*(Rpos[2][1]-Rneg[2][1]);Rpos[2][2]= 0.5*(Rpos[2][2]-Rneg[2][2]);
+                                    Rpos[0][0]= 0.5*(Rpos[0][0]-Rneg[0][0])/DPHI;Rpos[0][1]= 0.5*(Rpos[0][1]-Rneg[0][1])/DPHI;Rpos[0][2]= 0.5*(Rpos[0][2]-Rneg[0][2])/DPHI;
+                                    Rpos[1][0]= 0.5*(Rpos[1][0]-Rneg[1][0])/DPHI;Rpos[1][1]= 0.5*(Rpos[1][1]-Rneg[1][1])/DPHI;Rpos[1][2]= 0.5*(Rpos[1][2]-Rneg[1][2])/DPHI;
+                                    Rpos[2][0]= 0.5*(Rpos[2][0]-Rneg[2][0])/DPHI;Rpos[2][1]= 0.5*(Rpos[2][1]-Rneg[2][1])/DPHI;Rpos[2][2]= 0.5*(Rpos[2][2]-Rneg[2][2])/DPHI;
 
                                     MatrixTranspose(Rpos,Rneg);
 
@@ -523,9 +523,9 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                                     Am[px][1]-= DPHI *SD[dim][1];
                                     Am[px][2]-= DPHI *SD[dim][2];
 
-                                    Rpos[0][0]= 0.5*(Rpos[0][0]-Rneg[0][0]);Rpos[0][1]= 0.5*(Rpos[0][1]-Rneg[0][1]);Rpos[0][2]= 0.5*(Rpos[0][2]-Rneg[0][2]);
-                                    Rpos[1][0]= 0.5*(Rpos[1][0]-Rneg[1][0]);Rpos[1][1]= 0.5*(Rpos[1][1]-Rneg[1][1]);Rpos[1][2]= 0.5*(Rpos[1][2]-Rneg[1][2]);
-                                    Rpos[2][0]= 0.5*(Rpos[2][0]-Rneg[2][0]);Rpos[2][1]= 0.5*(Rpos[2][1]-Rneg[2][1]);Rpos[2][2]= 0.5*(Rpos[2][2]-Rneg[2][2]);
+                                    Rpos[0][0]= 0.5*(Rpos[0][0]-Rneg[0][0])/DPHI;Rpos[0][1]= 0.5*(Rpos[0][1]-Rneg[0][1])/DPHI;Rpos[0][2]= 0.5*(Rpos[0][2]-Rneg[0][2])/DPHI;
+                                    Rpos[1][0]= 0.5*(Rpos[1][0]-Rneg[1][0])/DPHI;Rpos[1][1]= 0.5*(Rpos[1][1]-Rneg[1][1])/DPHI;Rpos[1][2]= 0.5*(Rpos[1][2]-Rneg[1][2])/DPHI;
+                                    Rpos[2][0]= 0.5*(Rpos[2][0]-Rneg[2][0])/DPHI;Rpos[2][1]= 0.5*(Rpos[2][1]-Rneg[2][1])/DPHI;Rpos[2][2]= 0.5*(Rpos[2][2]-Rneg[2][2])/DPHI;
 
                                     MatrixTranspose(Rpos,Rneg);
 
@@ -618,9 +618,9 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                                     Af[px][1]+= DPHI *SD[dim][1];
                                     Af[px][2]+= DPHI *SD[dim][2];
 
-                                    Rpos[0][0]= 0.5*(Rpos[0][0]-Rneg[0][0]);Rpos[0][1]= 0.5*(Rpos[0][1]-Rneg[0][1]);Rpos[0][2]= 0.5*(Rpos[0][2]-Rneg[0][2]);
-                                    Rpos[1][0]= 0.5*(Rpos[1][0]-Rneg[1][0]);Rpos[1][1]= 0.5*(Rpos[1][1]-Rneg[1][1]);Rpos[1][2]= 0.5*(Rpos[1][2]-Rneg[1][2]);
-                                    Rpos[2][0]= 0.5*(Rpos[2][0]-Rneg[2][0]);Rpos[2][1]= 0.5*(Rpos[2][1]-Rneg[2][1]);Rpos[2][2]= 0.5*(Rpos[2][2]-Rneg[2][2]);
+                                    Rpos[0][0]= 0.5*(Rpos[0][0]-Rneg[0][0])/DPHI;Rpos[0][1]= 0.5*(Rpos[0][1]-Rneg[0][1])/DPHI;Rpos[0][2]= 0.5*(Rpos[0][2]-Rneg[0][2])/DPHI;
+                                    Rpos[1][0]= 0.5*(Rpos[1][0]-Rneg[1][0])/DPHI;Rpos[1][1]= 0.5*(Rpos[1][1]-Rneg[1][1])/DPHI;Rpos[1][2]= 0.5*(Rpos[1][2]-Rneg[1][2])/DPHI;
+                                    Rpos[2][0]= 0.5*(Rpos[2][0]-Rneg[2][0])/DPHI;Rpos[2][1]= 0.5*(Rpos[2][1]-Rneg[2][1])/DPHI;Rpos[2][2]= 0.5*(Rpos[2][2]-Rneg[2][2])/DPHI;
 
                                     MatrixTranspose(Rpos,Rneg);
 
@@ -650,9 +650,9 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                                     Am[px][1]+= DPHI *SD[dim][1];
                                     Am[px][2]+= DPHI *SD[dim][2];
 
-                                    Rpos[0][0]= 0.5*(Rpos[0][0]-Rneg[0][0]);Rpos[0][1]= 0.5*(Rpos[0][1]-Rneg[0][1]);Rpos[0][2]= 0.5*(Rpos[0][2]-Rneg[0][2]);
-                                    Rpos[1][0]= 0.5*(Rpos[1][0]-Rneg[1][0]);Rpos[1][1]= 0.5*(Rpos[1][1]-Rneg[1][1]);Rpos[1][2]= 0.5*(Rpos[1][2]-Rneg[1][2]);
-                                    Rpos[2][0]= 0.5*(Rpos[2][0]-Rneg[2][0]);Rpos[2][1]= 0.5*(Rpos[2][1]-Rneg[2][1]);Rpos[2][2]= 0.5*(Rpos[2][2]-Rneg[2][2]);
+                                    Rpos[0][0]= 0.5*(Rpos[0][0]-Rneg[0][0])/DPHI;Rpos[0][1]= 0.5*(Rpos[0][1]-Rneg[0][1])/DPHI;Rpos[0][2]= 0.5*(Rpos[0][2]-Rneg[0][2])/DPHI;
+                                    Rpos[1][0]= 0.5*(Rpos[1][0]-Rneg[1][0])/DPHI;Rpos[1][1]= 0.5*(Rpos[1][1]-Rneg[1][1])/DPHI;Rpos[1][2]= 0.5*(Rpos[1][2]-Rneg[1][2])/DPHI;
+                                    Rpos[2][0]= 0.5*(Rpos[2][0]-Rneg[2][0])/DPHI;Rpos[2][1]= 0.5*(Rpos[2][1]-Rneg[2][1])/DPHI;Rpos[2][2]= 0.5*(Rpos[2][2]-Rneg[2][2])/DPHI;
 
                                     MatrixTranspose(Rpos,Rneg);
 

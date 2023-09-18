@@ -98,15 +98,17 @@ int main( int argc , char * argv[] )
     typename ScalarResamplerType::Pointer movingResampler = ScalarResamplerType::New();
     
     std::string filename(argv[2]);
-    std::string::size_type idx=filename.find('.');
+    std::string::size_type idx=filename.rfind('.');
     std::string extension = filename.substr(idx+1);
 
     DisplacementFieldTransformType::Pointer disp_trans=nullptr;
     AffineTransformType::Pointer affine_trans=nullptr;
 
+    bool isaffine=true;
+
     if(idx != std::string::npos)
     {        
-        if(extension == "nii"  || extension == "nii.gz" )
+        if(filename.find(".nii")!=std::string::npos  )
         {
             typedef itk::ImageFileReader<DisplacementFieldType> FieldReaderType;
             typename FieldReaderType::Pointer mreader=FieldReaderType::New();
@@ -115,6 +117,7 @@ int main( int argc , char * argv[] )
             disp_trans= DisplacementFieldTransformType::New();
             disp_trans->SetDisplacementField(mreader->GetOutput());
             movingResampler->SetTransform(disp_trans); 
+            isaffine=false;
         }
         else
         {
@@ -170,7 +173,7 @@ int main( int argc , char * argv[] )
                 ImageType3D::PointType pt,pt_trans;
                 transformed_image3D->TransformIndexToPhysicalPoint(ind3,pt);
 
-                if(extension == "nii"  || extension == "nii.gz")
+                if(!isaffine)
                 {
                     pt_trans= disp_trans->TransformPoint(pt);
                 }
