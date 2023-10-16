@@ -195,6 +195,8 @@ int main(int argc, char *argv[])
     dti_estimator.SetVolIndicesForFitting(bindices);
     dti_estimator.SetFittingMode(regresion_mode);
     dti_estimator.SetFreeWaterDiffusivity(parser->getFreeWaterDiffusivity());
+    dti_estimator.SetNT2C1MaxADC(parser->getNT2C1MaxDiff());
+    dti_estimator.SetNT2C2MinADC(parser->getNT2C2MinDiff());
     dti_estimator.SetNoiseImg(noise_img);
     dti_estimator.PerformFitting();
 

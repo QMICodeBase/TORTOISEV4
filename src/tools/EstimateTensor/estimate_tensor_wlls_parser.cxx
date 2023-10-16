@@ -127,6 +127,23 @@ void EstimateTensorWLLS_PARSER::InitializeCommandLineOptions()
         this->AddOption( option );
     }
 
+
+    {
+        std::string description = std::string( "For NT2 fitting, what is the maximum diffusivity for the 1st compartment in  (\mu m)^2/s . Default: 3000" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "NT2_C1_max_ADC");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+    {
+        std::string description = std::string( "For NT2 fitting, what is the minimum diffusivity for the 2nd compartment in  (\mu m)^2/s . Default: 9000" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "NT2_C2_min_ADC");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+
+
     {
         std::string description = std::string( "Write the Chi-squred image? Default:0" );
         OptionType::Pointer option = OptionType::New();
@@ -135,7 +152,24 @@ void EstimateTensorWLLS_PARSER::InitializeCommandLineOptions()
         this->AddOption( option );
     }
 
+}
 
+float EstimateTensorWLLS_PARSER::getNT2C1MaxDiff()
+{
+    OptionType::Pointer option = this->GetOption( "NT2_C1_max_ADC");
+    if(option->GetNumberOfFunctions())
+        return atof(option->GetFunction(0)->GetName().c_str());
+    else
+       return 3000.;
+}
+
+float EstimateTensorWLLS_PARSER::getNT2C2MinDiff()
+{
+    OptionType::Pointer option = this->GetOption( "NT2_C2_min_ADC");
+    if(option->GetNumberOfFunctions())
+        return atof(option->GetFunction(0)->GetName().c_str());
+    else
+       return 9000.;
 }
 
 float EstimateTensorWLLS_PARSER::getFreeWaterDiffusivity()

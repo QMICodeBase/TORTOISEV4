@@ -7,7 +7,7 @@
 #include "itkRealTimeClock.h"
 #include "../tools/ResampleDWIs/resample_dwis.h"
 #include "itkGaussianOperator.h"
-
+#include "itkMultiplyImageFilter.h"
 
 #ifdef USECUDA
     #include "../cuda_src/resample_image.h"
@@ -427,11 +427,23 @@ void DRBUDDIStage::PreprocessImagesAndFields()
 
 float DRBUDDIStage::ComputeBeta(CurrentFieldType::Pointer cfield,CurrentFieldType::Pointer pfield)
 {
+#ifdef USECUDA
     auto pmfield= MultiplyImage(pfield,-1);
     auto diff= AddImages(cfield,pmfield);
     auto nom= SumImage(MultiplyImages(cfield,diff));
     auto denom = SumImage(MultiplyImages(pfield,pfield));
+#else
+    double nom=0,denom=0;
+    itk::ImageRegionIteratorWithIndex<CurrentFieldType> it(cfield,cfield->GetLargestPossibleRegion());
+    for(it.GoToBegin();!it.IsAtEnd();++it)
+    {
+        ImageType3D::IndexType ind3= it.GetIndex();
 
+        auto diff = cfield->GetPixel(ind3) - pfield->GetPixel(ind3);
+        nom+=cfield->GetPixel(ind3)*diff;
+        denom+= pfield->GetPixel(ind3) * pfield->GetPixel(ind3);
+    }
+#endif
     float Bpr=0;
     if(denom!=0)
         Bpr=nom/denom;
@@ -612,116 +624,117 @@ void DRBUDDIStage::RunDRBUDDIStage()
             RestrictPhase(updateFieldM,this->down_phase_vector);
         }
 
-        ScaleUpdateField(updateFieldF,1);
-        ScaleUpdateField(updateFieldM,1);
-
-        //ScaleUpdateField(updateFieldF,this->settings->learning_rate);
-        //ScaleUpdateField(updateFieldM,this->settings->learning_rate);
-
-        float beta_f=0,beta_m=0;
-        if(prev_updateFieldF)
-        {
-            beta_f= ComputeBeta(updateFieldF,prev_updateFieldF);
-            beta_m= ComputeBeta(updateFieldM,prev_updateFieldM);
-
-            if(beta_f>2)
-                beta_f=1;
-            if(beta_m>2)
-                beta_m=1;
-
-        }
-        prev_updateFieldF=CurrentFieldType::New();
-        prev_updateFieldF->DuplicateFromCUDAImage(updateFieldF);
-        prev_updateFieldM=CurrentFieldType::New();
-        prev_updateFieldM->DuplicateFromCUDAImage(updateFieldM);
-
-        if(conjugateFieldF)
-        {
-            conjugateFieldF=MultiplyImage(conjugateFieldF,beta_f);
-            conjugateFieldF=AddImages(conjugateFieldF,updateFieldF);
-            conjugateFieldM=MultiplyImage(conjugateFieldM,beta_m);
-            conjugateFieldM=AddImages(conjugateFieldM,updateFieldM);
-        }
-        else
-        {
-            conjugateFieldF=CurrentFieldType::New();
-            conjugateFieldF->DuplicateFromCUDAImage(updateFieldF);
-            conjugateFieldM=CurrentFieldType::New();
-            conjugateFieldM->DuplicateFromCUDAImage(updateFieldM);
-        }
-
-
-        float best_mv1=std::numeric_limits<float>::max();
-        float best_mv2=std::numeric_limits<float>::max();
-
         float best_lr=this->settings->learning_rate;
-        for(float lr=this->settings->learning_rate/4;lr<= this->settings->learning_rate; lr*=2)
-        {
-            ScaleUpdateField(conjugateFieldF,lr);
-            ScaleUpdateField(conjugateFieldM,lr);
+        float beta_f=0,beta_m=0;
+        #ifdef USECUDA
+            ScaleUpdateField(updateFieldF,1);
+            ScaleUpdateField(updateFieldM,1);
 
+            if(prev_updateFieldF)
             {
-                CurrentFieldType::Pointer f2midtmp=nullptr,f2midtmp_inv=nullptr;
-                CurrentFieldType::Pointer m2midtmp=nullptr,m2midtmp_inv=nullptr;
+                beta_f= ComputeBeta(updateFieldF,prev_updateFieldF);
+                beta_m= ComputeBeta(updateFieldM,prev_updateFieldM);
 
+                if(beta_f>2)
+                    beta_f=1;
+                if(beta_m>2)
+                    beta_m=1;
+            }
 
-                f2midtmp  = ComposeFields(this->def_F,conjugateFieldF);
-                f2midtmp = GaussianSmoothImage(f2midtmp,this->settings->total_gaussian_sigma);
-                CurrentFieldType::Pointer f2midtotal_inv= InvertField(f2midtmp, this->def_FINV );
+            prev_updateFieldF=CurrentFieldType::New();
+            prev_updateFieldF->DuplicateFromCUDAImage(updateFieldF);
+            prev_updateFieldM=CurrentFieldType::New();
+            prev_updateFieldM->DuplicateFromCUDAImage(updateFieldM);
 
-                m2midtmp  = ComposeFields(this->def_M,conjugateFieldM);
-                m2midtmp = GaussianSmoothImage(m2midtmp,this->settings->total_gaussian_sigma);
-                CurrentFieldType::Pointer m2midtotal_inv= InvertField(m2midtmp, this->def_MINV );
+            if(conjugateFieldF)
+            {
+                conjugateFieldF=MultiplyImage(conjugateFieldF,beta_f);
+                conjugateFieldF=AddImages(conjugateFieldF,updateFieldF);
+                conjugateFieldM=MultiplyImage(conjugateFieldM,beta_m);
+                conjugateFieldM=AddImages(conjugateFieldM,updateFieldM);
+            }
+            else
+            {
+                conjugateFieldF=CurrentFieldType::New();
+                conjugateFieldF->DuplicateFromCUDAImage(updateFieldF);
+                conjugateFieldM=CurrentFieldType::New();
+                conjugateFieldM->DuplicateFromCUDAImage(updateFieldM);
+            }
 
-                if(this->settings->constrain)
+            float best_mv1=std::numeric_limits<float>::max();
+            float best_mv2=std::numeric_limits<float>::max();
+            for(float lr=this->settings->learning_rate/4;lr<= this->settings->learning_rate; lr*=2)
+            {
+                ScaleUpdateField(conjugateFieldF,lr);
+                ScaleUpdateField(conjugateFieldM,lr);
+
                 {
-                    ContrainDefFields(f2midtotal_inv,m2midtotal_inv);
-                }
-
-                if(settings->init_finv_const!=nullptr)
-                {
-                    f2midtotal_inv= ComposeFields(settings->init_finv_const,f2midtotal_inv);
-                    m2midtotal_inv= ComposeFields(settings->init_minv_const,m2midtotal_inv);
-                }
-
-                CurrentFieldType::Pointer dummyf,dummym;
-                CurrentImageType::Pointer warped_up_temp = WarpImage(this->resampled_smoothed_up_images[0],f2midtotal_inv);
-                CurrentImageType::Pointer warped_down_temp = WarpImage(this->resampled_smoothed_down_images[0],m2midtotal_inv);
+                    CurrentFieldType::Pointer f2midtmp=nullptr,f2midtmp_inv=nullptr;
+                    CurrentFieldType::Pointer m2midtmp=nullptr,m2midtmp_inv=nullptr;
 
 
+                    f2midtmp  = ComposeFields(this->def_F,conjugateFieldF);
+                    f2midtmp = GaussianSmoothImage(f2midtmp,this->settings->total_gaussian_sigma);
+                    CurrentFieldType::Pointer f2midtotal_inv= InvertField(f2midtmp, this->def_FINV );
 
-                float mv1,mv2;
-                if(str_img)
-                {
+                    m2midtmp  = ComposeFields(this->def_M,conjugateFieldM);
+                    m2midtmp = GaussianSmoothImage(m2midtmp,this->settings->total_gaussian_sigma);
+                    CurrentFieldType::Pointer m2midtotal_inv= InvertField(m2midtmp, this->def_MINV );
 
-                    //mv2=ComputeMetric_CCSK(warped_up_temp,warped_down_temp, str_img,dummyf,dummym );
-                    mv2 = ComputeMetric_CCJacS(warped_up_temp,warped_down_temp,str_img,
-                                               f2midtotal_inv , m2midtotal_inv ,
-                                               dummyf,  dummym,
-                                               this->up_phase_vector,
-                                               Goper );
-
-                    if(mv2<best_mv2)
+                    if(this->settings->constrain)
                     {
-                        best_mv2=mv2;
-                        best_lr=lr;
+                        ContrainDefFields(f2midtotal_inv,m2midtotal_inv);
                     }
-                }
-                else
-                {
-                    mv1 = ComputeMetric_MSJac(warped_up_temp,warped_down_temp,
+
+                    if(settings->init_finv_const!=nullptr)
+                    {
+                        f2midtotal_inv= ComposeFields(settings->init_finv_const,f2midtotal_inv);
+                        m2midtotal_inv= ComposeFields(settings->init_minv_const,m2midtotal_inv);
+                    }
+
+                    CurrentFieldType::Pointer dummyf,dummym;
+                    CurrentImageType::Pointer warped_up_temp = WarpImage(this->resampled_smoothed_up_images[0],f2midtotal_inv);
+                    CurrentImageType::Pointer warped_down_temp = WarpImage(this->resampled_smoothed_down_images[0],m2midtotal_inv);
+
+
+
+                    float mv1,mv2;
+                    if(str_img)
+                    {
+
+                        //mv2=ComputeMetric_CCSK(warped_up_temp,warped_down_temp, str_img,dummyf,dummym );
+                        mv2 = ComputeMetric_CCJacS(warped_up_temp,warped_down_temp,str_img,
                                                    f2midtotal_inv , m2midtotal_inv ,
                                                    dummyf,  dummym,
                                                    this->up_phase_vector,
                                                    Goper );
-                    if(mv1<best_mv1)
+
+                        if(mv2<best_mv2)
+                        {
+                            best_mv2=mv2;
+                            best_lr=lr;
+                        }
+                    }
+                    else
                     {
-                        best_mv1=mv1;
-                        best_lr=lr;
+                        mv1 = ComputeMetric_MSJac(warped_up_temp,warped_down_temp,
+                                                       f2midtotal_inv , m2midtotal_inv ,
+                                                       dummyf,  dummym,
+                                                       this->up_phase_vector,
+                                                       Goper );
+                        if(mv1<best_mv1)
+                        {
+                            best_mv1=mv1;
+                            best_lr=lr;
+                        }
                     }
                 }
             }
-        }
+        #else
+            conjugateFieldF=updateFieldF;
+            conjugateFieldM=updateFieldM;
+        #endif
+
 
         ScaleUpdateField(conjugateFieldF,best_lr);
         ScaleUpdateField(conjugateFieldM,best_lr);

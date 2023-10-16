@@ -321,7 +321,7 @@ void DTIModel::EstimateTensorNT2()
     VF_img->FillBuffer(0.);
 
 
-    constexpr float free_water_adc_value=3.;
+    float free_water_adc_value=this->nt2c1maxadc/1000.;
     double MAX_TR=-1;
     itk::ImageRegionIteratorWithIndex<DTImageType> it(output_img,output_img->GetLargestPossibleRegion());
     for(it.GoToBegin();!it.IsAtEnd();++it)
@@ -334,10 +334,17 @@ void DTIModel::EstimateTensorNT2()
     if(MAX_TR<0)
         MAX_TR=2*free_water_adc_value;
 
-   // double flow_diffusivity=MAX_TR*2;
-    double flow_diffusivity=5*free_water_adc_value;
-    double min_flow_diffusivity=3*free_water_adc_value;
+    double min_flow_diffusivity=this->nt2c2minadc/1000.;
+    double flow_diffusivity=2*min_flow_diffusivity;
 
+
+    DTImageType::PixelType free_tens;
+    free_tens[0]=free_water_adc_value/1000.;
+    free_tens[3]=free_water_adc_value/1000.;
+    free_tens[5]=free_water_adc_value/1000.;
+    free_tens[1]=0;
+    free_tens[2]=0;
+    free_tens[4]=0;
 
     DTImageType::PixelType flow_tens;
     flow_tens[0]=flow_diffusivity/1000.;
@@ -347,13 +354,7 @@ void DTIModel::EstimateTensorNT2()
     flow_tens[2]=0;
     flow_tens[4]=0;
 
-    DTImageType::PixelType free_tens;
-    free_tens[0]=free_water_adc_value/1000.;
-    free_tens[3]=free_water_adc_value/1000.;
-    free_tens[5]=free_water_adc_value/1000.;
-    free_tens[1]=0;
-    free_tens[2]=0;
-    free_tens[4]=0;
+
 
 
     for(it.GoToBegin();!it.IsAtEnd();++it)
@@ -365,16 +366,13 @@ void DTIModel::EstimateTensorNT2()
             continue;
         }
 
+
         DTImageType::PixelType curr_tens= it.Get();
         double MD=( curr_tens[0]+curr_tens[3]+curr_tens[5])/3.;
         this->flow_tensor_img->SetPixel(index,flow_tens);
         if(MD*1000 > free_water_adc_value)
         {
-           // double V= (1000.*MD -flow_diffusivity)/(free_water_adc_value-flow_diffusivity);
-            //VF_img->SetPixel(index,V);
-
             VF_img->SetPixel(index,0.2);
-
             it.Set(free_tens);
         }
         else
@@ -382,6 +380,7 @@ void DTIModel::EstimateTensorNT2()
             DTImageType::PixelType pix= it.Get();
             VF_img->SetPixel(index,0.99);
         }
+
     }
 
 
@@ -402,7 +401,7 @@ void DTIModel::EstimateTensorNT2()
     ImageType3D::SizeType size = dwi_data[0]->GetLargestPossibleRegion().GetSize();
 
     mp_config_struct config;
-    config.maxiter=500;
+    config.maxiter=200;
     config.ftol=1E-10;
     config.xtol=1E-10;
     config.gtol=1E-10;
@@ -447,6 +446,7 @@ void DTIModel::EstimateTensorNT2()
         pars[0].limits[0]=0.0;
         pars[0].limits[1]=0;
         pars[0].side=0;
+        pars[0].fixed=1;
 
   //    pars[1].parname="vf";  this is vf  for parenchymal tensor
         pars[1].limited[0]=1;
@@ -503,7 +503,7 @@ void DTIModel::EstimateTensorNT2()
         pars[8].limited[0]=1;
         pars[8].limited[1]=0;
         pars[8].limits[0]=0.00001;
-       // pars[8].limits[0]=min_flow_diffusivity;
+        pars[8].limits[0]=min_flow_diffusivity;
         pars[8].limits[1]=8.*flow_diffusivity;
         pars[8].side=0;
 
@@ -524,8 +524,7 @@ void DTIModel::EstimateTensorNT2()
         //pars[5].parname="D2_YY";
         pars[11].limited[0]=1;
         pars[11].limited[1]=0;
-        //pars[11].limits[0]=min_flow_diffusivity;
-        pars[11].limits[0]=0.00001;
+        pars[11].limits[0]=min_flow_diffusivity;
         pars[11].limits[1]=8.*flow_diffusivity;
         pars[11].side=0;
 
@@ -539,8 +538,7 @@ void DTIModel::EstimateTensorNT2()
         //pars[5].parname="D2_ZZ";
         pars[13].limited[0]=1;
         pars[13].limited[1]=0;
-        pars[13].limits[0]=1.1*min_flow_diffusivity;
-       // pars[13].limits[0]=0.00001;
+        pars[13].limits[0]=min_flow_diffusivity;
         pars[13].limits[1]=8.*flow_diffusivity;
         pars[13].side=0;
 
@@ -620,12 +618,25 @@ void DTIModel::EstimateTensorNT2()
                     }
 
                     curr_design_matrix(vol,0)=1;
-                    curr_design_matrix(vol,1)= -curr_Bmatrix(vol,0)/1000.;
-                    curr_design_matrix(vol,2)= -curr_Bmatrix(vol,1)/1000.;
-                    curr_design_matrix(vol,3)= -curr_Bmatrix(vol,2)/1000.;
-                    curr_design_matrix(vol,4)= -curr_Bmatrix(vol,3)/1000.;
-                    curr_design_matrix(vol,5)= -curr_Bmatrix(vol,4)/1000.;
-                    curr_design_matrix(vol,6)= -curr_Bmatrix(vol,5)/1000.;
+               //     if(curr_Bmatrix(vol,0) +  curr_Bmatrix(vol,3) + curr_Bmatrix(vol,5) >10)
+                    {
+                        curr_design_matrix(vol,1)= -curr_Bmatrix(vol,0)/1000.;
+                        curr_design_matrix(vol,2)= -curr_Bmatrix(vol,1)/1000.;
+                        curr_design_matrix(vol,3)= -curr_Bmatrix(vol,2)/1000.;
+                        curr_design_matrix(vol,4)= -curr_Bmatrix(vol,3)/1000.;
+                        curr_design_matrix(vol,5)= -curr_Bmatrix(vol,4)/1000.;
+                        curr_design_matrix(vol,6)= -curr_Bmatrix(vol,5)/1000.;
+                    }
+                //    else
+                  //  {
+                    //    curr_design_matrix(vol,1)= 0;
+                  //      curr_design_matrix(vol,2)= 0;
+                  //      curr_design_matrix(vol,3)= 0;
+                  //      curr_design_matrix(vol,4)= 0;
+                  //      curr_design_matrix(vol,5)= 0;
+                  //      curr_design_matrix(vol,6)= 0;
+
+               //     }
 
                 } //for vol
 
@@ -654,12 +665,12 @@ void DTIModel::EstimateTensorNT2()
                     if(pars[pp].limited[0])
                     {
                         if(p[pp] < pars[pp].limits[0])
-                            p[pp]=pars[pp].limits[0]+0.000001;
+                            p[pp]=pars[pp].limits[0]*1.5;
                     }
                     if(pars[pp].limited[1])
                     {
                         if(p[pp] > pars[pp].limits[1])
-                            p[pp]=pars[pp].limits[1]-0.000001;
+                            p[pp]=pars[pp].limits[1]*1.5;
                     }
                 }
 

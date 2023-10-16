@@ -18,7 +18,19 @@ private:
 
 public:
     DiffusionModel(){stream=TORTOISE::stream;}
-    ~DiffusionModel(){};
+    ~DiffusionModel()
+    {
+        this->output_img=nullptr;
+        this->noise_img=nullptr;
+
+        this->dwi_data.clear();
+        this->weight_imgs.clear();
+        this->voxelwise_Bmatrix.clear();
+        this->graddev_img.clear();
+
+        this->mask_img=nullptr;
+        this->A0_img=nullptr;
+    };
 
     void SetJson( json njson){my_json=njson;}
     void SetBmatrix( vnl_matrix<double> bmat){Bmatrix=bmat;}

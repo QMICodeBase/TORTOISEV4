@@ -9,7 +9,7 @@ SET(USEOPENMP 1)
 
 
 if ( NOT DEFINED USECUDA)
-    SET(USECUDA 1)
+    SET(USECUDA 0)
 endif()
 if ( NOT DEFINED USE_VTK)
     SET(USE_VTK 0)
@@ -168,7 +168,7 @@ IF(USECUDA)
 
      add_executable(DRTAMAS_cuda  ../src/tools/DRTAMAS/compute_metric_dev.cu ../src/tools/DRTAMAS/compute_metric_dev.cxx   ../src/cuda_src/compute_metric.cu ../src/cuda_src/compute_metric.cxx ../src/cuda_src/warp_image.cu ../src/cuda_src/warp_image.cxx  ../src/cuda_src/gaussian_smooth_image.cu ../src/cuda_src/gaussian_smooth_image.cxx ../src/tools/DRTAMAS/run_drtamas_stage.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities.cu   ../src/tools/DRTAMAS/DRTAMAS_Diffeo.cxx ../src/cuda_src/resample_image.cu ../src/cuda_src/resample_image.cxx ../src/cuda_src/cuda_image_utilities.cu ../src/cuda_src/cuda_image_utilities.cxx ../src/cuda_src/cuda_image.cxx ../src/main/rigid_register_images.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/DRTAMAS/DRTAMAS_main.cxx ../src/tools/DRTAMAS/DRTAMAS.cxx ../src/tools/DRTAMAS/DRTAMAS_parser.cxx   ${SOURCES} )
      target_include_directories(DRTAMAS_cuda   PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-     target_link_libraries(DRTAMAS_cuda   ${ITK_LIBRARIES} ${Boost_LIBRARIES}    -static-libgcc -static-libstdc++)
+     target_link_libraries(DRTAMAS_cuda   ${ITK_LIBRARIES} ${Boost_LIBRARIES}    -static-libgcc -static-libstdc++ libc.a -lgcc)
 
 
 
@@ -465,16 +465,23 @@ add_executable(ConvertGEGradientsToBMatrix ../src/tools/ConvertGEGradientsToBMat
 target_link_libraries(ConvertGEGradientsToBMatrix  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
-add_executable(ImportBruker ../src/tools/import_bruker/ImportBruker.cxx ../src/tools/import_bruker/bruker_parser.cxx   ../src/utilities/write_bmatrix_file.cxx  ${SOURCES})
-target_link_libraries(ImportBruker  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
-
 add_executable(Combine3DImagesTo4D ../src/tools/Combine3DImagesTo4D/Combine3DImagesTo4D.cxx   ${SOURCES})
 target_link_libraries(Combine3DImagesTo4D  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
+#add_executable(ImportBruker ../src/tools/import_bruker/ImportBruker.cxx ../src/tools/import_bruker/bruker_parser.cxx   ../src/utilities/write_bmatrix_file.cxx  ${SOURCES})
+#target_link_libraries(ImportBruker  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
-add_executable(AnhApplyTransformationstoGhostImages  ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/AnhApplyTransformationstoGhostImages/AnhApplyTransformationstoGhostImages.cxx ${SOURCES})
-target_link_libraries(AnhApplyTransformationstoGhostImages ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+#add_executable(AnhApplyTransformationstoGhostImages  ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/AnhApplyTransformationstoGhostImages/AnhApplyTransformationstoGhostImages.cxx ${SOURCES})
+#target_link_libraries(AnhApplyTransformationstoGhostImages ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+
+#add_executable(SmoothTransitionHCPStructural  ../src/tools/SmoothTransitionHCPStructural/SmoothTransitionHCPStructural.cxx)
+#target_link_libraries(SmoothTransitionHCPStructural ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+#add_executable(CombineDRBUDDIDownTransformations   ../src/tools/CombineDRBUDDIDownTransformations/CombineDRBUDDIDownTransformations.cxx ${SOURCES})
+#target_link_libraries(CombineDRBUDDIDownTransformations ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 

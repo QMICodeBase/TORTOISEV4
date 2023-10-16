@@ -1234,70 +1234,6 @@ void DIFFPREP::MotionAndEddy()
 
         ImageType3D::Pointer b0_img = native_native_raw_dwis[this->b0_vol_id];
         ClassicMotionEddyCorrectAllDWIs(b0_img,native_native_raw_dwis);
-
-
-
-/*
-        std::ofstream trans_text_file("/qmi_home/irfanogo/Desktop/BIOWULF_HCPDWI/processed_data_200_T4_062623/data/100610/100610_LR_temp_proc/aaa.txt");
-        for( int vol=0; vol<Nvols;vol++)
-        {
-            if(vol==this->b0_vol_id)
-            {
-                OkanQuadraticTransformType::Pointer dummy= OkanQuadraticTransformType::New();
-                dummy->SetPhase(this->PE_string);
-                dummy->SetIdentity();
-                trans_text_file<<dummy->GetParameters()<<std::endl;
-            }
-            else
-            {
-                trans_text_file<<dwi_transforms[vol]->GetParameters()<<std::endl;
-            }
-        }
-        trans_text_file.close();
-*/
-
-/*
-        this->dwi_transforms.resize(Nvols);
-        std::string moteddy_trans_name="/qmi_home/irfanogo/Desktop/BIOWULF_HCPDWI/processed_data_200_T4_062623/data/100610/100610_LR_temp_proc/aaa.txt";
-
-            std::ifstream moteddy_text_file(moteddy_trans_name);
-            for( int vol=0; vol<Nvols;vol++)
-            {
-                std::string line;
-                std::getline(moteddy_text_file,line);
-
-                OkanQuadraticTransformType::Pointer quad_trans= OkanQuadraticTransformType::New();
-                quad_trans->SetPhase(this->PE_string);
-                quad_trans->SetIdentity();
-
-                OkanQuadraticTransformType::ParametersType params=quad_trans->GetParameters();
-                line=line.substr(1);
-                for(int p=0;p<OkanQuadraticTransformType::NQUADPARAMS;p++)
-                {
-                    int npos = line.find(", ");
-                    std::string curr_p_string = line.substr(0,npos);
-
-                    double val = atof(curr_p_string.c_str());
-                    params[p]=val;
-                    line=line.substr(npos+2);
-                }
-                quad_trans->SetParameters(params);
-                OkanQuadraticTransformType::ParametersType flags;
-                flags.SetSize(OkanQuadraticTransformType::NQUADPARAMS);
-                flags.Fill(0);
-                flags[0]=flags[1]=flags[2]=flags[3]=flags[4]=flags[5]=1;
-                quad_trans->SetParametersForOptimizationFlags(flags);
-                this->dwi_transforms[vol] ->AddTransform(quad_trans);
-            }
-            moteddy_text_file.close();
-
-*/
-
-
-
-
-
-
     } // IF NOT ITERATIVE WE ARE DONE
 
 
@@ -1421,108 +1357,114 @@ void DIFFPREP::MotionAndEddy()
              if(low_DT_indices.size()<15)
                  low_DT_indices.resize(0);
 
-             std::vector<std::vector<ImageType3D::Pointer> >dummyv;
-             std::vector<int> dummy;
-             DTIModel dti_estimator;
-             dti_estimator.SetBmatrix(Bmatrix);
-             dti_estimator.SetDWIData(eddy_s2v_replaced_raw_dwis);
-             dti_estimator.SetWeightImage(eddy_weight_img);
-             dti_estimator.SetVoxelwiseBmatrix(dummyv);
-             dti_estimator.SetMaskImage(nullptr);
-             dti_estimator.SetVolIndicesForFitting(low_DT_indices);
-             dti_estimator.SetFittingMode("WLLS");             
-             dti_estimator.PerformFitting();             
+
+             //Estimation and synthesization
              ImageType3D::Pointer TR_map=nullptr;
-             if(outlier_replacement)
-                 TR_map=dti_estimator.ComputeTRMap();
-
-
-             // MAPMRI FITTING
-             MAPMRIModel mapmri_estimator;
-             if(MAPMRI_indices.size()>0)
              {
-                 mapmri_estimator.SetMAPMRIDegree(CORRECTION_STAGE_MAPMRI_DEGREE);
-                 mapmri_estimator.SetDTImg(dti_estimator.GetOutput());
-                 mapmri_estimator.SetA0Image(dti_estimator.GetA0Image());
-                 mapmri_estimator.SetBmatrix(Bmatrix);
-                 mapmri_estimator.SetDWIData(eddy_s2v_replaced_raw_dwis);
-                 mapmri_estimator.SetWeightImage(eddy_weight_img);
-                 mapmri_estimator.SetVoxelwiseBmatrix(dummyv);
-                 mapmri_estimator.SetMaskImage(b0_mask_img);
-                 mapmri_estimator.SetVolIndicesForFitting(dummy);
-                 mapmri_estimator.SetSmallDelta(small_delta);
-                 mapmri_estimator.SetBigDelta(big_delta);
-                 mapmri_estimator.PerformFitting();
-             }
-             //All this is quite memory intensive. We should clear as soon as we can
-             eddy_s2v_replaced_raw_dwis.clear(); eddy_s2v_replaced_raw_dwis.resize(Nvols);
-             if(outlier_replacement)
-             {
-                 eddy_weight_img.clear(); eddy_weight_img.resize(Nvols);
-             }
-             (*stream)<<"Synthesizing volumes... " <<std::endl;            
+                 std::vector<std::vector<ImageType3D::Pointer> >dummyv;
+                 std::vector<int> dummy;
+                 DTIModel dti_estimator;
+                 dti_estimator.SetBmatrix(Bmatrix);
+                 dti_estimator.SetDWIData(eddy_s2v_replaced_raw_dwis);
+                 dti_estimator.SetWeightImage(eddy_weight_img);
+                 dti_estimator.SetVoxelwiseBmatrix(dummyv);
+                 dti_estimator.SetMaskImage(nullptr);
+                 dti_estimator.SetVolIndicesForFitting(low_DT_indices);
+                 dti_estimator.SetFittingMode("WLLS");
+                 dti_estimator.PerformFitting();
+                 if(outlier_replacement)
+                     TR_map=dti_estimator.ComputeTRMap();
 
-             //Start Processing each volume
-             #pragma omp parallel for
-             for(int vol=0;vol<Nvols;vol++)
-             {
-                 TORTOISE::EnableOMPThread();
-                 int NITK= TORTOISE::GetAvailableITKThreadFor();
-
-                 // Synthesize artificial volume with the same bvec/bval
-                 ImageType3D::Pointer synth_img=nullptr;
-
-                 if(bvals[vol]<=55)
+                 // MAPMRI FITTING
+                 MAPMRIModel mapmri_estimator;
+                 if(MAPMRI_indices.size()>0)
                  {
-                     synth_img= dti_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
+                     mapmri_estimator.SetMAPMRIDegree(CORRECTION_STAGE_MAPMRI_DEGREE);
+                     mapmri_estimator.SetDTImg(dti_estimator.GetOutput());
+                     mapmri_estimator.SetA0Image(dti_estimator.GetA0Image());
+                     mapmri_estimator.SetBmatrix(Bmatrix);
+                     mapmri_estimator.SetDWIData(eddy_s2v_replaced_raw_dwis);
+                     mapmri_estimator.SetWeightImage(eddy_weight_img);
+                     mapmri_estimator.SetVoxelwiseBmatrix(dummyv);
+                     mapmri_estimator.SetMaskImage(b0_mask_img);
+                     mapmri_estimator.SetVolIndicesForFitting(dummy);
+                     mapmri_estimator.SetSmallDelta(small_delta);
+                     mapmri_estimator.SetBigDelta(big_delta);
+                     mapmri_estimator.PerformFitting();
                  }
-                 else
+
+                 //All this is quite memory intensive. We should clear as soon as we can
+                 eddy_s2v_replaced_raw_dwis.clear(); eddy_s2v_replaced_raw_dwis.resize(Nvols);
+                 if(outlier_replacement)
                  {
-                     if(MAPMRI_indices.size()>0)
-                         synth_img = mapmri_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
-                     else
+                     eddy_weight_img.clear(); eddy_weight_img.resize(Nvols);
+                 }
+                 (*stream)<<"Synthesizing volumes... " <<std::endl;
+
+                 //Start Processing each volume
+                 #pragma omp parallel for
+                 for(int vol=0;vol<Nvols;vol++)
+                 {
+                     TORTOISE::EnableOMPThread();
+                     int NITK= TORTOISE::GetAvailableITKThreadFor();
+
+                     // Synthesize artificial volume with the same bvec/bval
+                     ImageType3D::Pointer synth_img=nullptr;
+
+                     if(bvals[vol]<=55)
+                     {
                          synth_img= dti_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
+                     }
+                     else
+                     {
+                         if(MAPMRI_indices.size()>0)
+                             synth_img = mapmri_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
+                         else
+                             synth_img= dti_estimator.SynthesizeDWI( Bmatrix.get_row(vol) );
+                     }
+
+                     eddy_s2v_replaced_synth_dwis[vol]=synth_img;
+
+
+                     // This synthesized image is on the space of the corrected data (for everything).
+                     // We have to transform it ALL the way to the very native space,
+                     //i.e., no inter-volume motion, no eddy-currents , no slice-to-volume motion
+                     // in reverse order.
+                     //Some transformations such as eddy's quadratic/cubic can not be analytically inverted
+                     // So we have to convert them into a displacement field and invert it there numerically.
+
+
+                     {  // curly bracket to automatically delete objects (yes me lazy)
+                         ImageType3D::Pointer synth_img_DP= ChangeImageHeaderToDP<ImageType3D>(synth_img);
+                         DisplacementFieldType::Pointer distortion_field=  ConvertEddyTransformToField(dwi_transforms[vol],synth_img,synth_img_DP);
+                         typedef itk::InvertDisplacementFieldImageFilterOkan<DisplacementFieldType> InverterType;
+                         InverterType::Pointer inverter = InverterType::New();
+                         inverter->SetInput( distortion_field );
+                         inverter->SetMaximumNumberOfIterations( 50 );
+                         inverter->SetMeanErrorToleranceThreshold( 0.0004 );
+                         inverter->SetMaxErrorToleranceThreshold( 0.04 );
+                         inverter->SetNumberOfWorkUnits(NITK);
+                         inverter->Update();
+
+                         DisplacementFieldType::Pointer distortion_field_inv = inverter->GetOutput();
+                         DisplacementFieldTransformType::Pointer disp_trans= DisplacementFieldTransformType::New();
+                         disp_trans->SetDisplacementField(distortion_field_inv);
+
+                         using ResampleImageFilterType= itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+                         ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                         resampleFilter->SetOutputParametersFromImage(synth_img);
+                         resampleFilter->SetInput(synth_img);
+                         resampleFilter->SetTransform(disp_trans);
+                         resampleFilter->SetNumberOfWorkUnits(NITK);
+                         resampleFilter->Update();
+                         ImageType3D::Pointer native_synth_img= resampleFilter->GetOutput();
+                         s2v_replaced_synth_dwis[vol]= native_synth_img;
+                         TORTOISE::ReleaseITKThreadFor();
+                     }
+
+                     TORTOISE::DisableOMPThread();
                  }
-
-                 eddy_s2v_replaced_synth_dwis[vol]=synth_img;
-
-                 // This synthesized image is on the space of the corrected data (for everything).
-                 // We have to transform it ALL the way to the very native space,
-                 //i.e., no inter-volume motion, no eddy-currents , no slice-to-volume motion
-                 // in reverse order.
-                 //Some transformations such as eddy's quadratic/cubic can not be analytically inverted
-                 // So we have to convert them into a displacement field and invert it there numerically.
-
-
-                 {  // curly bracket to automatically delete objects (yes me lazy)
-                     ImageType3D::Pointer synth_img_DP= ChangeImageHeaderToDP<ImageType3D>(synth_img);
-                     DisplacementFieldType::Pointer distortion_field=  ConvertEddyTransformToField(dwi_transforms[vol],synth_img,synth_img_DP);
-                     typedef itk::InvertDisplacementFieldImageFilterOkan<DisplacementFieldType> InverterType;
-                     InverterType::Pointer inverter = InverterType::New();
-                     inverter->SetInput( distortion_field );
-                     inverter->SetMaximumNumberOfIterations( 50 );
-                     inverter->SetMeanErrorToleranceThreshold( 0.0004 );
-                     inverter->SetMaxErrorToleranceThreshold( 0.04 );
-                     inverter->SetNumberOfWorkUnits(NITK);
-                     inverter->Update();
-
-                     DisplacementFieldType::Pointer distortion_field_inv = inverter->GetOutput();
-                     DisplacementFieldTransformType::Pointer disp_trans= DisplacementFieldTransformType::New();
-                     disp_trans->SetDisplacementField(distortion_field_inv);
-
-                     using ResampleImageFilterType= itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
-                     ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
-                     resampleFilter->SetOutputParametersFromImage(synth_img);
-                     resampleFilter->SetInput(synth_img);
-                     resampleFilter->SetTransform(disp_trans);
-                     resampleFilter->SetNumberOfWorkUnits(NITK);
-                     resampleFilter->Update();
-                     ImageType3D::Pointer native_synth_img= resampleFilter->GetOutput();
-                     s2v_replaced_synth_dwis[vol]= native_synth_img;
-                     TORTOISE::ReleaseITKThreadFor();
-                 }
-                 TORTOISE::DisableOMPThread();
-             }// for vol
+             } //dummy for memory cleaning
 
 
              //slice to volume registration
@@ -1554,74 +1496,6 @@ void DIFFPREP::MotionAndEddy()
                      TORTOISE::DisableOMPThread();
                  } //for vol
              } //if s2v
-
-
-/*
-
-             {
-                 fs::path s2v_txt_path = "/qmi_home/irfanogo/Desktop/BIOWULF_HCPDWI/processed_data_200_T4_062623/data/100610/100610_LR_temp_proc/bbb.txt";
-                 std::ofstream s2v_text_file(s2v_txt_path.string().c_str());
-                 ImageType3D::SizeType sz= this->b0_mask_img->GetLargestPossibleRegion().GetSize();
-
-                 for( int vol=0; vol<Nvols;vol++)
-                 {
-                     for(int k=0;k<sz[2];k++)
-                     {
-                         s2v_text_file<< s2v_transformations[vol][k] ->GetParameters()<<std::endl;
-                     }
-                 }
-                 s2v_text_file.close();
-             }
-*/
-
-/*
-             std::string s2v_trans_name= "/qmi_home/irfanogo/Desktop/BIOWULF_HCPDWI/processed_data_200_T4_062623/data/100610/100610_LR_temp_proc/bbb.txt";
-             if(fs::exists(s2v_trans_name) )
-             {
-                 this->s2v_transformations.resize(Nvols);
-                 ImageType3D::Pointer first_vol= this->b0_mask_img;
-                 ImageType3D::SizeType sz= first_vol->GetLargestPossibleRegion().GetSize();
-
-                 std::ifstream s2v_text_file(s2v_trans_name);
-                 for( int vol=0; vol<Nvols;vol++)
-                 {
-                     this->s2v_transformations[vol].resize(sz[2]);
-
-                     for(int k=0;k<sz[2];k++)
-                     {
-                         std::string line;
-                         std::getline(s2v_text_file,line);
-
-                         OkanQuadraticTransformType::Pointer quad_trans= OkanQuadraticTransformType::New();
-                         quad_trans->SetPhase(this->PE_string);
-                         quad_trans->SetIdentity();
-
-                         OkanQuadraticTransformType::ParametersType params=quad_trans->GetParameters();
-                         line=line.substr(1);
-                         for(int p=0;p<OkanQuadraticTransformType::NQUADPARAMS;p++)
-                         {
-                             int npos = line.find(", ");
-                             std::string curr_p_string = line.substr(0,npos);
-
-                             double val = atof(curr_p_string.c_str());
-                             params[p]=val;
-                             line=line.substr(npos+2);
-                         }
-                         quad_trans->SetParameters(params);
-                         OkanQuadraticTransformType::ParametersType flags;
-                         flags.SetSize(OkanQuadraticTransformType::NQUADPARAMS);
-                         flags.Fill(0);
-                         flags[0]=flags[1]=flags[2]=flags[3]=flags[4]=flags[5]=1;
-                         quad_trans->SetParametersForOptimizationFlags(flags);
-                         s2v_transformations[vol][k]    = quad_trans;
-
-                     }
-                 }
-                 s2v_text_file.close();
-             }
-*/
-
-
 
              (*stream)<<std::endl<<std::endl;
 
@@ -1681,19 +1555,16 @@ void DIFFPREP::MotionAndEddy()
                      TORTOISE::DisableOMPThread();
                  } //for vol
 
+                 //Clean memory
+                 s2v_replaced_synth_dwis.clear();  s2v_replaced_synth_dwis.resize(Nvols);
+
 
                  // AT this point, we have the synthesized data computed in EVERYTHING corrected space
                  // transformed back to everything UNCORRECTED space.
                  // so,  we can now check for outliers by statistical analysis.
-
-
-
-
                  this->native_weight_img = ReplaceOutliers(native_native_synth_dwis, native_native_raw_dwis,shells,bvals,TR_map);
                  (*stream)<<"Replacing outliers...Done!"<<std::endl;
-                 //Clean memory
-                 //native_native_synth_dwis.clear(); native_native_synth_dwis.resize(Nvols);
-                 s2v_replaced_synth_dwis.clear();  s2v_replaced_synth_dwis.resize(Nvols);
+
 
 
                  // Now that we have found the outliers in the completely uncorrected space,

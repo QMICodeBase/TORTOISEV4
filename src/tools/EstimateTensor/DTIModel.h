@@ -62,6 +62,10 @@ public:
     }
 
 
+    void SetNT2C1MaxADC(float val){nt2c1maxadc=val;}
+    void SetNT2C2MinADC(float val){nt2c2minadc=val;}
+
+
 private:
     void EstimateTensorWLLS();
     void EstimateTensorNLLS();
@@ -87,6 +91,9 @@ private:
     ImageType3D::Pointer VF_img{nullptr};
     ImageType3D::Pointer VF_img2{nullptr};
     DTImageType::Pointer flow_tensor_img{nullptr};
+
+    float nt2c1maxadc{3000};
+    float nt2c2minadc{9000};
 
 };
 

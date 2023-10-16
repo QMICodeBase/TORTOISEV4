@@ -23,6 +23,10 @@ public:
     std::string getRegressionMode();
     float getFreeWaterDiffusivity();
 
+    float getNT2C1MaxDiff();
+    float getNT2C2MinDiff();
+
+
     bool getWriteCSImg();
 
      
