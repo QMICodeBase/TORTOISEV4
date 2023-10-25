@@ -345,8 +345,15 @@ void ScaleUpdateField_cuda(cudaPitchedPtr field, const int3 data_sz,float3 spc, 
     }
 
     {
-        const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-        const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );        
+        dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+        dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+        while(gridSize.x *gridSize.y *gridSize.z >1024)
+        {
+            blockSize.x*=2;
+            blockSize.y*=2;
+            blockSize.z*=2;
+            gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+        }
 
         if(magnitude>1E-20)
         {
@@ -422,8 +429,15 @@ RestrictPhase_kernel(cudaPitchedPtr field, const int3 d_sz, float3 phase)
 
 void RestrictPhase_cuda(cudaPitchedPtr field, const int3 data_sz,float3 phase )
 {
-        const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-        const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+        dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+        dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+        while(gridSize.x *gridSize.y *gridSize.z >1024)
+        {
+            blockSize.x*=2;
+            blockSize.y*=2;
+            blockSize.z*=2;
+            gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+        }
 
         RestrictPhase_kernel<<< blockSize,gridSize>>>(  field, data_sz, phase );
 
@@ -470,8 +484,15 @@ ContrainDefFields_kernel(cudaPitchedPtr ufield, cudaPitchedPtr dfield, const int
 
 void ContrainDefFields_cuda(cudaPitchedPtr ufield, cudaPitchedPtr dfield, const int3 data_sz)
 {
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     ContrainDefFields_kernel<<< blockSize,gridSize>>>(  ufield, dfield, data_sz );
 
@@ -634,8 +655,15 @@ void ComposeFields_cuda(cudaPitchedPtr main_field,cudaPitchedPtr update_field,
     gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
 
 
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     ComposeFields_kernel<<< blockSize,gridSize>>>( main_field,update_field,output );
 
@@ -784,8 +812,15 @@ UpdateInvertField_kernel( cudaPitchedPtr composed_field, cudaPitchedPtr scale_im
 
 void  NegateField_cuda(cudaPitchedPtr field, const int3 data_sz)
 {
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
     
     NegateImage_kernel<<< blockSize,gridSize>>>(field,data_sz,3);
     gpuErrchk(cudaPeekAtLastError());
@@ -836,8 +871,15 @@ AddImages_kernel(cudaPitchedPtr im1, cudaPitchedPtr im2,cudaPitchedPtr output,  
 
 void  AddImages_cuda(cudaPitchedPtr im1, cudaPitchedPtr im2, cudaPitchedPtr output, const int3 data_sz,const int ncomp)
 {
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     AddImages_kernel<<< blockSize,gridSize>>>(im1,im2,output,data_sz,ncomp);
     gpuErrchk(cudaPeekAtLastError());
@@ -879,8 +921,15 @@ MultiplyImage_kernel(cudaPitchedPtr im1, float factor,cudaPitchedPtr output,  co
 
 void  MultiplyImage_cuda(cudaPitchedPtr im1, float factor, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp)
 {
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     MultiplyImage_kernel<<< blockSize,gridSize>>>(im1,factor,d_output,data_sz,ncomp);
     gpuErrchk(cudaPeekAtLastError());
@@ -894,8 +943,15 @@ void InvertField_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 data
                       float3 data_orig,
                       cudaPitchedPtr output)
 {
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
 
     cudaPitchedPtr scale_image={0};
@@ -1072,8 +1128,17 @@ void PreprocessImage_cuda(cudaPitchedPtr img,
         min=out;
     }
 
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize.x=std::ceil(1.*data_sz.x / blockSize.x);
+        gridSize.y=std::ceil(1.*data_sz.y / blockSize.y);
+        gridSize.z=std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) ;
+    }
 
     PreprocessImage_kernel<<< blockSize,gridSize>>>( img,data_sz,min,max , low_val,up_val,output );
     gpuErrchk(cudaPeekAtLastError());
@@ -1552,8 +1617,15 @@ DivideImages_kernel(cudaPitchedPtr im1, cudaPitchedPtr im2,cudaPitchedPtr output
 
 void  DivideImages_cuda(cudaPitchedPtr im1,cudaPitchedPtr im2, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp)
 {
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     DivideImages_kernel<<< blockSize,gridSize>>>(im1,im2,d_output,data_sz,ncomp);
     gpuErrchk(cudaPeekAtLastError());
@@ -1606,8 +1678,15 @@ MultiplyImages_kernel(cudaPitchedPtr im1, cudaPitchedPtr im2,cudaPitchedPtr outp
 
 void  MultiplyImages_cuda(cudaPitchedPtr im1,cudaPitchedPtr im2, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp)
 {
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     MultiplyImages_kernel<<< blockSize,gridSize>>>(im1,im2,d_output,data_sz,ncomp);
     gpuErrchk(cudaPeekAtLastError());

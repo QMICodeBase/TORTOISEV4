@@ -114,6 +114,7 @@ public:
     std::vector<int> GetOutputNVoxels();
     std::vector<float> GetOutputRes();
     std::string getOutputDataCombination();
+    std::string getOutputSignalRedistribution();
     std::string getOutputGradientNonlinearityType();
 
      

@@ -84,8 +84,15 @@ void WarpImage_cuda(cudaTextureObject_t tex, int3 sz , float3 res,
 
 
 
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*sz.x / blockSize.x), std::ceil(1.*sz.y / blockSize.y), std::ceil(1.*sz.z / blockSize.z/PER_SLICE) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*sz.x / blockSize.x), std::ceil(1.*sz.y / blockSize.y), std::ceil(1.*sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*sz.x / blockSize.x), std::ceil(1.*sz.y / blockSize.y), std::ceil(1.*sz.z / blockSize.z/PER_SLICE) );
+    }
 
 
     float h_dir[]= {d00,d01,d02,d10,d11,d12,d20,d21,d22};

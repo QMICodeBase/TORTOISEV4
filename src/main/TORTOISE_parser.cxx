@@ -527,6 +527,17 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
         this->AddOption( option );
     }
     {
+        std::string description = std::string("Signal Redistribution method for final output: Jac/LSR . Default: LSR    " );
+
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "output_signal_redist_method");
+        option->SetUsageOption(0, "Jac: Signal manipulation done by transformation Jacobian." );
+        option->SetUsageOption(1, "LSR: signal manipulation done by estimating the mapping of the geometry-corrected/signal-uncorrected images to geometry-and-signal-corrected images." );
+        option->SetDescription( description );
+        option->SetModule(7);
+        this->AddOption( option );
+    }
+    {
         std::string description = std::string("Format of the gradient nonlinearity output information. If vbmat is selected, s2v effects will also be considered even if no gradient nonlinearity information is present.   " );
 
         OptionType::Pointer option = OptionType::New();
@@ -992,7 +1003,20 @@ std::string TORTOISE_PARSER::getOutputDataCombination()
         return option->GetFunction(0)->GetName();
     else
        return std::string("Merge");
+}
 
+
+std::string TORTOISE_PARSER::getOutputSignalRedistribution()
+{
+    OptionType::Pointer option = this->GetOption( "output_signal_redist_method");
+    if(option->GetNumberOfFunctions())
+    {
+        std::string str = option->GetFunction(0)->GetName();
+        std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+        return str;
+    }
+    else
+       return std::string("LSR");
 }
 
 std::string TORTOISE_PARSER::getOutputGradientNonlinearityType()

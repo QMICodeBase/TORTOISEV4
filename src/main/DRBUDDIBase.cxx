@@ -39,82 +39,94 @@ void DRBUDDIBase::Process()
 void DRBUDDIBase::CreateBlipUpQuadImage()
 {
     std::vector<std::string> str_names= parser->getStructuralNames();
+    ImageType3D::SpacingType new_spacing;
+
     if(str_names.size())
     {
         ImageType3D::Pointer str_img = readImageD<ImageType3D>(str_names[0]);
-        ImageType3D::SpacingType str_spacing = str_img->GetSpacing();
-
-        ImageType3D::SizeType new_size;
-        new_size[0] = (int)ceil(1.0*b0_up->GetLargestPossibleRegion().GetSize()[0] * b0_up->GetSpacing()[0]/str_spacing[0]);
-        new_size[1] = (int)ceil(1.0*b0_up->GetLargestPossibleRegion().GetSize()[1] * b0_up->GetSpacing()[1]/str_spacing[1]);
-        new_size[2] = (int)ceil(1.0*b0_up->GetLargestPossibleRegion().GetSize()[2] * b0_up->GetSpacing()[2]/str_spacing[2]);
-        ImageType3D::IndexType start; start.Fill(0);
-        ImageType3D::RegionType nreg(start,new_size);
-
-        ImageType3D::SpacingType new_spc;
-        new_spc[0]=  1.0*b0_up->GetLargestPossibleRegion().GetSize()[0] * b0_up->GetSpacing()[0] / new_size[0];
-        new_spc[1]=  1.0*b0_up->GetLargestPossibleRegion().GetSize()[1] * b0_up->GetSpacing()[1] / new_size[1];
-        new_spc[2]=  1.0*b0_up->GetLargestPossibleRegion().GetSize()[2] * b0_up->GetSpacing()[2] / new_size[2];
-
-        itk::ContinuousIndex<double,3> ind;
-        ind[0]=-0.5;
-        ind[1]=-0.5;
-        ind[2]=-0.5;
-        ImageType3D::PointType pt;
-        this->b0_up->TransformContinuousIndexToPhysicalPoint(ind,pt);
-
-        vnl_vector<double> vec(3);
-        vec[0]= ind[0]* new_spc[0];
-        vec[1]= ind[1]* new_spc[1];
-        vec[2]= ind[2]* new_spc[2];
-        vnl_vector<double> nvec= b0_up->GetDirection().GetVnlMatrix() * vec;
-        ImageType3D::PointType new_orig;
-        new_orig[0]=pt[0]-nvec[0];
-        new_orig[1]=pt[1]-nvec[1];
-        new_orig[2]=pt[2]-nvec[2];
-
-        ImageType3D::Pointer b0_up_ref_img =  ImageType3D::New();
-        b0_up_ref_img->SetDirection(b0_up->GetDirection());
-        b0_up_ref_img->SetOrigin(new_orig);
-        b0_up_ref_img->SetSpacing(new_spc);
-        b0_up_ref_img->SetRegions(nreg);
-
-        int pad=16;
-        if(parser->getDisableInitRigid())
-            pad=0;
-
-        ind[0]=-pad/2;
-        ind[1]=-pad/2;
-        ind[2]=0;
-        b0_up_ref_img->TransformContinuousIndexToPhysicalPoint(ind,pt);
-
-        new_size[0]=new_size[0]+pad;
-        new_size[1]=new_size[1]+pad;
-        new_size[2]=new_size[2];
-        nreg.SetSize(new_size);
-        nreg.SetIndex(start);
-
-        b0_up_ref_img =  ImageType3D::New();
-        b0_up_ref_img->SetDirection(b0_up->GetDirection());
-        b0_up_ref_img->SetOrigin(pt);
-        b0_up_ref_img->SetSpacing(new_spc);
-        b0_up_ref_img->SetRegions(nreg);
-
-        itk::IdentityTransform<double,3>::Pointer  id=itk::IdentityTransform<double,3>::New();
-        id->SetIdentity();
-
-        using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
-        ResampleImageFilterType::Pointer resampleFilter2 = ResampleImageFilterType::New();
-        resampleFilter2->SetOutputParametersFromImage(b0_up_ref_img);
-        resampleFilter2->SetInput(b0_up);
-        resampleFilter2->SetTransform(id);
-        resampleFilter2->Update();
-        this->b0_up_quad= resampleFilter2->GetOutput();
+        new_spacing = str_img->GetSpacing();
     }
     else
     {
-        this->b0_up_quad=b0_up;
+        new_spacing= b0_up->GetSpacing();
     }
+    while(new_spacing[0]>=1)
+        new_spacing=new_spacing/1.5;
+
+    ImageType3D::SizeType new_size;
+    new_size[0] = (int)ceil(1.0*b0_up->GetLargestPossibleRegion().GetSize()[0] * b0_up->GetSpacing()[0]/new_spacing[0]);
+    new_size[1] = (int)ceil(1.0*b0_up->GetLargestPossibleRegion().GetSize()[1] * b0_up->GetSpacing()[1]/new_spacing[1]);
+    new_size[2] = (int)ceil(1.0*b0_up->GetLargestPossibleRegion().GetSize()[2] * b0_up->GetSpacing()[2]/new_spacing[2]);
+    ImageType3D::IndexType start; start.Fill(0);
+    ImageType3D::RegionType nreg(start,new_size);
+
+    ImageType3D::SpacingType new_spc;
+    new_spc[0]=  1.0*b0_up->GetLargestPossibleRegion().GetSize()[0] * b0_up->GetSpacing()[0] / new_size[0];
+    new_spc[1]=  1.0*b0_up->GetLargestPossibleRegion().GetSize()[1] * b0_up->GetSpacing()[1] / new_size[1];
+    new_spc[2]=  1.0*b0_up->GetLargestPossibleRegion().GetSize()[2] * b0_up->GetSpacing()[2] / new_size[2];
+
+    itk::ContinuousIndex<double,3> ind;
+    ind[0]=-0.5;
+    ind[1]=-0.5;
+    ind[2]=-0.5;
+    ImageType3D::PointType pt;
+    this->b0_up->TransformContinuousIndexToPhysicalPoint(ind,pt);
+
+    vnl_vector<double> vec(3);
+    vec[0]= ind[0]* new_spc[0];
+    vec[1]= ind[1]* new_spc[1];
+    vec[2]= ind[2]* new_spc[2];
+    vnl_vector<double> nvec= b0_up->GetDirection().GetVnlMatrix() * vec;
+    ImageType3D::PointType new_orig;
+    new_orig[0]=pt[0]-nvec[0];
+    new_orig[1]=pt[1]-nvec[1];
+    new_orig[2]=pt[2]-nvec[2];
+
+    ImageType3D::Pointer b0_up_ref_img =  ImageType3D::New();
+    b0_up_ref_img->SetDirection(b0_up->GetDirection());
+    b0_up_ref_img->SetOrigin(new_orig);
+    b0_up_ref_img->SetSpacing(new_spc);
+    b0_up_ref_img->SetRegions(nreg);
+
+    int pad=16;
+    if(parser->getDisableInitRigid())
+        pad=0;
+
+    ind[0]=-pad/2;
+    ind[1]=-pad/2;
+    ind[2]=0;
+    b0_up_ref_img->TransformContinuousIndexToPhysicalPoint(ind,pt);
+
+    new_size[0]=new_size[0]+pad;
+    new_size[1]=new_size[1]+pad;
+    new_size[2]=new_size[2];
+    nreg.SetSize(new_size);
+    nreg.SetIndex(start);
+
+    b0_up_ref_img =  ImageType3D::New();
+    b0_up_ref_img->SetDirection(b0_up->GetDirection());
+    b0_up_ref_img->SetOrigin(pt);
+    b0_up_ref_img->SetSpacing(new_spc);
+    b0_up_ref_img->SetRegions(nreg);
+
+    itk::IdentityTransform<double,3>::Pointer  id=itk::IdentityTransform<double,3>::New();
+    id->SetIdentity();
+
+    using InterpolatorType= itk::BSplineInterpolateImageFunction<ImageType3D,double,double>;
+    InterpolatorType::Pointer interp=InterpolatorType::New();
+    interp->SetSplineOrder(3);
+
+
+    using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+    ResampleImageFilterType::Pointer resampleFilter2 = ResampleImageFilterType::New();
+    resampleFilter2->SetOutputParametersFromImage(b0_up_ref_img);
+    resampleFilter2->SetInput(b0_up);
+    resampleFilter2->SetTransform(id);
+    resampleFilter2->SetInterpolator(interp);
+    resampleFilter2->Update();
+    this->b0_up_quad= resampleFilter2->GetOutput();
+
+
 
     itk::ImageRegionIterator<ImageType3D> it(this->b0_up_quad,this->b0_up_quad->GetLargestPossibleRegion());
     for(it.GoToBegin(); !it.IsAtEnd(); ++it)

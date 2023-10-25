@@ -73,6 +73,7 @@ private:            //Subfunctions the main processing functions use
     void  GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer> > dwis);
     std::vector< std::vector<ImageType3D::Pointer> >  GenerateTransformedInterpolatedData();
     void GenerateGradNonlinOutput();
+    ImageType3D::Pointer ComputeDetImgFromAllTransExceptStr(ImageType3D::Pointer ref_vol,int vol_id,int PE);
 
 
     ImageType3D::Pointer UnObliqueImage(ImageType3D::Pointer img);

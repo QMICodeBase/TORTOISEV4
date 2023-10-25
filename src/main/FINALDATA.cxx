@@ -817,6 +817,113 @@ FINALDATA::CompositeTransformType::Pointer FINALDATA::GenerateCompositeTransform
 }
 
 
+ImageType3D::Pointer FINALDATA::ComputeDetImgFromAllTransExceptStr(ImageType3D::Pointer first_vol, int v,int PE )
+{
+    ImageType3D::Pointer first_vol_DP= ChangeImageHeaderToDP<ImageType3D>(first_vol);
+    ImageType3D::SizeType sz= first_vol->GetLargestPossibleRegion().GetSize();
+
+    int phase=0;
+    if(this->PE_strings[0]=="vertical")
+        phase=1;
+    if(this->PE_strings[0]=="slice")
+        phase=2;
+
+    vnl_vector<double> phase_vector(3,0);
+    phase_vector[phase]=1;
+    vnl_matrix_fixed<double,3,3> dir = first_vol->GetDirection().GetVnlMatrix();
+    vnl_vector_fixed<double,3> new_phase_vector = dir*phase_vector;
+    int phase_xyz;
+    if( (fabs(new_phase_vector[0])>fabs(new_phase_vector[1])) && (fabs(new_phase_vector[0])>fabs(new_phase_vector[2])))
+        phase_xyz=0;
+    else if( (fabs(new_phase_vector[1])>fabs(new_phase_vector[0])) && (fabs(new_phase_vector[1])>fabs(new_phase_vector[2])))
+        phase_xyz=1;
+    else phase_xyz=2;
+
+    CompositeTransformType::Pointer all_trans= CompositeTransformType::New();
+
+    using IdTransformType = itk::IdentityTransform<double,3> ;
+    IdTransformType::Pointer id_trans = IdTransformType::New();
+    id_trans->SetIdentity();
+    all_trans->AddTransform(id_trans);
+
+
+    DisplacementFieldType::Pointer mot_eddy_field=nullptr;
+    if(this->dwi_transforms[0].size())
+    {
+        OkanQuadraticTransformType::Pointer curr_mot_eddy_trans= this->dwi_transforms[PE][v];
+        mot_eddy_field=DisplacementFieldType::New();
+        mot_eddy_field->SetRegions(first_vol->GetLargestPossibleRegion());
+        mot_eddy_field->Allocate();
+        mot_eddy_field->SetSpacing(first_vol->GetSpacing());
+        mot_eddy_field->SetOrigin(first_vol->GetOrigin());
+        mot_eddy_field->SetDirection(first_vol->GetDirection());
+
+        itk::ImageRegionIteratorWithIndex<ImageType3D> it(first_vol_DP,first_vol_DP->GetLargestPossibleRegion());
+        for(it.GoToBegin();!it.IsAtEnd();++it)
+        {
+            ImageType3D::IndexType ind3= it.GetIndex();
+            ImageType3D::PointType pt,pt_trans;
+            first_vol_DP->TransformIndexToPhysicalPoint(ind3,pt);
+            pt_trans=curr_mot_eddy_trans->TransformPoint(pt);
+
+            auto vec= pt_trans- pt;
+            auto vec2= first_vol->GetDirection() * vec;
+            mot_eddy_field->SetPixel(ind3,vec2);
+        }
+        DisplacementFieldTransformType::Pointer mot_eddy_trans= DisplacementFieldTransformType::New();
+        mot_eddy_trans->SetDisplacementField(mot_eddy_field);
+        all_trans->AddTransform(mot_eddy_trans);
+    }
+    if(this->gradwarp_field)
+    {
+        DisplacementFieldTransformType::Pointer gradwarp_trans= DisplacementFieldTransformType::New();
+        gradwarp_trans->SetDisplacementField(this->gradwarp_field);
+        all_trans->AddTransform(gradwarp_trans);
+    }
+    if(this->epi_trans[PE])
+    {
+        DisplacementFieldTransformType::Pointer mepi_trans= DisplacementFieldTransformType::New();
+        mepi_trans->SetDisplacementField(this->epi_trans[PE]);
+        all_trans->AddTransform(mepi_trans);
+    }
+
+    ImageType3D::Pointer det_img = ImageType3D::New();
+    det_img->SetRegions(first_vol->GetLargestPossibleRegion());
+    det_img->Allocate();
+    det_img->SetSpacing(first_vol->GetSpacing());
+    det_img->SetOrigin(first_vol->GetOrigin());
+    det_img->SetDirection(first_vol->GetDirection());
+    det_img->FillBuffer(1);
+
+    itk::ImageRegionIteratorWithIndex<ImageType3D> it(det_img,det_img->GetLargestPossibleRegion());
+    for(it.GoToBegin();!it.IsAtEnd();++it)
+    {
+        ImageType3D::IndexType ind3= it.GetIndex();
+        if(ind3[phase]>0 && ind3[phase]<sz[phase]-1)
+        {
+            DisplacementFieldType::IndexType Nind=ind3;
+            Nind[phase]+=1;
+            ImageType3D::PointType pt,pt_trans;
+            det_img->TransformIndexToPhysicalPoint(Nind,pt);
+            pt_trans= all_trans->TransformPoint(pt);
+            double grad=  pt_trans[phase]-pt[phase];
+
+            Nind[phase]-=2;
+            det_img->TransformIndexToPhysicalPoint(Nind,pt);
+            pt_trans= all_trans->TransformPoint(pt);
+            grad-=  pt_trans[phase]-pt[phase];
+            grad*= 0.5/det_img->GetSpacing()[phase];
+
+            vnl_vector<double> temp(3,0);
+            temp[phase]=grad;
+            temp = det_img->GetDirection().GetVnlMatrix()* temp;
+
+            it.Set( 1 + temp[phase_xyz]);
+        }
+    }
+
+    return det_img;
+}
 
 void FINALDATA::GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer> >  final_DWIs)
 {
@@ -905,52 +1012,110 @@ void FINALDATA::GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer>
     {
         if( data_names[1]!="")
         {
-            ImageType3D::Pointer blip_up_b0_corrected= readImageD<ImageType3D>(temp_folder+"/blip_up_b0_corrected.nii");
-            ImageType3D::Pointer blip_down_b0_corrected= readImageD<ImageType3D>(temp_folder+"/blip_down_b0_corrected.nii");
-            ImageType3D::Pointer b0_corrected_final= readImageD<ImageType3D>(temp_folder+"/b0_corrected_final.nii");
+            std::string method = parser->getOutputSignalRedistribution();
 
-            typedef itk::ResampleImageFilter<ImageType3D,ImageType3D>  ResampleImageFilterType;
-            ResampleImageFilterType::Pointer resampleFilteru = ResampleImageFilterType::New();
-            resampleFilteru->SetOutputParametersFromImage(template_structural);
-            resampleFilteru->SetInput(blip_up_b0_corrected);
-            resampleFilteru->SetTransform( b0_t0_str_trans);
-            resampleFilteru->Update();
-            blip_up_b0_corrected= resampleFilteru->GetOutput();
+            using IdTransformType = itk::IdentityTransform<double,3> ;
+            IdTransformType::Pointer id_trans = IdTransformType::New();
+            id_trans->SetIdentity();
 
 
-            ResampleImageFilterType::Pointer resampleFilterd = ResampleImageFilterType::New();
-            resampleFilterd->SetOutputParametersFromImage(template_structural);
-            resampleFilterd->SetInput(blip_down_b0_corrected);
-            resampleFilterd->SetTransform( b0_t0_str_trans);
-            resampleFilterd->Update();
-            blip_down_b0_corrected= resampleFilterd->GetOutput();
-
-            ResampleImageFilterType::Pointer resampleFilterc = ResampleImageFilterType::New();
-            resampleFilterc->SetOutputParametersFromImage(template_structural);
-            resampleFilterc->SetInput(b0_corrected_final);
-            resampleFilterc->SetTransform( b0_t0_str_trans);
-            resampleFilterc->Update();
-            b0_corrected_final= resampleFilterc->GetOutput();
-
-
-            ImageType3D::Pointer b0_imgs[2]={blip_up_b0_corrected,blip_down_b0_corrected};
-            for(int PE=0;PE<2;PE++)
+            if(method=="LSR")
             {
-                int Nvols= final_DWIs[PE].size();
-                for(int v=0;v<Nvols;v++)
+                ImageType3D::Pointer blip_up_b0_corrected= readImageD<ImageType3D>(temp_folder+"/blip_up_b0_corrected.nii");
+                ImageType3D::Pointer blip_down_b0_corrected= readImageD<ImageType3D>(temp_folder+"/blip_down_b0_corrected.nii");
+                ImageType3D::Pointer b0_corrected_final= readImageD<ImageType3D>(temp_folder+"/b0_corrected_final.nii");
+
+
+                typedef itk::ResampleImageFilter<ImageType3D,ImageType3D>  ResampleImageFilterType;
+                ResampleImageFilterType::Pointer resampleFilteru = ResampleImageFilterType::New();
+                resampleFilteru->SetOutputParametersFromImage(template_structural);
+                resampleFilteru->SetInput(blip_up_b0_corrected);
+                if(this->b0_t0_str_trans)
+                    resampleFilteru->SetTransform( b0_t0_str_trans);
+                else
+                    resampleFilteru->SetTransform( id_trans);
+                resampleFilteru->Update();
+                blip_up_b0_corrected= resampleFilteru->GetOutput();
+
+
+                ResampleImageFilterType::Pointer resampleFilterd = ResampleImageFilterType::New();
+                resampleFilterd->SetOutputParametersFromImage(template_structural);
+                resampleFilterd->SetInput(blip_down_b0_corrected);
+                if(this->b0_t0_str_trans)
+                    resampleFilterd->SetTransform( b0_t0_str_trans);
+                else
+                    resampleFilterd->SetTransform( id_trans);
+                resampleFilterd->Update();
+                blip_down_b0_corrected= resampleFilterd->GetOutput();
+
+                ResampleImageFilterType::Pointer resampleFilterc = ResampleImageFilterType::New();
+                resampleFilterc->SetOutputParametersFromImage(template_structural);
+                resampleFilterc->SetInput(b0_corrected_final);
+                if(this->b0_t0_str_trans)
+                    resampleFilterc->SetTransform( b0_t0_str_trans);
+                else
+                    resampleFilterc->SetTransform( id_trans);
+                resampleFilterc->Update();
+                b0_corrected_final= resampleFilterc->GetOutput();
+
+
+                ImageType3D::Pointer b0_imgs[2]={blip_up_b0_corrected,blip_down_b0_corrected};
+                for(int PE=0;PE<2;PE++)
                 {
-                    itk::ImageRegionIteratorWithIndex<ImageType3D> it(final_DWIs[PE][v],final_DWIs[PE][v]->GetLargestPossibleRegion());
-                    for(it.GoToBegin();!it.IsAtEnd();++it)
+                    int Nvols= final_DWIs[PE].size();
+                    for(int v=0;v<Nvols;v++)
                     {
-                        ImageType3D::IndexType ind3= it.GetIndex();
+                        itk::ImageRegionIteratorWithIndex<ImageType3D> it(final_DWIs[PE][v],final_DWIs[PE][v]->GetLargestPossibleRegion());
+                        for(it.GoToBegin();!it.IsAtEnd();++it)
+                        {
+                            ImageType3D::IndexType ind3= it.GetIndex();
 
-                        double det= b0_corrected_final->GetPixel(ind3)/b0_imgs[PE]->GetPixel(ind3);
-                        float val1=it.Get();
-                        double fval = val1*det;
-                        if(std::isnan(fval))
-                            fval=0;
+                            double det= b0_corrected_final->GetPixel(ind3)/b0_imgs[PE]->GetPixel(ind3);
+                            float val1=it.Get();
+                            double fval = val1*det;
+                            if(std::isnan(fval))
+                                fval=0;
 
-                        it.Set(fval);
+                            it.Set(fval);
+                        }
+                    }
+                }
+            }
+            else  //NOT LSR but Jac
+            {
+                (*stream)<<"Jacobian manipulating images..."<<std::endl;
+                for(int PE=0;PE<2;PE++)
+                {
+                    int Nvols= final_DWIs[PE].size();
+                    ImageType3D::Pointer first_vol= read_3D_volume_from_4D(data_names[PE],0);
+
+                    #pragma omp parallel for
+                    for(int v=0;v<Nvols;v++)
+                    {
+                        ImageType3D::Pointer det_img = ComputeDetImgFromAllTransExceptStr(first_vol,v,PE);
+
+                        typedef itk::ResampleImageFilter<ImageType3D, ImageType3D> ResamplerType;
+                        ResamplerType::Pointer resampler= ResamplerType::New();
+                        resampler->SetInput(det_img);
+                        resampler->SetOutputParametersFromImage(this->template_structural);
+                        resampler->SetDefaultPixelValue(1);
+                        if(this->b0_t0_str_trans)
+                            resampler->SetTransform(this->b0_t0_str_trans);
+                        else
+                            resampler->SetTransform(id_trans);
+                        resampler->Update();
+                        ImageType3D::Pointer det_img_on_str= resampler->GetOutput();
+
+
+                        itk::ImageRegionIteratorWithIndex<ImageType3D> it2(final_DWIs[PE][v],final_DWIs[PE][v]->GetLargestPossibleRegion());
+                        for(it2.GoToBegin();!it2.IsAtEnd();++it2)
+                        {
+                            ImageType3D::IndexType ind3= it2.GetIndex();
+                            float val = it2.Get()* det_img_on_str->GetPixel(ind3);
+                            if(val<0)
+                                val=0;
+                            it2.Set(val);
+                        }
                     }
                 }
             }
@@ -987,7 +1152,7 @@ void FINALDATA::GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer>
                 bvals_file<<bvals;
                 bvals_file.close();
             }
-            else
+            else    //JacSep
             {
                 std::string final_folder= fs::path(this->output_name).parent_path().string();
                 if(final_folder=="")
@@ -1060,109 +1225,15 @@ void FINALDATA::GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer>
             ImageType3D::Pointer first_vol_DP= ChangeImageHeaderToDP<ImageType3D>(first_vol);
             ImageType3D::SizeType sz= first_vol->GetLargestPossibleRegion().GetSize();
 
-            int phase=0;
-            if(this->PE_strings[0]=="vertical")
-                phase=1;
-            if(this->PE_strings[0]=="slice")
-                phase=2;
-
-            vnl_vector<double> phase_vector(3,0);
-            phase_vector[phase]=1;
-            vnl_matrix_fixed<double,3,3> dir = first_vol->GetDirection().GetVnlMatrix();
-            vnl_vector_fixed<double,3> new_phase_vector = dir*phase_vector;
-            int phase_xyz;
-            if( (fabs(new_phase_vector[0])>fabs(new_phase_vector[1])) && (fabs(new_phase_vector[0])>fabs(new_phase_vector[2])))
-                phase_xyz=0;
-            else if( (fabs(new_phase_vector[1])>fabs(new_phase_vector[0])) && (fabs(new_phase_vector[1])>fabs(new_phase_vector[2])))
-                phase_xyz=1;
-            else phase_xyz=2;
+            using IdTransformType = itk::IdentityTransform<double,3> ;
+            IdTransformType::Pointer id_trans = IdTransformType::New();
+            id_trans->SetIdentity();
 
 
             #pragma omp parallel for
             for(int v=0;v<final_DWIs[0].size();v++)
             {
-                CompositeTransformType::Pointer all_trans= CompositeTransformType::New();
-
-                using IdTransformType = itk::IdentityTransform<double,3> ;
-                IdTransformType::Pointer id_trans = IdTransformType::New();
-                id_trans->SetIdentity();
-                all_trans->AddTransform(id_trans);
-
-
-                DisplacementFieldType::Pointer mot_eddy_field=nullptr;
-                if(this->dwi_transforms[0].size())
-                {
-                    OkanQuadraticTransformType::Pointer curr_mot_eddy_trans= this->dwi_transforms[0][v];
-                    mot_eddy_field=DisplacementFieldType::New();
-                    mot_eddy_field->SetRegions(first_vol->GetLargestPossibleRegion());
-                    mot_eddy_field->Allocate();
-                    mot_eddy_field->SetSpacing(first_vol->GetSpacing());
-                    mot_eddy_field->SetOrigin(first_vol->GetOrigin());
-                    mot_eddy_field->SetDirection(first_vol->GetDirection());
-
-                    itk::ImageRegionIteratorWithIndex<ImageType3D> it(first_vol_DP,first_vol_DP->GetLargestPossibleRegion());
-                    for(it.GoToBegin();!it.IsAtEnd();++it)
-                    {
-                        ImageType3D::IndexType ind3= it.GetIndex();
-                        ImageType3D::PointType pt,pt_trans;
-                        first_vol_DP->TransformIndexToPhysicalPoint(ind3,pt);
-                        pt_trans=curr_mot_eddy_trans->TransformPoint(pt);
-
-                        auto vec= pt_trans- pt;
-                        auto vec2= first_vol->GetDirection() * vec;
-                        mot_eddy_field->SetPixel(ind3,vec2);
-                    }
-                    DisplacementFieldTransformType::Pointer mot_eddy_trans= DisplacementFieldTransformType::New();
-                    mot_eddy_trans->SetDisplacementField(mot_eddy_field);
-                    all_trans->AddTransform(mot_eddy_trans);
-                }
-                if(this->gradwarp_field)
-                {
-                    DisplacementFieldTransformType::Pointer gradwarp_trans= DisplacementFieldTransformType::New();
-                    gradwarp_trans->SetDisplacementField(this->gradwarp_field);
-                    all_trans->AddTransform(gradwarp_trans);
-                }
-                if(this->epi_trans[0])
-                {
-                    DisplacementFieldTransformType::Pointer mepi_trans= DisplacementFieldTransformType::New();
-                    mepi_trans->SetDisplacementField(this->epi_trans[0]);
-                    all_trans->AddTransform(mepi_trans);
-                }
-
-                ImageType3D::Pointer det_img = ImageType3D::New();
-                det_img->SetRegions(first_vol->GetLargestPossibleRegion());
-                det_img->Allocate();
-                det_img->SetSpacing(first_vol->GetSpacing());
-                det_img->SetOrigin(first_vol->GetOrigin());
-                det_img->SetDirection(first_vol->GetDirection());
-                det_img->FillBuffer(1);
-
-                itk::ImageRegionIteratorWithIndex<ImageType3D> it(det_img,det_img->GetLargestPossibleRegion());
-                for(it.GoToBegin();!it.IsAtEnd();++it)
-                {
-                    ImageType3D::IndexType ind3= it.GetIndex();
-                    if(ind3[phase]>0 && ind3[phase]<sz[phase]-1)
-                    {
-                        DisplacementFieldType::IndexType Nind=ind3;
-                        Nind[phase]+=1;
-                        ImageType3D::PointType pt,pt_trans;
-                        det_img->TransformIndexToPhysicalPoint(Nind,pt);
-                        pt_trans= all_trans->TransformPoint(pt);
-                        double grad=  pt_trans[phase]-pt[phase];
-
-                        Nind[phase]-=2;
-                        det_img->TransformIndexToPhysicalPoint(Nind,pt);
-                        pt_trans= all_trans->TransformPoint(pt);
-                        grad-=  pt_trans[phase]-pt[phase];
-                        grad*= 0.5/det_img->GetSpacing()[phase];
-
-                        vnl_vector<double> temp(3,0);
-                        temp[phase]=grad;
-                        temp = det_img->GetDirection().GetVnlMatrix()* temp;
-
-                        it.Set( 1 + temp[phase_xyz]);
-                    }
-                }
+                ImageType3D::Pointer det_img = ComputeDetImgFromAllTransExceptStr(first_vol,v,0);
 
                 typedef itk::ResampleImageFilter<ImageType3D, ImageType3D> ResamplerType;
                 ResamplerType::Pointer resampler= ResamplerType::New();
@@ -1180,11 +1251,11 @@ void FINALDATA::GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer>
                 itk::ImageRegionIteratorWithIndex<ImageType3D> it2(final_DWIs[0][v],final_DWIs[0][v]->GetLargestPossibleRegion());
                 for(it2.GoToBegin();!it2.IsAtEnd();++it2)
                 {
-                    ImageType3D::IndexType ind3= it.GetIndex();
-                    float val = it.Get()* det_img_on_str->GetPixel(ind3);
+                    ImageType3D::IndexType ind3= it2.GetIndex();
+                    float val = it2.Get()* det_img_on_str->GetPixel(ind3);
                     if(val<0)
                         val=0;
-                    it.Set(val);
+                    it2.Set(val);
                 }
             }  //for v
 

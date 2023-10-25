@@ -95,20 +95,24 @@ class DRBUDDI_Diffeo
     {
         orig_dir = img->GetDirection();
         new_dir=orig_dir;
+        new_dir.Fill(0);
         for(int r=0;r<3;r++)
         {
+
+            float mx=-2;
+            int mx_id=-1;
             for(int c=0;c<3;c++)
             {
-                if(fabs(orig_dir(r,c))>0.5)
+                if(fabs(orig_dir(r,c))>mx)
                 {
-                    if(orig_dir(r,c)>0)
-                        new_dir(r,c)=1;
-                    else
-                        new_dir(r,c)=-1;
+                    mx=fabs(orig_dir(r,c));
+                    mx_id=c;
                 }
-                else
-                    new_dir(r,c)=0;
             }
+            if(orig_dir(r,mx_id)>0)
+                new_dir(r,mx_id)=1;
+            else
+                new_dir(r,mx_id)=-1;
         }
         img->SetDirection(new_dir);
         this->b0_up_img=CUDAIMAGE::New();
@@ -182,20 +186,24 @@ class DRBUDDI_Diffeo
     {
         orig_dir = img2->GetDirection();
         new_dir=orig_dir;
+        new_dir.Fill(0);
         for(int r=0;r<3;r++)
         {
+
+            float mx=-2;
+            int mx_id=-1;
             for(int c=0;c<3;c++)
             {
-                if(fabs(orig_dir(r,c))>0.5)
+                if(fabs(orig_dir(r,c))>mx)
                 {
-                    if(orig_dir(r,c)>0)
-                        new_dir(r,c)=1;
-                    else
-                        new_dir(r,c)=-1;
+                    mx=fabs(orig_dir(r,c));
+                    mx_id=c;
                 }
-                else
-                    new_dir(r,c)=0;
             }
+            if(orig_dir(r,mx_id)>0)
+                new_dir(r,mx_id)=1;
+            else
+                new_dir(r,mx_id)=-1;
         }
         typedef itk::ImageDuplicator<ImageType3D> DupType;
         DupType::Pointer dup= DupType::New();

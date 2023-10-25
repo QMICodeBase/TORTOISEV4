@@ -350,6 +350,10 @@ void DRBUDDI::Step1_RigidRegistration()
         down_to_up_rigid_trans = RigidDiffeoRigidRegisterB0DownToB0Up(this->b0_up_quad,this->b0_down,"CC",initial_corrected_b0);
     }
 
+    using InterpolatorType= itk::BSplineInterpolateImageFunction<ImageType3D,double,double>;
+    InterpolatorType::Pointer interp=InterpolatorType::New();
+    interp->SetSplineOrder(3);
+
 
     //Create and write b0_down quad image and the rigid transformation
     using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
@@ -357,6 +361,7 @@ void DRBUDDI::Step1_RigidRegistration()
     resampleFilter2->SetOutputParametersFromImage(this->b0_up_quad);;
     resampleFilter2->SetInput(this->b0_down);
     resampleFilter2->SetTransform(down_to_up_rigid_trans);
+    resampleFilter2->SetInterpolator(interp);
     resampleFilter2->Update();
     this->b0_down_quad= resampleFilter2->GetOutput();
     itk::ImageRegionIterator<ImageType3D> it(this->b0_down_quad,this->b0_down_quad->GetLargestPossibleRegion());
