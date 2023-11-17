@@ -854,8 +854,15 @@ void ComputeMetric_CCJacSSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_
 
 
 
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     cudaPitchedPtr sSS={0};
     cudaMalloc3D(&sSS, extent);    cudaMemset3D(sSS,0,extent);
@@ -1335,8 +1342,15 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
     else phase_xyz=2;
 
 
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     cudaPitchedPtr sSS={0};
     cudaMalloc3D(&sSS, extent);    cudaMemset3D(sSS,0,extent);
@@ -2168,8 +2182,15 @@ void ComputeMetric_MSJacSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_i
 
 
 
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     ComputeMetric_MSJacSingle_kernel<<< blockSize,gridSize>>>( up_img, down_img, up_grad_img_x,up_grad_img_y,up_grad_img_z,down_grad_img_x,down_grad_img_y,down_grad_img_z,def_FINV,updateFieldFINV,  metric_image, phase, phase_xyz, kernel_sz );
 
@@ -2450,8 +2471,15 @@ void ComputeMetric_CCSK_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cud
     cudaMemset3D(K_image,0,extent);
 
 
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     Compute_K_image<<< blockSize,gridSize>>>( up_img, down_img,K_image,t);
     gpuErrchk(cudaPeekAtLastError());
@@ -2666,8 +2694,15 @@ void ComputeMetric_CC_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     cudaMemset3D(metric_image,0,extent);
 
 
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
 
     ComputeMetric_CC_kernel<<< blockSize,gridSize>>>(up_img,down_img, updateFieldF, updateFieldM, metric_image );
@@ -2726,8 +2761,15 @@ void ComputeDetImg_cuda(cudaPitchedPtr img, cudaPitchedPtr field,
     else phase_xyz=2;
 
 
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     computeDetImg<<< blockSize,gridSize>>>( img,field,output,phase,phase_xyz);
 

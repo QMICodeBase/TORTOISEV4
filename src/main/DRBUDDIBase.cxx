@@ -148,7 +148,7 @@ ImageType3D::Pointer DRBUDDIBase::JacobianTransformImage(ImageType3D::Pointer im
     using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
     ResampleImageFilterType::Pointer resampleFilter2 = ResampleImageFilterType::New();
     resampleFilter2->SetOutputParametersFromImage(ref_img);
-    resampleFilter2->SetInterpolator(interpolator);
+  //  resampleFilter2->SetInterpolator(interpolator);
     resampleFilter2->SetInput(img);
     resampleFilter2->SetTransform(disp_trans);
     resampleFilter2->Update();
@@ -178,9 +178,9 @@ ImageType3D::Pointer DRBUDDIBase::JacobianTransformImage(ImageType3D::Pointer im
         double det = A(phase_id,phase_id);
         if(det>0)
         {
-            double logd = log(det);
-            double ly = logd / (sqrt(1+0.2*logd*logd));
-            det=exp(ly);
+          //  double logd = log(det);
+          //  double ly = logd / (sqrt(1+0.2*logd*logd));
+          //  det=exp(ly);
             it.Set(it.Get()*det);
         }
         else
@@ -210,9 +210,9 @@ ImageType3D::Pointer DRBUDDIBase::JacobianTransformImage(ImageType3D::Pointer im
             if(Ntot>0)
             {
                 det=tot/Ntot;
-                double logd = log(det);
-                double ly = logd / (sqrt(1+0.2*logd*logd));
-                det=exp(ly);
+             //   double logd = log(det);
+             //   double ly = logd / (sqrt(1+0.2*logd*logd));
+             //   det=exp(ly);
                 it.Set(it.Get()*det);
             }
             else

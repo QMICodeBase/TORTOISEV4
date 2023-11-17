@@ -233,7 +233,15 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         this->AddOption( option );
     }
     {
-        std::string description = std::string("Flag to disable ALL ITK multi-threading. The only multi-threading is OpenMP if this glaf is 1. Boolean. Default:0")  ;
+        std::string description = std::string("Flag to enforce DRBUDDI to enforce  blip-up blip-down antisymmetry and phasen-encoding restriction when using the default settings. Boolean. Default:0")  ;
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "enforce_full_symmetry");
+        option->SetDescription( description );
+        option->SetModule(6);
+        this->AddOption( option );
+    }
+    {
+        std::string description = std::string("Flag to disable ALL ITK multi-threading. The only multi-threading is OpenMP if this flah is 1. Boolean. Default:0")  ;
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "disable_itk_threads");
         option->SetDescription( description );
@@ -260,6 +268,14 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
 
 }
 
+bool DRBUDDI_PARSERBASE::getEnforceFullAntiSymmetry()
+{
+    OptionType::Pointer option = this->GetOption( "enforce_full_symmetry");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+       return false;
+}
 
 int DRBUDDI_PARSERBASE::getNumberOfCores()
 {
@@ -277,7 +293,6 @@ bool DRBUDDI_PARSERBASE::getDisableITKThreads()
         return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
     else
        return 0;
-
 }
 
 std::string DRBUDDI_PARSERBASE::getUpInputName()

@@ -3,13 +3,13 @@ cmake_minimum_required(VERSION 3.20)
 PROJECT(TORTOISEV4  )
 
 SET(USEOPENMP 1)
-#   SET(CMAKE_BUILD_TYPE Debug)
+ #  SET(CMAKE_BUILD_TYPE Debug)
 #   SET(ISDEBUG 1)
 
 
 
 if ( NOT DEFINED USECUDA)
-    SET(USECUDA 1)
+    SET(USECUDA 0)
 endif()
 if ( NOT DEFINED USE_VTK)
     SET(USE_VTK 0)
@@ -483,6 +483,10 @@ target_link_libraries(Combine3DImagesTo4D  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  
 #add_executable(CombineDRBUDDIDownTransformations   ../src/tools/CombineDRBUDDIDownTransformations/CombineDRBUDDIDownTransformations.cxx ${SOURCES})
 #target_link_libraries(CombineDRBUDDIDownTransformations ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
+
+
+#add_executable(MultiplyFieldwithScalar   ../src/tools/MultiplyFieldwithScalar/MultiplyFieldwithScalar.cxx ${SOURCES})
+#target_link_libraries(MultiplyFieldwithScalar ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 

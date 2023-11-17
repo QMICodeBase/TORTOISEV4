@@ -18,7 +18,7 @@ int main( int argc , char * argv[] )
 {
     if(argc<4)    
     {
-        std::cout<<"Usage:   ApplyTransformationToTensorDRT   full_path_to_tensor_to_be_transformed  full_path_to_transformation  full_path_to_name_of_output full_path_to_image_with_desired_dimensions "<<std::endl;
+        std::cout<<"Usage:   ApplyTransformationToTensor   full_path_to_tensor_to_be_transformed  full_path_to_transformation  full_path_to_name_of_output full_path_to_image_with_desired_dimensions "<<std::endl;
         return EXIT_FAILURE;
     }
     

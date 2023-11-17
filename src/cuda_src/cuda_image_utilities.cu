@@ -285,8 +285,15 @@ void AddToUpdateField_cuda(cudaPitchedPtr total_data, cudaPitchedPtr to_add_data
 
     if(magnitude!=0)
     {
-        const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-        const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+        dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+        dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+        while(gridSize.x *gridSize.y *gridSize.z >1024)
+        {
+            blockSize.x*=2;
+            blockSize.y*=2;
+            blockSize.z*=2;
+            gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+        }
 
         AddToUpdateField_kernel<<< blockSize,gridSize>>>(  total_data,to_add_data,weight/magnitude,data_sz,Ncomponents );
     }
@@ -1265,8 +1272,15 @@ void ComputeImageGradient_cuda(cudaPitchedPtr img,
     float h_d_dir[]= {data_d00,data_d01,data_d02,data_d10,data_d11,data_d12,data_d20,data_d21,data_d22};
     gpuErrchk(cudaMemcpyToSymbol(d_dir, &h_d_dir, 9 * sizeof(float)));
     
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     ComputeImageGradient_kernel<<< blockSize,gridSize>>>( img,data_sz,outputx,outputy,outputz );
     gpuErrchk(cudaPeekAtLastError());
@@ -1560,8 +1574,15 @@ void IntegrateVelocityField_cuda(cudaPitchedPtr *velocity_field,
     gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
 
 
-    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
 
     IntegrateVelocityField_kernel<<< blockSize,gridSize>>>( velocity_field,output_field, lowt,hight, NT );
 

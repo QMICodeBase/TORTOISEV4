@@ -26,6 +26,7 @@
 #include "itkBSplineInterpolateImageFunction.h"
 
 #include "DRBUDDI_Diffeo.h"
+#include "../tools/ResampleDWIs/resample_dwis.h"
 
 
 DRBUDDI::DRBUDDI(std::string uname,std::string dname,std::vector<std::string> str_names,json mjson)
@@ -186,18 +187,18 @@ std::vector<DRBUDDI::DisplacementFieldType::Pointer> DRBUDDI::DRBUDDI_Initial_Re
     if(phase=="horizontal")
         phase_vector[0]=1;
     if(phase=="slice")
-        phase_vector[2]=1;    
+        phase_vector[2]=1;
 
 
     std::vector<DRBUDDIStageSettings> stages;
     stages.resize(4);
     {
-        stages[0].niter=100;
+        stages[0].niter=200;
         stages[0].img_smoothing_std=3.;
         stages[0].downsample_factor=6;
         stages[0].learning_rate=0.2;
-        stages[0].update_gaussian_sigma=4.5;
-        stages[0].total_gaussian_sigma=0.05;
+        stages[0].update_gaussian_sigma=6.5;
+        stages[0].total_gaussian_sigma=0.0;
         stages[0].restrct=1;
         stages[0].constrain=1;
         DRBUDDIMetric metric;
@@ -210,8 +211,8 @@ std::vector<DRBUDDI::DisplacementFieldType::Pointer> DRBUDDI::DRBUDDI_Initial_Re
         stages[1].img_smoothing_std=2.;
         stages[1].downsample_factor=4;
         stages[1].learning_rate=0.25;
-        stages[1].update_gaussian_sigma=4.5;
-        stages[1].total_gaussian_sigma=0.05;
+        stages[1].update_gaussian_sigma=5.5;
+        stages[1].total_gaussian_sigma=0.0;
         stages[1].restrct=1;
         stages[1].constrain=1;
         DRBUDDIMetric metric;
@@ -220,12 +221,12 @@ std::vector<DRBUDDI::DisplacementFieldType::Pointer> DRBUDDI::DRBUDDI_Initial_Re
         stages[1].metrics.push_back(metric);
     }
     {
-        stages[2].niter=10;
+        stages[2].niter=50;
         stages[2].img_smoothing_std=1;
         stages[2].downsample_factor=2;
         stages[2].learning_rate=0.4;
-        stages[2].update_gaussian_sigma=4.;
-        stages[2].total_gaussian_sigma=0.05;
+        stages[2].update_gaussian_sigma=4.5;
+        stages[2].total_gaussian_sigma=0.0;
         stages[2].restrct=1;
         stages[2].constrain=1;
         DRBUDDIMetric metric;
@@ -238,8 +239,8 @@ std::vector<DRBUDDI::DisplacementFieldType::Pointer> DRBUDDI::DRBUDDI_Initial_Re
         stages[3].img_smoothing_std=0.;
         stages[3].downsample_factor=1;
         stages[3].learning_rate=0.5;
-        stages[3].update_gaussian_sigma=3.;
-        stages[3].total_gaussian_sigma=0.05;
+        stages[3].update_gaussian_sigma=3.5;
+        stages[3].total_gaussian_sigma=0.0;
         stages[3].restrct=1;
         stages[3].constrain=1;
         DRBUDDIMetric metric;
@@ -361,7 +362,7 @@ void DRBUDDI::Step1_RigidRegistration()
     resampleFilter2->SetOutputParametersFromImage(this->b0_up_quad);;
     resampleFilter2->SetInput(this->b0_down);
     resampleFilter2->SetTransform(down_to_up_rigid_trans);
-    resampleFilter2->SetInterpolator(interp);
+  //  resampleFilter2->SetInterpolator(interp);
     resampleFilter2->Update();
     this->b0_down_quad= resampleFilter2->GetOutput();
     itk::ImageRegionIterator<ImageType3D> it(this->b0_down_quad,this->b0_down_quad->GetLargestPossibleRegion());
@@ -427,6 +428,8 @@ void DRBUDDI::Step1_RigidRegistration()
 
     int Nstr= parser->getNumberOfStructurals();
 
+
+
     for(int str=0;str<Nstr;str++)
     {
         (*stream)<<"Rigidly registering structural image id: " <<str<<" to b0_up quad..."<<std::endl;
@@ -451,9 +454,22 @@ void DRBUDDI::Step1_RigidRegistration()
             rigid_trans=rigid_trans2;
         else
         {
-            auto params= 0.5*(params1+params2);
-            params1= params;
-            rigid_trans1->SetParameters(params1);
+            std::cout<<"Could not compute the rigid transformation from the structural imageto b=0 image... Starting multistart.... This could take a while"<<std::endl;
+            std::cout<<"Better be safe than sorry, right?"<<std::endl;
+
+
+            std::vector<float> new_res; new_res.resize(3);
+            new_res[0]= initial_corrected_b0->GetSpacing()[0] * 2;
+            new_res[1]= initial_corrected_b0->GetSpacing()[1] * 2;
+            new_res[2]= initial_corrected_b0->GetSpacing()[2] * 2;
+            std::vector<float> dummy;
+            ImageType3D::Pointer b02= resample_3D_image(initial_corrected_b0,new_res,dummy,"Linear");
+            new_res[0]= str_img->GetSpacing()[0] * 2;
+            new_res[1]= str_img->GetSpacing()[1] * 2;
+            new_res[2]= str_img->GetSpacing()[2] * 2;
+            ImageType3D::Pointer str2= resample_3D_image(str_img,new_res,dummy,"Linear");
+
+            rigid_trans1=MultiStartRigidSearch(b02,  str2);
             rigid_trans= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, "MI",parser->getRigidLR(),rigid_trans1);
         }
 
