@@ -86,6 +86,12 @@ To mount your local data drive to Docker:
 docker run -v /mydatadrive:/mydatadrive eurotomania/tortoise TORTOISEProcess --up_data /mydatadrive/my.nii
 ```
 
+To run the CUDA versions of the executables, you need to enable the GPUs:
+```
+docker run --gpus all --net=host -e DISPLAY -v /mydatadrive:/mydatadrive eurotomania/tortoise TORTOISEProcess_cuda --up_data /mydatadrive/my.nii
+```
+
+
 ## TORTOISEV4 Source code compilation
 
 ### TORTOISEV4 Prerequisite Libraries
