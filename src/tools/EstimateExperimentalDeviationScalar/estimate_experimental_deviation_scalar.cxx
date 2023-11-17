@@ -6,7 +6,7 @@
 
 #include "../external_src/cmpfit-1.3a/mpfit.h"
 #include "estimate_experimental_deviation_scalar_parser.h"
-#include "vnl_matrix_inverse.h"
+#include "./vnl_matrix_inverse.h"
 #include "vnl_trace.h"
 
 #include "../utilities/read_bmatrix_file.h"
