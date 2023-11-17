@@ -7,7 +7,7 @@
 #include "../external_src/cmpfit-1.3a/mpfit.h"
 #include "estimate_experimental_deviation_scalar_parser.h"
 #include "./vnl_matrix_inverse.h"
-#include "vnl_trace.h"
+
 
 #include "../utilities/read_bmatrix_file.h"
 #include "../utilities/read_3Dvolume_from_4D.h"
@@ -403,7 +403,15 @@ int main(int argc, char *argv[])
                      if(denom!=0)
                          FA= sqrt( 1.5*nom/denom);
 
-                     double tr_ratio = vnl_trace<double>(curr_tens)/vnl_trace<double>(ct2);
+                     double nom1=0;
+                     for(int r=0;r<curr_tens.rows();r++)
+                         nom1+=curr_tens(r,r);
+                     double denom1=0;
+                     for(int r=0;r<ct2.rows();r++)
+                         denom1+=ct2(r,r);
+
+                     //double tr_ratio = vnl_trace<double>(curr_tens)/vnl_trace<double>(ct2);
+                     double tr_ratio = nom1/denom1;
 
                      del_FA(1,0)= 1./FA * tr_ratio *  ( (  1./2. *tr_ratio*dt[0]     ) - 0.5     );
                      del_FA(2,0)= 1./FA * tr_ratio *  ( (   tr_ratio*dt[1]     )      );
