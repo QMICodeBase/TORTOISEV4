@@ -258,27 +258,6 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
     {
         CurrentFieldType::Pointer updateFieldF= nullptr,updateFieldM= nullptr;
 
-        if(iter%5==0)
-        {
-            CurrentFieldType::Pointer field_up=IntegrateVelocityField(0.5,0);
-            CurrentFieldType::Pointer field_down=IntegrateVelocityField(0.5,1);
-
-            if(settings->init_finv_const!=nullptr)
-            {
-                field_up= ComposeFields(settings->init_finv_const,field_up);
-                field_down= ComposeFields(settings->init_minv_const,field_down);
-
-                settings->init_finv_const=field_up;
-                settings->init_minv_const=field_down;
-            }
-            cudaExtent extent =  make_cudaExtent(this->velocity_field[0]->components_per_voxel*sizeof(float)*this->velocity_field[0]->sz.x,this->velocity_field[0]->sz.y,this->velocity_field[0]->sz.z);
-            for(int T=0;T<NTimePoints;T++)
-            {
-                cudaMemset3D(this->velocity_field[T]->getFloatdata(),0,extent);
-            }
-        }
-
-
         std::vector<float> metric_values;
         metric_values.resize(Nmetrics);
         for(int met=0; met< Nmetrics;met++)
@@ -318,9 +297,6 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
                 field_down= ComposeFields(settings->init_minv_const,field_down);
             }
 
-
-
-
             for(int met=0; met< Nmetrics;met++)
             {
                 CurrentImageType::Pointer warped_up_img = WarpImage(this->resampled_smoothed_up_images[met],field_up);
@@ -335,7 +311,7 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
                     str_img_texture->CreateTexture();
                     warped_str_img = WarpImage(str_img_texture,field_str);
                     warped_str_img_jac= ComputeDetImgMain(warped_str_img,field_str,this->up_phase_vector);
-
+                    //warped_str_img_jac= warped_str_img;
                 }
 
                 float metric_value=0;
@@ -349,15 +325,6 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
                                                        updateFieldF_temp,  updateFieldM_temp,
                                                        this->up_phase_vector,
                                                        Goper );
-
-                    updateFieldF_temp=CurrentFieldType::New();
-                    updateFieldF_temp->sz = this->velocity_field[0]->sz;
-                    updateFieldF_temp->dir = this->velocity_field[0]->dir;
-                    updateFieldF_temp->orig = this->velocity_field[0]->orig;
-                    updateFieldF_temp->spc = this->velocity_field[0]->spc;
-                    updateFieldF_temp->components_per_voxel = 3;
-                    updateFieldF_temp->Allocate();
-
                 }
                 if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCSK)
                 {
@@ -376,89 +343,56 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
                                                               Goper );
                 }
 
+                updateFieldM_temp= MultiplyImage(updateFieldM_temp,-1);
+                updateFieldF_temp= AddImages(updateFieldF_temp,updateFieldM_temp);
+                updateFieldF_temp= MultiplyImage(updateFieldF_temp,0.5);
+
                 if(t==0.5)
                     metric_values[met]=metric_value;
 
                 if(Nmetrics>1)
                 {
-                    AddToUpdateField(updateFieldF,updateFieldF_temp,this->settings->metrics[met].weight);
-               //     AddToUpdateField(updateFieldM,updateFieldM_temp,this->settings->metrics[met].weight);
+                    AddToUpdateField(updateFieldF,updateFieldF_temp,this->settings->metrics[met].weight);               
                 }
                 else
                 {
-                    updateFieldF=updateFieldF_temp;
-                //    updateFieldM=updateFieldM_temp;
+                    updateFieldF=updateFieldF_temp;                
                 }
 
             } //for met
 
-            updateFieldF=GaussianSmoothImage(updateFieldF,this->settings->update_gaussian_sigma);
-         //   updateFieldM=GaussianSmoothImage(updateFieldM,this->settings->update_gaussian_sigma);
+            updateFieldF=GaussianSmoothImage(updateFieldF,this->settings->update_gaussian_sigma);         
 
             if(this->settings->restrct)
             {
-                RestrictPhase(updateFieldF,this->up_phase_vector);
-            //    RestrictPhase(updateFieldM,this->down_phase_vector);
+                RestrictPhase(updateFieldF,this->up_phase_vector);            
             }
 
-            ScaleUpdateField(updateFieldF,1);
-          //  ScaleUpdateField(updateFieldM,1);
-
-
-            CurrentFieldType::Pointer updateFieldF_inv= InvertField(updateFieldF );
-         //   CurrentFieldType::Pointer updateFieldM_inv= InvertField(updateFieldM );
+            ScaleUpdateField(updateFieldF,1);                             
 
             if(this->settings->constrain)
             {
              //   ContrainDefFields(updateFieldF,updateFieldM);
             }
 
+            CurrentFieldType::Pointer updateFieldF_inv= InvertField(updateFieldF );
             updateFieldF=InvertField(updateFieldF_inv );
-          //  updateFieldM=InvertField(updateFieldM_inv );
 
             update_velocity_field[T]=updateFieldF;
-
 
         } //T loop
 
         for(int T=0;T<NTimePoints;T++)
         {
-            update_velocity_field[T]= MultiplyImage(update_velocity_field[T],0.1);
+            update_velocity_field[T]= MultiplyImage(update_velocity_field[T],this->settings->learning_rate);
             this->velocity_field[T]= AddImages(this->velocity_field[T],update_velocity_field[T]);
+            this->velocity_field[T]=GaussianSmoothImage(this->velocity_field[T],this->settings->total_gaussian_sigma);
         }
-
-
 
 
         for(int met=0; met< Nmetrics;met++)
            all_ConvergenceMonitoring[met]->AddEnergyValue( metric_values[met]);
 
-
-/*
-        if(this->settings->constrain)
-        {
-            for(int T=0;T<NTimePoints/2;T++)
-            {
-               CUDAIMAGE::Pointer field1 = update_velocity_field[NTimePoints-1-T];
-                CUDAIMAGE::Pointer field2= AddImages(update_velocity_field[T],field1);
-                CUDAIMAGE::Pointer field3 = MultiplyImage(field2,0.5);
-
-                update_velocity_field[T] =field3;
-                update_velocity_field[NTimePoints-1-T] =field3;
-
-                last_update_velocity_field[T]=update_velocity_field[T];
-                last_update_velocity_field[NTimePoints-1-T]=update_velocity_field[NTimePoints-1-T];
-            }
-        }
-
-
-        for(int T=0;T<NTimePoints;T++)
-        {
-            CUDAIMAGE::Pointer field1 = MultiplyImage(update_velocity_field[T],this->settings->learning_rate);
-            this->velocity_field[T] = AddImages(this->velocity_field[T],field1);
-            this->velocity_field[T] = GaussianSmoothImage(this->velocity_field[T],this->settings->total_gaussian_sigma*1.5);
-        }
-*/
 
 
         double average_convergence=0;

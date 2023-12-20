@@ -865,6 +865,9 @@ void DRBUDDI_Diffeo::SetDefaultStages()
 }
 
 
+
+
+
 void DRBUDDI_Diffeo::SetImagesForMetrics()
 {
     CurrentImageType::Pointer preprocessed_b0_up= PreprocessImage(this->b0_up_img,0,1);
@@ -965,7 +968,7 @@ void DRBUDDI_Diffeo::SetImagesForMetrics()
             }
         } //while redo
 
-        if(Nstg > 20 && st<21)
+/*        if(Nstg > 20 && st<21)
         {
             DRBUDDIMetric metric1;
             metric1.SetMetricType( DRBUDDIMetricEnumeration::CC);
@@ -975,7 +978,7 @@ void DRBUDDI_Diffeo::SetImagesForMetrics()
 
             this->stages[st].metrics.push_back(metric1);
         }
-
+*/
     }  //for stage
 }
 
@@ -991,7 +994,8 @@ void DRBUDDI_Diffeo::Process()
 
 
     CurrentFieldType::Pointer prev_finv=nullptr;
-    CurrentFieldType::Pointer prev_minv=nullptr;
+    CurrentFieldType::Pointer prev_minv=nullptr;    
+    std::vector<CurrentFieldType::Pointer> init_vfield;
 
     if(parser->GetInitialFINV()!="")
     {
@@ -1016,30 +1020,80 @@ void DRBUDDI_Diffeo::Process()
 
     #ifdef USECUDA
         DRBUDDIStage_TVVF prev_stage(&(stages[0]));
+        DRBUDDIStage_TVVF final_stage;
     #endif
 
 
 
-        for(int st=0;st< stages.size();st++)
-        {
-            (*stream)<<"Stage number: "<<st+1<< " / " << stages.size() << std::endl;
-            (*stream)<<"Current learning rate: "<<stages[st].learning_rate<<std::endl;
-            (*stream)<<"Number of iterations: "<<stages[st].niter<<std::endl;
-            (*stream)<<"Image smoothing stdev: "<<stages[st].img_smoothing_std<<std::endl;
-            (*stream)<<"Downsampling factor: "<<stages[st].downsample_factor<<std::endl;
+    for(int st=0;st< stages.size();st++)
+    {
+        (*stream)<<"Stage number: "<<st+1<< " / " << stages.size() << std::endl;
+        (*stream)<<"Current learning rate: "<<stages[st].learning_rate<<std::endl;
+        (*stream)<<"Number of iterations: "<<stages[st].niter<<std::endl;
+        (*stream)<<"Image smoothing stdev: "<<stages[st].img_smoothing_std<<std::endl;
+        (*stream)<<"Downsampling factor: "<<stages[st].downsample_factor<<std::endl;
 
-            (*stream)<<"Current update sigma: "<<stages[st].update_gaussian_sigma<<std::endl;
-            (*stream)<<"Current total sigma: "<<stages[st].total_gaussian_sigma<<std::endl;
+        (*stream)<<"Current update sigma: "<<stages[st].update_gaussian_sigma<<std::endl;
+        (*stream)<<"Current total sigma: "<<stages[st].total_gaussian_sigma<<std::endl;
 
-            (*stream)<<"Current restrict: "<<stages[st].restrct<<std::endl;
-            (*stream)<<"Current constrain: "<<stages[st].constrain<<std::endl;
-            (*stream)<<"Current metrics: ";
-            for(int m=0;m<this->stages[st].metrics.size();m++)
-                (*stream)<<this->stages[st].metrics[m].metric_name<<"\{"<<this->stages[st].metrics[m].weight<<"\} ";
-            (*stream)<<std::endl;
+        (*stream)<<"Current restrict: "<<stages[st].restrct<<std::endl;
+        (*stream)<<"Current constrain: "<<stages[st].constrain<<std::endl;
+        (*stream)<<"Current metrics: ";
+        for(int m=0;m<this->stages[st].metrics.size();m++)
+            (*stream)<<this->stages[st].metrics[m].metric_name<<"\{"<<this->stages[st].metrics[m].weight<<"\} ";
+        (*stream)<<std::endl;
 
 
+        #ifdef USECUDA
+            if(this->GetRegistrationMethodType()=="TVVF")
+            {
+                DRBUDDIStageSettings new_stage= stages[st];
+                new_stage.init_finv=nullptr;
+                new_stage.init_minv=nullptr;
+                new_stage.init_finv_const=prev_finv;
+                new_stage.init_minv_const=prev_minv;
+                new_stage.init_vfield=init_vfield;
 
+                DRBUDDIStage_TVVF current_stage(&new_stage);
+                current_stage.SetUpPhaseEncoding(up_phase_vector);
+                current_stage.SetDownPhaseEncoding(down_phase_vector);
+
+
+                current_stage.PreprocessImagesAndFields();
+                current_stage.RunDRBUDDIStage();
+                init_vfield=current_stage.GetVelocityfield();
+
+                final_stage=current_stage;
+            }
+            else
+            {
+                if(st>=27)
+                {
+                    stages[st].init_finv_const=prev_finv;
+                    stages[st].init_minv_const=prev_minv;
+                }
+                else
+                {
+                    if(prev_finv && prev_minv)
+                    {
+                        stages[st].init_finv=prev_finv;
+                        stages[st].init_minv=prev_minv;
+                    }
+                }
+
+                DRBUDDIStage current_stage(&(stages[st]));
+                current_stage.SetUpPhaseEncoding(up_phase_vector);
+                current_stage.SetDownPhaseEncoding(down_phase_vector);
+                current_stage.SetEstimateLRPerIteration(parser->getEstimateLRPerIteration());
+
+                current_stage.PreprocessImagesAndFields();
+                current_stage.RunDRBUDDIStage();
+
+                prev_finv= stages[st].output_finv;
+                prev_minv= stages[st].output_minv;
+            }
+
+        #else
             if(st>=27)
             {
                 stages[st].init_finv_const=prev_finv;
@@ -1064,42 +1118,30 @@ void DRBUDDI_Diffeo::Process()
 
             prev_finv= stages[st].output_finv;
             prev_minv= stages[st].output_minv;
+        #endif
 
-        }
+    } //for stages
 
-        this->def_FINV= stages[stages.size()-1].output_finv;
-        this->def_MINV= stages[stages.size()-1].output_minv;
-
-        /*
+    #ifdef USECUDA
         if(this->GetRegistrationMethodType()=="TVVF")
         {
-            DRBUDDIStageSettings new_stage= stages[stages.size()-1];
-            new_stage.init_finv=nullptr;
-            new_stage.init_minv=nullptr;
-            new_stage.init_finv_const=stages[stages.size()-1].output_finv;
-            new_stage.init_minv_const=stages[stages.size()-1].output_minv;
-
-
-            DRBUDDIStage_TVVF current_stage(&new_stage);
-            current_stage.SetUpPhaseEncoding(up_phase_vector);
-            current_stage.SetDownPhaseEncoding(down_phase_vector);
-
-
-            current_stage.PreprocessImagesAndFields();
-            current_stage.RunDRBUDDIStage();
-
-
-            current_stage.ComputeFields(this->def_FINV, this->def_MINV);
-            this->def_FINV=ComposeFields(new_stage.init_finv_const,this->def_FINV);
-            this->def_MINV=ComposeFields(new_stage.init_minv_const,this->def_MINV);
-
+            final_stage.ComputeFields(this->def_FINV, this->def_MINV);
+            if(prev_finv)
+                this->def_FINV=ComposeFields(prev_finv,this->def_FINV);
+            if(prev_minv)
+                this->def_MINV=ComposeFields(prev_minv,this->def_MINV);
         }
         else
         {
             this->def_FINV= stages[stages.size()-1].output_finv;
             this->def_MINV= stages[stages.size()-1].output_minv;
         }
-*/
+
+    #else
+        this->def_FINV= stages[stages.size()-1].output_finv;
+        this->def_MINV= stages[stages.size()-1].output_minv;
+    #endif
+
 
 }
 

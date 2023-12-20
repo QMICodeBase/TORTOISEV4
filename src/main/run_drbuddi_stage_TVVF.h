@@ -26,6 +26,7 @@ public:
     DRBUDDIStage_TVVF(DRBUDDIStageSettings *my_settings)
     {
         settings=my_settings;
+        velocity_field=my_settings->init_vfield;
         float tot_weight=0;
         for(int m=0;m<settings->metrics.size();m++)
             tot_weight+=settings->metrics[m].weight;

@@ -725,93 +725,101 @@ typename ImageType::Pointer FINALDATA::ChangeImageHeaderToDP(typename ImageType:
 FINALDATA::CompositeTransformType::Pointer FINALDATA::GenerateCompositeTransformForVolume(ImageType3D::Pointer ref_img,int PE, int vol)
 {
     CompositeTransformType::Pointer all_trans= CompositeTransformType::New();
-
     ImageType3D::Pointer ref_img_DP= ChangeImageHeaderToDP<ImageType3D>(ref_img);
 
-    if(this->dwi_transforms[PE].size())
-    {
-
-        // The motion eddy transformations are defined in IJK coordinate system not XYZ
-        // So we convert them here first to displacement fields that live in both.
-        OkanQuadraticTransformType::Pointer curr_mot_eddy_trans= this->dwi_transforms[PE][vol];
-        DisplacementFieldType::Pointer mot_eddy_field=DisplacementFieldType::New();
-        mot_eddy_field->SetRegions(ref_img->GetLargestPossibleRegion());
-        mot_eddy_field->Allocate();
-        mot_eddy_field->SetSpacing(ref_img->GetSpacing());
-        mot_eddy_field->SetOrigin(ref_img->GetOrigin());
-        mot_eddy_field->SetDirection(ref_img->GetDirection());
-
-        itk::ImageRegionIteratorWithIndex<ImageType3D> it(ref_img_DP,ref_img_DP->GetLargestPossibleRegion());
-        for(it.GoToBegin();!it.IsAtEnd();++it)
-        {
-            ImageType3D::IndexType ind3= it.GetIndex();
-            ImageType3D::PointType pt,pt_trans;
-            ref_img_DP->TransformIndexToPhysicalPoint(ind3,pt);
-            pt_trans=curr_mot_eddy_trans->TransformPoint(pt);
-
-            itk::ContinuousIndex<double,3> cint;
-            ref_img_DP->TransformPhysicalPointToContinuousIndex(pt_trans,cint);
-
-            ref_img->TransformIndexToPhysicalPoint(ind3,pt);
-            ref_img->TransformContinuousIndexToPhysicalPoint(cint,pt_trans);
-
-
-            auto vec= pt_trans- pt;
-            //auto vec2= ref_img->GetDirection() * vec;
-            mot_eddy_field->SetPixel(ind3,vec);
-        }
-        DisplacementFieldTransformType::Pointer mot_eddy_trans= DisplacementFieldTransformType::New();
-        mot_eddy_trans->SetDisplacementField(mot_eddy_field);
-        all_trans->AddTransform(mot_eddy_trans);
-    }
+    DisplacementFieldTransformType::Pointer gradwarp_trans=nullptr;
     if(this->gradwarp_field)
     {
-        DisplacementFieldTransformType::Pointer gradwarp_trans= DisplacementFieldTransformType::New();
+        gradwarp_trans= DisplacementFieldTransformType::New();
         gradwarp_trans->SetDisplacementField(this->gradwarp_field);
-        all_trans->AddTransform(gradwarp_trans);
     }
-    if(PE==1 && this->b0down_t0_b0up_trans)
-    {
-        all_trans->AddTransform(this->b0down_t0_b0up_trans);
-    }
-    if(this->epi_trans[PE])
+
+
+
+    vnl_matrix<double> rotmat2T(3,3);
+    rotmat2T.set_identity();
+    if(this->epi_trans[PE] &&this->dwi_transforms[PE].size())
     {
         OkanQuadraticTransformType::Pointer curr_mot_eddy_trans=this->dwi_transforms[PE][vol];
-        auto rotmat1= curr_mot_eddy_trans->GetMatrix().GetVnlMatrix();
 
+        auto rotmat1= curr_mot_eddy_trans->GetMatrix().GetVnlMatrix();
         vnl_matrix<double> dirmat=ref_img->GetDirection().GetVnlMatrix();
         auto rotmat2= dirmat * rotmat1 *dirmat.transpose();
-        auto rotmat2T= rotmat2.transpose();
-
-        DisplacementFieldType::Pointer new_field= DisplacementFieldType::New();
-        new_field->SetRegions(this->epi_trans[PE]->GetLargestPossibleRegion());
-        new_field->Allocate();
-        DisplacementFieldType::PixelType zero; zero.Fill(0);
-        new_field->FillBuffer(zero);
-        new_field->SetSpacing(this->epi_trans[PE]->GetSpacing());
-        new_field->SetOrigin(this->epi_trans[PE]->GetOrigin());
-        new_field->SetDirection(this->epi_trans[PE]->GetDirection());
-
-        itk::ImageRegionIteratorWithIndex<DisplacementFieldType> it(new_field,new_field->GetLargestPossibleRegion());
-        for(it.GoToBegin();!it.IsAtEnd();++it)
-        {
-            DisplacementFieldType::IndexType ind3= it.GetIndex();
-            DisplacementFieldType::PixelType vec = this->epi_trans[PE]->GetPixel(ind3);
-            vnl_vector<double> vecR= rotmat2T *vec.GetVnlVector();
-            vec[0]=vecR[0];
-            vec[1]=vecR[1];
-            vec[2]=vecR[2];
-            it.Set(vec);
-        }
-
-        DisplacementFieldTransformType::Pointer mepi_trans= DisplacementFieldTransformType::New();
-        mepi_trans->SetDisplacementField(new_field);
-        all_trans->AddTransform(mepi_trans);
+        rotmat2T= rotmat2.transpose();
     }
-    if(this->b0_t0_str_trans)
+
+    DisplacementFieldType::Pointer total_field= DisplacementFieldType::New();
+    total_field->SetRegions(this->template_structural->GetLargestPossibleRegion());
+    total_field->Allocate();
+    DisplacementFieldType::PixelType zero; zero.Fill(0);
+    total_field->FillBuffer(zero);
+    total_field->SetSpacing(this->template_structural->GetSpacing());
+    total_field->SetOrigin(this->template_structural->GetOrigin());
+    total_field->SetDirection(this->template_structural->GetDirection());
+
+    using LinDispInterpolatorType = itk::LinearInterpolateImageFunction<DisplacementFieldType,double>;
+    LinDispInterpolatorType::Pointer field_interpolator=LinDispInterpolatorType::New();
+    field_interpolator->SetInputImage(this->epi_trans[PE]);
+
+
+    itk::ImageRegionIteratorWithIndex<DisplacementFieldType> it(total_field,total_field->GetLargestPossibleRegion());
+    for(it.GoToBegin();!it.IsAtEnd();++it)
     {
-        all_trans->AddTransform(this->b0_t0_str_trans);
+        ImageType3D::IndexType ind3= it.GetIndex();
+        ImageType3D::PointType pt,pt_trans;
+        total_field->TransformIndexToPhysicalPoint(ind3,pt);
+        pt_trans=pt;
+
+        if(this->b0_t0_str_trans)
+        {
+            pt_trans=this->b0_t0_str_trans->TransformPoint(pt_trans);
+        }
+        if(this->epi_trans[PE])
+        {
+            DisplacementFieldType::PixelType disp_vec; disp_vec.Fill(0);
+            if(field_interpolator->IsInsideBuffer(pt_trans))
+                disp_vec= field_interpolator->Evaluate(pt_trans);
+            if(this->dwi_transforms[PE].size())
+            {
+                auto disp_vec2 = rotmat2T * disp_vec.GetVnlVector();
+                disp_vec[0]=disp_vec2[0];
+                disp_vec[1]=disp_vec2[1];
+                disp_vec[2]=disp_vec2[2];
+            }
+            pt_trans[0]= pt_trans[0] + disp_vec[0];
+            pt_trans[1]= pt_trans[1] + disp_vec[1];
+            pt_trans[2]= pt_trans[2] + disp_vec[2];
+        }
+        if(PE==1 && this->b0down_t0_b0up_trans)
+        {
+            pt_trans=this->b0down_t0_b0up_trans->TransformPoint(pt_trans);
+        }
+        if(gradwarp_trans)
+        {
+            pt_trans=gradwarp_trans->TransformPoint(pt_trans);
+        }
+        if(this->dwi_transforms[PE].size())
+        {
+            itk::ContinuousIndex<double,3> cind3;
+            ImageType3D::PointType pt_trans2;
+            ref_img->TransformPhysicalPointToContinuousIndex(pt_trans,cind3);
+            ref_img_DP->TransformContinuousIndexToPhysicalPoint(cind3,pt_trans2);
+
+            OkanQuadraticTransformType::Pointer curr_mot_eddy_trans= this->dwi_transforms[PE][vol];
+            pt_trans2= curr_mot_eddy_trans->TransformPoint(pt_trans2);
+            ref_img_DP->TransformPhysicalPointToContinuousIndex(pt_trans2,cind3);
+            ref_img->TransformContinuousIndexToPhysicalPoint(cind3,pt_trans);
+        }
+        DisplacementFieldType::PixelType vec;
+        vec[0]=pt_trans[0]-pt[0];
+        vec[1]=pt_trans[1]-pt[1];
+        vec[2]=pt_trans[2]-pt[2];
+        it.Set(vec);
     }
+
+    DisplacementFieldTransformType::Pointer total_trans=DisplacementFieldTransformType::New();
+    total_trans->SetDisplacementField(total_field);
+    all_trans->AddTransform(total_trans);
 
     return all_trans;
 }
@@ -1383,6 +1391,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
         {
             TORTOISE::EnableOMPThread();
 
+
             ImageType3D::Pointer final_img=ImageType3D::New();
             final_img->SetRegions(template_structural->GetLargestPossibleRegion());
             final_img->Allocate();
@@ -1410,7 +1419,11 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                 // So what what we do is to convert it to a displacement field slice by slice and then invert it.
                 //This field might not be diffeomorphic so we might not be able to invert it accurately
 
-                CompositeTransformType::Pointer all_trans_wo_s2v=GenerateCompositeTransformForVolume(raw_data[0],PE, vol);
+                CompositeTransformType::Pointer all_trans_wo_s2v=nullptr;
+               // #pragma omp critical
+                {
+                    all_trans_wo_s2v=GenerateCompositeTransformForVolume(raw_data[0],PE, vol);
+                }
                 CompositeTransformType::Pointer all_trans=nullptr;
                 DisplacementFieldType::Pointer forward_s2v_field=nullptr;
 
@@ -1471,6 +1484,8 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                             values.push_back(raw_data[vol]->GetPixel(ind3));
                             orig_slice_inds.push_back(ind3);
                         }
+
+
                     }
                     TreeGeneratorType::Pointer treeGenerator = TreeGeneratorType::New();
                     treeGenerator->SetSample(sample);
@@ -1595,6 +1610,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                         // if not, most likely not diffeomorphic so not invertable
                         // then we revert back to forward interpolation with idw.
 
+
                         int SL= (int)std::round(ind3_ts2v[2]);
                         if(SL<0 || SL > orig_sz[2]-1)
                             forward_interp=true;
@@ -1624,7 +1640,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                             }
                         }
                         else
-                        {
+                        {                            
                             MeasurementVectorType queryPoint;
                             queryPoint[0]=ind3_t[0];
                             queryPoint[1]=ind3_t[1];
@@ -1695,9 +1711,6 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                                     else
                                     {
                                         it.Set(idw_val);
-
-
-
                                     } // not BSP
                                 } //if not idw
                             } //if mn>0.1
@@ -1705,6 +1718,8 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                     }  //if s2v
                 } //for ind3
             } //dummy interpolation
+
+
 
 
             //final data transformed.. Now first apply drift.
@@ -1723,6 +1738,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                     it.Set(it.Get()*scale);
                 }
             }
+
             final_data[vol]=final_img;
 
             fs::path up_path(up_name);

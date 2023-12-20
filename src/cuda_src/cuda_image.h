@@ -48,6 +48,11 @@ public:
     void SetImageFromITK(ImageType3D::Pointer itk_image, bool create_texture=false);
     void SetImageFromITK(DisplacementFieldType::Pointer itk_field);    
     void SetTImageFromITK(DTMatrixImageType::Pointer tensor_img);
+    void FillBuffer(float val)
+    {
+        cudaExtent extent =  make_cudaExtent(this->components_per_voxel*sizeof(float)*this->sz.x,this->sz.y,this->sz.z);
+        cudaMemset3D(PitchedFloatData,val,extent);
+    }
 
     ImageType3D::Pointer CudaImageToITKImage();
     TensorVectorImageType::Pointer CudaImageToITKImage4D();

@@ -65,11 +65,13 @@ struct DRBUDDIStageSettings
     #ifdef USECUDA
         CUDAIMAGE::Pointer init_finv{nullptr};
         CUDAIMAGE::Pointer init_minv{nullptr};
-        CUDAIMAGE::Pointer output_finv{nullptr};
-        CUDAIMAGE::Pointer output_minv{nullptr};
-
         CUDAIMAGE::Pointer init_finv_const{nullptr};
         CUDAIMAGE::Pointer init_minv_const{nullptr};
+
+        CUDAIMAGE::Pointer output_finv{nullptr};
+        CUDAIMAGE::Pointer output_minv{nullptr};               
+
+        std::vector<CUDAIMAGE::Pointer>  init_vfield;
 
     #else
         DisplacementFieldType::Pointer init_finv{nullptr};
