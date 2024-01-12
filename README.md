@@ -59,7 +59,7 @@ TORTOISE community page: https://tortoise.nibib.nih.gov/community
 # TORTOISEV4 installation
 
 There are 3 ways you can use TORTOISEV4:
-1) Download pre-compiled executables for Linux (any distribution) from the Rlease section (on the right) form this GitHub page.
+1) Download pre-compiled executables for Linux (any distribution) from the Releases section (on the right) on this GitHub page.
 2) Download the Docker containers 
 3) Compile the source code
 
