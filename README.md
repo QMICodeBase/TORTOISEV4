@@ -53,7 +53,7 @@ Please visit these websites for more information:
 
 TORTOISE homepage: https://tortoise.nibib.nih.gov/
 
-TORTOISE community page: https://tortoise.nibib.nih.gov/community
+TORTOISE community page: https://discuss.afni.nimh.nih.gov/c/tortoise-message-board/9
 
 
 # TORTOISEV4 installation
