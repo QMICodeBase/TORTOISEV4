@@ -71,6 +71,15 @@ void Reorient_Image_PARSER::InitializeCommandLineOptions()
     }
 
     {
+        std::string description = std::string( "Desired orientation of the output from a refence image" );
+
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "ref");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+
+    {
         std::string description = std::string( "Desired orientation of the image. Default: LPS" );
 
         OptionType::Pointer option = OptionType::New();
@@ -79,6 +88,8 @@ void Reorient_Image_PARSER::InitializeCommandLineOptions()
         option->SetDescription( description );
         this->AddOption( option );
     }
+
+
 
     {
         std::string description = std::string( "Output name" );
@@ -97,7 +108,14 @@ void Reorient_Image_PARSER::InitializeCommandLineOptions()
 }
 
 
-
+std::string Reorient_Image_PARSER::getDesiredOrientationFromReferenceImage()
+{
+    OptionType::Pointer option = this->GetOption( "ref");
+    if(option->GetNumberOfFunctions())
+        return option->GetFunction(0)->GetName();
+    else
+       return std::string("");
+}
 
 
 std::string Reorient_Image_PARSER::getInputImageName()

@@ -770,10 +770,13 @@ FINALDATA::CompositeTransformType::Pointer FINALDATA::GenerateCompositeTransform
         total_field->TransformIndexToPhysicalPoint(ind3,pt);
         pt_trans=pt;
 
+        // pt_trans is on the final template space
         if(this->b0_t0_str_trans)
         {
             pt_trans=this->b0_t0_str_trans->TransformPoint(pt_trans);
         }
+
+        // pt_trans is on the everything corrected native b=0 space
         if(this->epi_trans[PE])
         {
             DisplacementFieldType::PixelType disp_vec; disp_vec.Fill(0);
@@ -790,16 +793,26 @@ FINALDATA::CompositeTransformType::Pointer FINALDATA::GenerateCompositeTransform
             pt_trans[1]= pt_trans[1] + disp_vec[1];
             pt_trans[2]= pt_trans[2] + disp_vec[2];
         }
+        // pt_trans is on the motion&eddycurents gradwarp corrected , EPI uncorrected space
         if(PE==1 && this->b0down_t0_b0up_trans)
         {
             pt_trans=this->b0down_t0_b0up_trans->TransformPoint(pt_trans);
         }
+
         if(gradwarp_trans)
         {
             pt_trans=gradwarp_trans->TransformPoint(pt_trans);
         }
+
+        // pt_trans is on the motion&eddy currents corrected space
         if(this->dwi_transforms[PE].size())
         {
+
+            // for motion&eddy currents we use the read/phase/slice space not xyz
+            // so we have to convert pt_trans to that
+            // then transform
+            // then transform back to xyz
+
             itk::ContinuousIndex<double,3> cind3;
             ImageType3D::PointType pt_trans2;
             ref_img->TransformPhysicalPointToContinuousIndex(pt_trans,cind3);
@@ -810,11 +823,14 @@ FINALDATA::CompositeTransformType::Pointer FINALDATA::GenerateCompositeTransform
             ref_img_DP->TransformPhysicalPointToContinuousIndex(pt_trans2,cind3);
             ref_img->TransformContinuousIndexToPhysicalPoint(cind3,pt_trans);
         }
+        // pt_trans is on native space (except s2v which will be handled later
         DisplacementFieldType::PixelType vec;
         vec[0]=pt_trans[0]-pt[0];
         vec[1]=pt_trans[1]-pt[1];
         vec[2]=pt_trans[2]-pt[2];
         it.Set(vec);
+
+
     }
 
     DisplacementFieldTransformType::Pointer total_trans=DisplacementFieldTransformType::New();

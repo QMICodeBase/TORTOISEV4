@@ -492,7 +492,6 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
     ImageType3D::Pointer mask2=ChangeImageHeaderToDP<ImageType3D>(this->b0_mask_img);
     ImageType3D::Pointer target_zero=ChangeImageHeaderToDP<ImageType3D>(target_imgs[0]);
 
-     (*stream)<<"Done registering vol: " <<std::flush;
 
     int Nt= omp_get_max_threads();
     std::vector< std::vector<int> > my_threads;
@@ -504,32 +503,52 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
         my_threads [ vol2%newt].push_back(vol2);
     }
 
-    omp_set_num_threads(newt);
 
-    //The volumes in my_threads 1 will be processed by te GPU
-    // the others by the CPU
-    // so we give a bit more volumes to threads1
-#ifdef USECUDA
-    if(Nt>7 && Nvols >7)
-    {
-        std::vector< std::vector<int> > my_threads2;
-        my_threads2.push_back(my_threads[0]);
-
-        std::vector<int> vec= my_threads[1];
-        vec.insert(vec.end(),my_threads[newt-1].begin(),my_threads[newt-1].end());
-        vec.insert(vec.end(),my_threads[newt-2].begin(),my_threads[newt-2].end());
-        vec.insert(vec.end(),my_threads[newt-3].begin(),my_threads[newt-3].end());
-        my_threads2.push_back(vec);
-
-        for(int v=2;v<newt-3;v++)
-            my_threads2.push_back(my_threads[v]);
-
-        my_threads=my_threads2;
-    }
-#endif
+    #ifdef USECUDA
+        int GPU_CPU_ratio=15;    //this should be the ratio of how much GPU is faster than a CPU per volume
+                                 // Ideally, I should check what GPU it is and automatically decide it, but too much work for this.
+        //The volumes in my_threads 1 will be processed by te GPU
+        // the others by the CPU
+        // so we give a bit more volumes to threads1
 
 
+        my_threads.clear();
+        my_threads.resize(Nt+1);
+        int tot_pass= Nt+GPU_CPU_ratio;
 
+        for(int v=0;v<Nvols;v++)
+        {
+            int rem= v %tot_pass;
+            if(rem==0)
+            {
+                my_threads[0].push_back(v);
+            }
+            else
+            {
+                if(rem<=GPU_CPU_ratio)
+                {
+                    my_threads[1].push_back(v);
+                }
+                else
+                {
+                    int id= rem-GPU_CPU_ratio+1;
+                    my_threads[id].push_back(v);
+                }
+            }
+        }
+
+    //    std::cout<<"Volumes to be processed by the GPU:"<<std::endl;
+      //  for(int mm=0;mm<my_threads[1].size();mm++)
+       //     std::cout<<my_threads[1][mm]<<" ";
+      //  std::cout<<std::endl;
+
+        omp_set_num_threads(Nt+1);
+    #else
+        omp_set_num_threads(newt);
+    #endif
+
+
+    (*stream)<<"Done registering vol: "<<std::flush;
 
 #ifdef USECUDA
     #pragma omp parallel for schedule(static,1)
@@ -984,6 +1003,9 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
         }
     }
 
+
+    //std::cout<<std::endl<<covereds<<std::endl;
+
     // each shell has to have 70% good data for a given slice
     // otherwise fitting synth goes crazy
     for(int sh=0;sh<shells.size();sh++)
@@ -1021,10 +1043,14 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
                     bool enter=true;
                     meds_sl(sh,k)=per_shell_inliers[sh][0];
                     MADs_sl(sh,k)=per_shell_inliers[sh][1];
+                    int iter=0;
                     while(enter)
                     {
                         covereds(sh,k)=0;
-                        meds_sl(sh,k)*=1.1;
+                        iter++;
+
+                        meds_sl(sh,k)+= fabs(meds_sl(sh,k))*0.03;
+                        // meds_sl(sh,k)*=1.1;
                         MADs_sl(sh,k)*=1.05;
                         for(int vol=0;vol<Nvols; vol++)
                         {
@@ -1040,7 +1066,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
                                     covereds(sh,k)++;
                             }
                         }
-                        if(covereds(sh,k) >= 0.7*volumes_per_shell[sh] )
+                        if((covereds(sh,k) >= 0.7*volumes_per_shell[sh] ) || iter==10)
                             enter=false;
                     }
                 }

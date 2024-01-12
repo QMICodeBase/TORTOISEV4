@@ -241,7 +241,25 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         this->AddOption( option );
     }
     {
-        std::string description = std::string("Flag to disable ALL ITK multi-threading. The only multi-threading is OpenMP if this flah is 1. Boolean. Default:0")  ;
+        std::string description = std::string("Flag to enforce DRBUDDI to enforce  blip-up blip-down antisymmetry and phasen-encoding restriction when using the default settings. Boolean. Default:0")  ;
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "DRBUDDI_disable_last_stage");
+        option->SetDescription( description );
+        option->SetModule(6);
+        this->AddOption( option );
+    }
+    {
+        std::string description = std::string("Multiplicative factor for metrics that use the structural image. Might want to reduce it if the structural's contrast is significantly different than the b=0. Float. Default:1")  ;
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "DRBUDDI_structural_weight");
+        option->SetDescription( description );
+        option->SetModule(6);
+        this->AddOption( option );
+    }
+
+
+    {
+        std::string description = std::string("The last DRBUDDI stage heavily favors the structural image. If this image is not ideal (not a good contrast), it might be more robust to disable this stage. Boolean. Default:0")  ;
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "disable_itk_threads");
         option->SetDescription( description );
@@ -264,8 +282,25 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         option->SetModule(6);
         this->AddOption( option );
     }
+}
 
 
+float DRBUDDI_PARSERBASE::getStructuralWeight()
+{
+    OptionType::Pointer option = this->GetOption( "DRBUDDI_structural_weight");
+    if(option->GetNumberOfFunctions())
+        return (atof(option->GetFunction(0)->GetName().c_str()));
+    else
+       return 1.;
+}
+
+bool DRBUDDI_PARSERBASE::getDisableLastStage()
+{
+    OptionType::Pointer option = this->GetOption( "DRBUDDI_disable_last_stage");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+       return false;
 }
 
 bool DRBUDDI_PARSERBASE::getEnforceFullAntiSymmetry()

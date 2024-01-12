@@ -77,6 +77,8 @@ void DRBUDDI_Diffeo::SetDefaultStages()
 {
     int Nstr=parser->getNumberOfStructurals();
 
+    float str_weight=parser->getStructuralWeight();
+
     {
         DRBUDDIStageSettings curr_stage;                                //1
         curr_stage.niter=300;
@@ -176,7 +178,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric2.weight=0.8;
+            metric2.weight=0.8*str_weight;
             curr_stage.metrics.push_back(metric2);
         }
         this->stages.push_back(curr_stage);
@@ -199,7 +201,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1.;
+            metric2.weight=1.*str_weight;
             curr_stage.metrics.push_back(metric2);
         }
         this->stages.push_back(curr_stage);
@@ -231,7 +233,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=1*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
@@ -261,7 +263,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=1*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
@@ -292,7 +294,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=1*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
@@ -322,7 +324,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=1*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
@@ -353,7 +355,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=1*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
@@ -376,7 +378,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric2.weight=1;
+            metric2.weight=1*str_weight;
             curr_stage.metrics.push_back(metric2);
         }
         DRBUDDIMetric metric3;
@@ -403,7 +405,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
+            metric2.weight=1*str_weight;
             curr_stage.metrics.push_back(metric2);
         }
         if((this->FA_up_img  && this->FA_down_img) )
@@ -436,12 +438,12 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
+            metric2.weight=1*str_weight;
             curr_stage.metrics.push_back(metric2);
 
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=0.5;
+            metric4.weight=0.5*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -468,11 +470,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
+            metric2.weight=1*str_weight;
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=0.5;
+            metric4.weight=0.5*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -499,11 +501,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
+            metric2.weight=1*str_weight;
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=0.5;
+            metric4.weight=0.5*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -530,11 +532,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
+            metric2.weight=1*str_weight;
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=0.5;
+            metric4.weight=0.5*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -561,11 +563,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
+            metric2.weight=1*str_weight;
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=0.5;
+            metric4.weight=0.5*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -592,11 +594,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
+            metric2.weight=1*str_weight;
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=0.5;
+            metric4.weight=0.5*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -623,7 +625,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
+            metric2.weight=1*str_weight;
             curr_stage.metrics.push_back(metric2);
         }
         DRBUDDIMetric metric3;
@@ -652,11 +654,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
+            metric2.weight=1*str_weight;
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=0.5;
+            metric4.weight=0.5*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -683,11 +685,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=0.5;
+            metric2.weight=0.5*str_weight;
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=1;
+            metric4.weight=1*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -714,11 +716,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
+            metric2.weight=1*str_weight;
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=0.5;
+            metric4.weight=0.5*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -745,11 +747,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1;
+            metric2.weight=1*str_weight;
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=0.5;
+            metric4.weight=0.5*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         DRBUDDIMetric metric3;
@@ -781,11 +783,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         {
             DRBUDDIMetric metric2;
             metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-            metric2.weight=1.1;
+            metric2.weight=1.1*str_weight;
             curr_stage.metrics.push_back(metric2);
             DRBUDDIMetric metric4;
             metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-            metric4.weight=0.5;
+            metric4.weight=0.5*str_weight;
             curr_stage.metrics.push_back(metric4);
         }
         this->stages.push_back(curr_stage);
@@ -818,17 +820,17 @@ void DRBUDDI_Diffeo::SetDefaultStages()
             {
                 DRBUDDIMetric metric2;
                 metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-                metric2.weight=1.5;
+                metric2.weight=1.5*str_weight;
                 curr_stage.metrics.push_back(metric2);
                 DRBUDDIMetric metric4;
                 metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-                metric4.weight=1.;
+                metric4.weight=1.*str_weight;
                 curr_stage.metrics.push_back(metric4);
             }
             this->stages.push_back(curr_stage);
         }
 
-        if(Nstr>0 && (this->FA_up_img  && this->FA_down_img) )
+        if(parser->getDisableLastStage()==0 && Nstr>0 && (this->FA_up_img  && this->FA_down_img) )
         {
             DRBUDDIStageSettings curr_stage;                                   //28
             curr_stage.niter=300;
@@ -852,11 +854,11 @@ void DRBUDDI_Diffeo::SetDefaultStages()
             {
                 DRBUDDIMetric metric2;
                 metric2.SetMetricType( DRBUDDIMetricEnumeration::CCSK);
-                metric2.weight=1.2;
+                metric2.weight=1.2*str_weight;
                 curr_stage.metrics.push_back(metric2);
                 DRBUDDIMetric metric4;
                 metric4.SetMetricType( DRBUDDIMetricEnumeration::CCJacS);
-                metric4.weight=0.8;
+                metric4.weight=0.8*str_weight;
                 curr_stage.metrics.push_back(metric4);
             }
             this->stages.push_back(curr_stage);

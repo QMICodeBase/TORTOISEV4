@@ -90,10 +90,40 @@ void CreateDummyJson_PARSER::InitializeCommandLineOptions()
         option->SetDescription( description );
         this->AddOption( option );
     }
-
-
+    {
+        std::string description = std::string( "Big delta. Diffusion separation time." );
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "big_delta");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+    {
+        std::string description = std::string( "Small delta. Diffusion  time." );
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "small_delta");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
 }
 
+
+float CreateDummyJson_PARSER::getBigDelta()
+{
+    OptionType::Pointer option = this->GetOption( "big_delta");
+    if(option->GetNumberOfFunctions())
+        return atof(option->GetFunction(0)->GetName().c_str());
+    else
+       return -1;
+}
+
+float CreateDummyJson_PARSER::getSmallDelta()
+{
+    OptionType::Pointer option = this->GetOption( "small_delta");
+    if(option->GetNumberOfFunctions())
+        return atof(option->GetFunction(0)->GetName().c_str());
+    else
+       return -1;
+}
 
 
 std::string CreateDummyJson_PARSER::getInputImageName()

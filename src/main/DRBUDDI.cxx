@@ -450,7 +450,7 @@ void DRBUDDI::Step1_RigidRegistration()
         std::cout<<"R1: "<< params1<<std::endl;
         std::cout<<"R2: "<< params2<<std::endl;
         std::cout<<"MI vs CC diff: "<< diff<<std::endl;
-        if(diff<0.001)
+        if(diff<0.005)
             rigid_trans=rigid_trans2;
         else
         {

@@ -261,7 +261,19 @@ int main(int argc, char * argv[])
     if(input_orient=="")
         input_orient = DirectionToOrient(dwis->GetDirection().GetVnlMatrix());
     if(output_orient=="")
-        output_orient="LPS";
+    {
+        if(parser->getDesiredOrientationFromReferenceImage()!="")
+        {
+            ReaderType::Pointer rd2= ReaderType::New();
+            rd2->SetFileName(parser->getDesiredOrientationFromReferenceImage());
+            rd2->Update();
+            ImageType3D::Pointer  ref_img = rd2->GetOutput();
+
+            output_orient= DirectionToOrient(ref_img->GetDirection().GetVnlMatrix());
+        }
+        else
+            output_orient="LPS";
+    }
 
 
     vnl_vector_fixed<int,3> permutes = GetPermutation(input_orient,output_orient);

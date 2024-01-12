@@ -49,6 +49,9 @@ public:
     std::string GetMetricString(int st,int m);
     bool getEstimateLRPerIteration();
 
+    float getStructuralWeight();
+    bool getDisableLastStage();
+
     bool getEnforceFullAntiSymmetry();
 
     int getNumberOfStructurals();

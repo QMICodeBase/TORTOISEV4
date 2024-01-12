@@ -17,6 +17,7 @@ public:
     std::string getInputImageName();
     std::string getOriginalOrientation();
     std::string getDesiredOrientation();
+    std::string getDesiredOrientationFromReferenceImage();
     std::string getOutputName();
 
      

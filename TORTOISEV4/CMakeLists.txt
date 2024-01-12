@@ -489,6 +489,9 @@ target_link_libraries(Combine3DImagesTo4D  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  
 #target_link_libraries(MultiplyFieldwithScalar ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
+#add_executable(ReorderDWIVolumes   ../src/tools/ReorderDWIVolumes/ReorderDWIVolumes.cxx ${SOURCES})
+#target_link_libraries(ReorderDWIVolumes ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
 
 IF(USE_VTK)
     add_definitions(-DUSE_VTK)

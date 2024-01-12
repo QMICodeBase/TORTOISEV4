@@ -21,6 +21,10 @@ int main(int argc, char *argv[])
     my_json["PartialFourier"] = PF;
     my_json["PhaseEncodingDirection"]= phase;
     my_json["MultibandAccelerationFactor"]=MBf;
+    if(parser->getBigDelta()!=-1)
+        my_json["BigDelta"]=parser->getBigDelta();
+    if(parser->getSmallDelta()!=-1)
+        my_json["SmallDelta"]=parser->getSmallDelta();
 
 
     ImageType3D::Pointer first_vol = read_3D_volume_from_4D(parser->getInputImageName(),0);

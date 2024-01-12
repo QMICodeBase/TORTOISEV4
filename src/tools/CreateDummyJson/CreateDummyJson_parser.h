@@ -18,6 +18,8 @@ public:
     std::string getPhaseEncoding();
     int getMBFactor();
     float getPF();
+    float getBigDelta();
+    float getSmallDelta();
 
 
      
