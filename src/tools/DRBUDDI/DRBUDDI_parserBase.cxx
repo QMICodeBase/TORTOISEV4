@@ -138,6 +138,18 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         this->AddOption( option );
     }
     {
+        std::string description = std::string( "Disable Gradwarp field correction.  Sometimes DWIs are NOT gradwarped at the scanner but sometimes they are. In case they are, the user might want to turn off gradwarp to prevent double correction but just want a voxelwise Bmatrix at the end. Boolean. Default: 0" );
+
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "NO_gradwarp");
+        option->SetDescription( description );
+        option->SetModule(6);
+        this->AddOption( option );
+    }
+
+
+
+    {
         std::string description = std::string( "DRBUDDI transformation output folder." );
 
         OptionType::Pointer option = OptionType::New();
@@ -284,6 +296,15 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
     }
 }
 
+
+bool DRBUDDI_PARSERBASE::getNOGradWarp()
+{
+    OptionType::Pointer option = this->GetOption( "NO_gradwarp");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+       return false;
+}
 
 float DRBUDDI_PARSERBASE::getStructuralWeight()
 {

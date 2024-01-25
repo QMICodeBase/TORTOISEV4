@@ -26,6 +26,7 @@ public:
     void setGradNonlinInput(std::string fname);
     bool getGradNonlinIsGE();
     std::string getGradNonlinGradWarpDim();
+    bool getNOGradWarp();
 
     bool getDisableInitRigid();
     bool getStartWithDiffeo();

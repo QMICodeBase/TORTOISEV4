@@ -38,6 +38,8 @@ public:
         }
     }
 
+    void SetMaskImg(ImageType3D::Pointer mi){this->main_mask_img=mi;}
+
 
 protected:            //Subfunctions the main processing functions use
     void CreateCorrectionImage(std::string nii_filename,ImageType3D::Pointer &b0_img, ImageType3D::Pointer &FA_img);
@@ -84,6 +86,7 @@ protected:
 
     ImageType3D::Pointer b0_up_quad{nullptr};
     ImageType3D::Pointer b0_up{nullptr};
+    ImageType3D::Pointer main_mask_img{nullptr};
 
     std::vector<ImageType3D::Pointer> structural_imgs;
 

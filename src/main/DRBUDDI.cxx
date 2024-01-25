@@ -121,9 +121,8 @@ void DRBUDDI::Step0_CreateImages()
     CreateCorrectionImage(this->up_nii_name,this->b0_up,this->FA_up);
     CreateCorrectionImage(this->down_nii_name,this->b0_down,this->FA_down);
 
-    std::string gradnonlin_field_name = parser->getGradNonlinInput();
-    //std::string gradnonlin_field_name= RegistrationSettings::get().getValue<std::string>("grad_nonlin");
-    if(gradnonlin_field_name!="")
+    std::string gradnonlin_field_name = parser->getGradNonlinInput();    
+    if(gradnonlin_field_name!="" && parser->getNOGradWarp()==false)
     {
         std::string gradnonlin_name_inv = gradnonlin_field_name.substr(0,gradnonlin_field_name.rfind(".nii"))+ "_inv.nii";
 

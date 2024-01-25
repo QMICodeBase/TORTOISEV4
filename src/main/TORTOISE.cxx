@@ -1110,6 +1110,13 @@ void TORTOISE::EPICorrectData()
 
         DRBUDDI myDRBUDDI(up_name,down_name,structural_names,this->my_jsons[0]);
         myDRBUDDI.SetParser(this->parser);
+        if(parser->getB0MaskName()!="")
+        {
+            ImageType3D::Pointer mask_img= readImageD<ImageType3D>(parser->getB0MaskName());
+            myDRBUDDI.SetMaskImg(mask_img);
+        }
+
+
         myDRBUDDI.Process();
     }
 }

@@ -482,7 +482,7 @@ void FINALDATA::ReadOrigTransforms()
 
     std::string gradnonlin_field_name= RegistrationSettings::get().getValue<std::string>("grad_nonlin");
     std::string gradnonlin_name_inv = gradnonlin_field_name.substr(0,gradnonlin_field_name.rfind(".nii"))+ "_inv.nii";
-    if(fs::exists(gradnonlin_name_inv))
+    if(fs::exists(gradnonlin_name_inv) && parser->getNOGradWarp()==false)
     {
         this->gradwarp_field= readImageD<DisplacementFieldType>(gradnonlin_name_inv);
         this->gradwarp_field_forward= readImageD<DisplacementFieldType>(gradnonlin_field_name);
