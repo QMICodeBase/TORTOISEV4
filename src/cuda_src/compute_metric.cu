@@ -856,7 +856,7 @@ void ComputeMetric_CCJacSSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_
 
     dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
     dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    while(gridSize.x *gridSize.y *gridSize.z >800)
     {
         blockSize.x*=2;
         blockSize.y*=2;
@@ -1344,7 +1344,7 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
 
     dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
     dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    while(gridSize.x *gridSize.y *gridSize.z >800)
     {
         blockSize.x*=2;
         blockSize.y*=2;
@@ -1788,7 +1788,7 @@ void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     
     dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
     dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    while(gridSize.x *gridSize.y *gridSize.z >800)
     {
         blockSize.x*=2;
         blockSize.y*=2;
@@ -2184,7 +2184,7 @@ void ComputeMetric_MSJacSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_i
 
     dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
     dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    while(gridSize.x *gridSize.y *gridSize.z >800)
     {
         blockSize.x*=2;
         blockSize.y*=2;
@@ -2473,7 +2473,7 @@ void ComputeMetric_CCSK_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cud
 
     dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
     dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    while(gridSize.x *gridSize.y *gridSize.z >800)
     {
         blockSize.x*=2;
         blockSize.y*=2;
@@ -2696,7 +2696,7 @@ void ComputeMetric_CC_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
     dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
     dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    while(gridSize.x *gridSize.y *gridSize.z >800)
     {
         blockSize.x*=2;
         blockSize.y*=2;
@@ -2763,7 +2763,7 @@ void ComputeDetImg_cuda(cudaPitchedPtr img, cudaPitchedPtr field,
 
     dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
     dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    while(gridSize.x *gridSize.y *gridSize.z >800)
     {
         blockSize.x*=2;
         blockSize.y*=2;
