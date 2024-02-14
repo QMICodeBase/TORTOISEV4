@@ -497,7 +497,6 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
     std::vector< std::vector<int> > my_threads;
     int newt= std::min(Nt,Nvols);
     my_threads.resize(newt);
-
     for( int vol2=0; vol2<Nvols;vol2++)
     {
         my_threads [ vol2%newt].push_back(vol2);
@@ -505,45 +504,100 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
 
 
     #ifdef USECUDA
-        int GPU_CPU_ratio=15;    //this should be the ratio of how much GPU is faster than a CPU per volume
+        const int GPU_CPU_ratio=15;    //this should be the ratio of how much GPU is faster than a CPU per volume
                                  // Ideally, I should check what GPU it is and automatically decide it, but too much work for this.
         //The volumes in my_threads 1 will be processed by te GPU
         // the others by the CPU
         // so we give a bit more volumes to threads1
+        int NGPUs;
+        cudaGetDeviceCount	(&NGPUs);
 
-
-        my_threads.clear();
-        my_threads.resize(Nt+1);
-        int tot_pass= Nt+GPU_CPU_ratio;
-
-        for(int v=0;v<Nvols;v++)
+        std::vector<int> cuda_device_ids;
+        cudaDeviceProp prop;
+        for(int g=0;g<NGPUs;g++)
         {
-            int rem= v %tot_pass;
-            if(rem==0)
+            cudaGetDeviceProperties( & prop,g );
+            std::string gnm =prop.name;
+            if(gnm.find("Display") == std::string::npos)      //This is to prevent DGX system's display adaptor
             {
-                my_threads[0].push_back(v);
+                cuda_device_ids.push_back(g);
+            }
+        }
+        NGPUs=cuda_device_ids.size();
+        std::cout<<"NGPUs: " << NGPUs <<std::endl;
+
+
+        int max_t_per_pass= NGPUs * GPU_CPU_ratio + Nt - NGPUs;
+        int npass = (int)std::ceil(1.*Nvols /max_t_per_pass );
+
+        std::vector<int> gpu_ids_per_thread;
+        gpu_ids_per_thread.resize(Nvols);
+
+        for(int pass=0;pass<npass;pass++)
+        {
+            int Nvols_this_pass= Nvols - max_t_per_pass*pass;
+            if(Nvols_this_pass > max_t_per_pass )
+                Nvols_this_pass = max_t_per_pass ;
+
+            int start_vol= max_t_per_pass*pass;
+
+            if(Nvols_this_pass <=GPU_CPU_ratio * NGPUs )
+            {
+                for(int v=start_vol; v < start_vol+Nvols_this_pass; v++)
+                {
+                    gpu_ids_per_thread[v]= v % NGPUs;
+                }
             }
             else
             {
-                if(rem<=GPU_CPU_ratio)
+                for(int v=start_vol; v < start_vol+Nvols_this_pass; v++)
                 {
-                    my_threads[1].push_back(v);
-                }
-                else
-                {
-                    int id= rem-GPU_CPU_ratio+1;
-                    my_threads[id].push_back(v);
+                    if( v-start_vol <GPU_CPU_ratio * NGPUs)
+                    {
+                        gpu_ids_per_thread[v]= v % NGPUs;
+                    }
+                    else
+                    {
+                        gpu_ids_per_thread[v]=-1;
+                    }
                 }
             }
         }
 
-    //    std::cout<<"Volumes to be processed by the GPU:"<<std::endl;
-      //  for(int mm=0;mm<my_threads[1].size();mm++)
-       //     std::cout<<my_threads[1][mm]<<" ";
-      //  std::cout<<std::endl;
+        int n_omp_threads;
+        if(npass>1)
+            n_omp_threads= Nt;
+        else
+        {
+            if(Nvols <=GPU_CPU_ratio * NGPUs )
+                n_omp_threads= NGPUs;
+            else
+            {
+                n_omp_threads=   Nvols%(GPU_CPU_ratio * NGPUs) + NGPUs;
+            }
+        }
+        omp_set_num_threads(n_omp_threads);
 
-        omp_set_num_threads(Nt+1);
+        my_threads.clear();
+        my_threads.resize(n_omp_threads);
+        int cpu_thread_counter=0;
+        for(int v=0;v<gpu_ids_per_thread.size();v++)
+        {
+            if(gpu_ids_per_thread[v]!=-1)
+            {
+                my_threads[gpu_ids_per_thread[v]].push_back(v);
+            }
+            else
+            {
+                my_threads[NGPUs+cpu_thread_counter].push_back(v);
+                cpu_thread_counter = (cpu_thread_counter+1) %(n_omp_threads -NGPUs);
+            }
+        }
+
+
+
     #else
+        int n_omp_threads=newt;
         omp_set_num_threads(newt);
     #endif
 
@@ -555,12 +609,14 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
 #else
     #pragma omp parallel for
 #endif
-    for(int nt=0;nt<my_threads.size();nt++)
+
+    for(int thr=0;thr<n_omp_threads;thr++)
     {
-        TORTOISE::EnableOMPThread();
-        for( int vol2=0; vol2<my_threads[nt].size();vol2++)
-        {
-            int vol= my_threads[nt][vol2];
+        for( int vol2=0; vol2<my_threads[thr].size();vol2++)
+        {            
+            TORTOISE::EnableOMPThread();
+
+            int vol = my_threads[thr][vol2];
 
             if(vol == this->b0_vol_id || correction_mode=="off" )
             {
@@ -581,6 +637,25 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
 
 
                 OkanQuadraticTransformType::Pointer curr_trans=nullptr;
+
+                #ifdef USECUDA
+                    if(thr>= NGPUs)
+                    {
+                        curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol );
+                    }
+                    else
+                    {
+                    //    TORTOISE::ReserveGPU(gpu_ids_per_thread[vol]);
+                        cudaSetDevice(cuda_device_ids[gpu_ids_per_thread[vol]]);
+                        curr_trans=  RegisterDWIToB0_cuda(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
+                   //     TORTOISE::ReleaseGPU(gpu_ids_per_thread[vol]);
+                    }
+                #else
+                        curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol );
+                #endif
+
+
+                /*
                 #ifdef USECUDA
                     if(nt==1)
                     {
@@ -598,6 +673,7 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
                 #else                        
                         curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol );
                 #endif
+                */
 
 
                 dwi_transforms[vol]->ClearTransformQueue();
@@ -607,9 +683,14 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
             {
                 (*stream)<<", "<<vol<<std::flush;
             }
-        }
-        TORTOISE::DisableOMPThread();
-    }
+            TORTOISE::DisableOMPThread();
+        } //for vol
+    } //for thr
+
+        #ifdef USECUDA
+            cudaSetDevice(0);
+        #endif
+
     (*stream)<<std::endl<<std::endl;
     omp_set_num_threads(Nt);
 }
@@ -2214,7 +2295,7 @@ void DIFFPREP::SetBoId()
     {
         if(b0_ids.size()<4)
         {
-            (*stream)<<"Less than 3 b=0 volumes in the dataset. can not automatically select best one. Using the first one instead."<<std::endl;
+            (*stream)<<"Less than 4 b=0 volumes in the dataset. can not automatically select best one. Using the first one instead."<<std::endl;
             this->b0_vol_id= b0_ids[0];
         }
         else

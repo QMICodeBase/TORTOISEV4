@@ -6,6 +6,7 @@
 #include "../utilities/write_3D_image_to_4D_file.h"
 #include "../utilities/extract_3Dvolume_from_4D.h"
 #include "../utilities/read_bmatrix_file.h"
+#include "../utilities/read_3Dvolume_from_4D.h"
 #include "../tools/TORTOISEBmatrixToFSLBVecs/tortoise_bmatrix_to_fsl_bvecs.h"
 
 void CombineDWIsWithBMatrix(std::vector<std::string> nii_names, std::string output_name)
@@ -28,6 +29,7 @@ void CombineDWIsWithBMatrix(std::vector<std::string> nii_names, std::string outp
     std::cout<<"Total volumes: "<< tot_Nvols<<std::endl;
 
     int vols_so_far=0;
+    bool all_data_have_vbmat=true;
     for(int ni=0;ni<Nimgs;ni++)
     {
         std::string nii_name = nii_names[ni];
@@ -45,7 +47,37 @@ void CombineDWIsWithBMatrix(std::vector<std::string> nii_names, std::string outp
             write_3D_image_to_4D_file<float>(vol,output_name,vols_so_far+v,tot_Nvols);
         }
         vols_so_far+=Nvols;
+
+
+        std::string vbmat_name = nii_name.substr(0,nii_name.rfind(".nii")) + "_vbmat.nii";
+        if(!fs::exists(vbmat_name))
+            all_data_have_vbmat=false;
     }
+
+
+    if(all_data_have_vbmat)
+    {
+        std::string output_vbmat_name = output_name.substr(0,output_name.rfind(".nii"))+"_vbmat.nii";
+        vols_so_far=0;
+        for(int ni=0;ni<Nimgs;ni++)
+        {
+            std::string nii_name = nii_names[ni];
+            std::string vbmat_name = nii_name.substr(0,nii_name.rfind(".nii")) + "_vbmat.nii";
+            std::string bmtxt_name = nii_name.substr(0,nii_name.rfind(".nii"))+".bmtxt";
+            vnl_matrix<double> Bmatrix= read_bmatrix_file(bmtxt_name);
+            int Nvols = Bmatrix.rows();
+
+            for(int v=0;v<6*Nvols;v++)
+            {
+                ImageType3D::Pointer vol = read_3D_volume_from_4D(vbmat_name,v);
+                write_3D_image_to_4D_file<float>(vol,output_vbmat_name,vols_so_far+v,6*tot_Nvols);
+            }
+            vols_so_far+=6*Nvols;
+        }
+    }
+
+
+
 
     std::string bmat_name= output_name.substr(0,output_name.rfind(".nii")) + ".bmtxt";
     std::string bvals_fname= output_name.substr(0,output_name.rfind(".nii")) + ".bvals";

@@ -8,6 +8,8 @@
 #include <atomic>
 #include "../utilities/TORTOISE_Utilities.h"
 
+
+
 class OMPTHREADBASE
 {
 private:
@@ -23,26 +25,68 @@ public:
     {
         Nthreads_per_OMP_thread=thread_array;
     }
+    OMPTHREADBASE()
+    {
+#ifdef USECUDA
+        for(int i=0;i<8;i++)
+            gpu_available[i]=1;
+#endif
+    }
+
+
 
 #ifdef USECUDA
-    bool static ReserveGPU()
-    {
-        bool toreturn=false;
-        #pragma omp critical
+    void static ReserveGPU(int id)
+    {                                
+        if(id==0)
         {
-            if(gpu_available)
+            #pragma omp critical
             {
-                toreturn=true;
-                gpu_available=false;
+                while(!gpu_available[id])
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                gpu_available[id]=false;
             }
         }
-        return toreturn;
-    }
-    void static ReleaseGPU()
-    {
-        #pragma omp critical
+        if(id==1)
         {
-            gpu_available=true;
+            #pragma omp critical
+            {
+                while(!gpu_available[id])
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                gpu_available[id]=false;
+            }
+        }
+        if(id==2)
+        {
+            #pragma omp critical
+            {
+                while(!gpu_available[id])
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                gpu_available[id]=false;
+            }
+        }
+        if(id==3)
+        {
+            #pragma omp critical
+            {
+                while(!gpu_available[id])
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                gpu_available[id]=false;
+            }
+        }
+
+
+
+    }
+    void static ReleaseGPU(int id)
+    {
+    //    #pragma omp critical
+        {
+            gpu_available[id]=true;
         }
     }
 #endif
@@ -117,7 +161,7 @@ private:
     static std::vector<uint> Nthreads_per_OMP_thread;
 
 #ifdef USECUDA
-    static std::atomic_bool gpu_available;
+    static std::array< std::atomic_bool,8 > gpu_available;
 #endif
 
 
