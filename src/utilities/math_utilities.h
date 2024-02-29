@@ -22,6 +22,9 @@ inline double normalCDF_val(double value)
    if(value<-5)
        return 0;
 
+   if(std::isnan(value) || std::isinf(value))
+       return 0;
+
     return 0.5 * erfc(-value * M_SQRT1_2);
 }
 

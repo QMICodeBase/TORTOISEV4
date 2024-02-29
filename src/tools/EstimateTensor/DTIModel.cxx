@@ -225,73 +225,7 @@ int myNLLS_t2(int m, int n, double *p, double *deviates,   double **derivs, void
 
      }
     return 0;
-
-
 }
-
-
-
-vnl_matrix<double>  DTIModel::getCurrentBmatrix(ImageType3D::IndexType ind3,std::vector<int> curr_all_indices)
-{
-
-    vnl_matrix<double> curr_Bmatrix(curr_all_indices.size(),6);
-
-    vnl_matrix_fixed<double,3,3> L, B;
-    if(graddev_img.size())
-    {
-        L(0,0)= graddev_img[0]->GetPixel(ind3); L(0,1)= graddev_img[1]->GetPixel(ind3); L(0,2)= graddev_img[2]->GetPixel(ind3);
-        L(1,0)= graddev_img[3]->GetPixel(ind3); L(1,1)= graddev_img[4]->GetPixel(ind3); L(1,2)= graddev_img[5]->GetPixel(ind3);
-        L(2,0)= graddev_img[6]->GetPixel(ind3); L(2,1)= graddev_img[7]->GetPixel(ind3); L(2,2)= graddev_img[8]->GetPixel(ind3);
-
-        L=L.transpose();
-    }
-
-
-    for(int vol=0;vol<curr_Bmatrix.rows();vol++)
-    {
-        int vol_id= curr_all_indices[vol];
-
-        if(graddev_img.size())
-        {
-            B(0,0)= Bmatrix(vol_id,0); B(0,1)= Bmatrix(vol_id,1)/2;  B(0,2)= Bmatrix(vol_id,2)/2;
-            B(1,0)= Bmatrix(vol_id,1)/2; B(1,1)= Bmatrix(vol_id,3);  B(1,2)= Bmatrix(vol_id,4)/2;
-            B(2,0)= Bmatrix(vol_id,2)/2; B(2,1)= Bmatrix(vol_id,4)/2;  B(2,2)= Bmatrix(vol_id,5);
-
-            B= L * B * L.transpose();
-
-            curr_Bmatrix(vol,0)= B(0,0);
-            curr_Bmatrix(vol,1)= 2*B(0,1);
-            curr_Bmatrix(vol,2)= 2*B(0,2);
-            curr_Bmatrix(vol,3)= B(1,1);
-            curr_Bmatrix(vol,4)= 2*B(1,2);
-            curr_Bmatrix(vol,5)= B(2,2);
-        }
-        else
-        {
-            if(voxelwise_Bmatrix.size())
-            {
-                curr_Bmatrix(vol,0)= voxelwise_Bmatrix[vol_id][0]->GetPixel(ind3);
-                curr_Bmatrix(vol,1)= voxelwise_Bmatrix[vol_id][1]->GetPixel(ind3);
-                curr_Bmatrix(vol,2)= voxelwise_Bmatrix[vol_id][2]->GetPixel(ind3);
-                curr_Bmatrix(vol,3)= voxelwise_Bmatrix[vol_id][3]->GetPixel(ind3);
-                curr_Bmatrix(vol,4)= voxelwise_Bmatrix[vol_id][4]->GetPixel(ind3);
-                curr_Bmatrix(vol,5)= voxelwise_Bmatrix[vol_id][5]->GetPixel(ind3);
-            }
-            else
-            {
-                curr_Bmatrix(vol,0)=Bmatrix(vol_id,0);
-                curr_Bmatrix(vol,1)=Bmatrix(vol_id,1);
-                curr_Bmatrix(vol,2)=Bmatrix(vol_id,2);
-                curr_Bmatrix(vol,3)=Bmatrix(vol_id,3);
-                curr_Bmatrix(vol,4)=Bmatrix(vol_id,4);
-                curr_Bmatrix(vol,5)=Bmatrix(vol_id,5);
-            }
-        }
-    }
-    return curr_Bmatrix;
-}
-
-
 
 
 

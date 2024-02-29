@@ -7,6 +7,7 @@
 #include "../utilities/read_bmatrix_file.h"
 #include "../utilities/read_3Dvolume_from_4D.h"
 #include "registration_settings.h"
+#include "create_mask.h"
 
 #include "../tools/EstimateTensor/estimate_tensor_wlls.h"
 //#include "../tools/ComputeFAMap/compute_fa_map.h"
@@ -433,7 +434,9 @@ void DRBUDDI::Step1_RigidRegistration()
     {
         (*stream)<<"Rigidly registering structural image id: " <<str<<" to b0_up quad..."<<std::endl;
 
-        ImageType3D::Pointer str_img = readImageD<ImageType3D>(parser->getStructuralNames(str));
+        ImageType3D::Pointer str_img_orig = readImageD<ImageType3D>(parser->getStructuralNames(str));
+        ImageType3D::Pointer str_img= create_mask(str_img_orig);
+
         RigidTransformType::Pointer rigid_trans1= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, "CC",parser->getRigidLR());
         RigidTransformType::Pointer rigid_trans2= RigidRegisterImagesEuler( initial_corrected_b0,  str_img,"MI",parser->getRigidLR());
 
@@ -478,7 +481,7 @@ void DRBUDDI::Step1_RigidRegistration()
         {
             ResampleImageFilterType::Pointer resampleFilter3 = ResampleImageFilterType::New();
             resampleFilter3->SetOutputParametersFromImage(this->b0_up_quad);
-            resampleFilter3->SetInput(str_img);
+            resampleFilter3->SetInput(str_img_orig);
             resampleFilter3->SetTransform(rigid_trans);
             resampleFilter3->SetDefaultPixelValue(0);
             resampleFilter3->Update();

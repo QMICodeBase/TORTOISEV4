@@ -18,7 +18,8 @@ void MAPMRIModel::PerformFitting()
         dti_estimator.SetBmatrix(this->Bmatrix);
         dti_estimator.SetDWIData(this->dwi_data);
         dti_estimator.SetWeightImage(this->weight_imgs);
-        dti_estimator.SetVoxelwiseBmatrix(this->voxelwise_Bmatrix);
+        dti_estimator.SetVoxelwiseBmatrix(this->voxelwise_Bmatrix);        
+        dti_estimator.SetGradDev(this->graddev_img);
         dti_estimator.SetMaskImage(this->mask_img);
         dti_estimator.SetVolIndicesForFitting(this->DT_indices);
         dti_estimator.PerformFitting();
@@ -60,7 +61,7 @@ void MAPMRIModel::PerformFitting()
     else
         std::cout<<"Computing MAPMRI with degree: "<<MAP_DEGREE<<std::endl;
 
-    vnl_matrix<double> qq_orig= bmat2q(this->Bmatrix,all_indices);
+
 
     #pragma omp parallel for
     for(int k=0;k<size[2];k++)
@@ -75,13 +76,15 @@ void MAPMRIModel::PerformFitting()
             index3[1]=j;
             for(int i=0;i<size[0];i++)
             {
-                index3[0]=i;
+                index3[0]=i;                                                
 
                 std::vector<float> curr_signal;
                 curr_signal.resize(all_indices.size());
                 std::vector<int> curr_all_indices= all_indices;
-                vnl_matrix<double> curr_qq=qq_orig;
 
+                auto curr_Bmatrix = getCurrentBmatrix(index3,curr_all_indices);
+                vnl_matrix<double> qq_orig= bmat2q(curr_Bmatrix,curr_all_indices);
+                vnl_matrix<double> curr_qq=qq_orig;
 
                  EValType eval = eval_image->GetPixel(index3);
                  if( A0_img->GetPixel(index3)!=0)

@@ -58,6 +58,41 @@ int main(int argc, char *argv[])
         }
     }
 
+    std::vector<ImageType3D::Pointer> graddev_img;
+    std::vector<  std::vector< ImageType3D::Pointer> > vbmat_img;
+    if(parser->getUseVoxelwiseBmat())
+    {
+        std::string Lname= input_name.substr(0,input_name.rfind(".nii")) + "_graddev.nii";
+        if(fs::exists(Lname))
+        {
+            graddev_img.resize(9);
+            for(int v=0;v<9;v++)
+            {
+                graddev_img[v]=read_3D_volume_from_4D(Lname,v);
+            }
+        }
+        else
+        {
+            std::string vbmat_name= input_name.substr(0,input_name.rfind(".nii")) + "_vbmat.nii";
+            if(fs::exists(vbmat_name))
+            {
+                vbmat_img.resize(Nvols);
+                for(int v=0; v< Nvols;v++)
+                {
+                    vbmat_img[v].resize(6);
+                    for(int bi=0;bi<6;bi++)
+                    {
+                        vbmat_img[v][bi]= read_3D_volume_from_4D(vbmat_name, v*6+bi);
+                    }
+                }
+            }
+            else
+            {
+                std::cout<<"Voxelwise bmat or grad_dev use requested but these files are not present. Disregarding this option."<<std::endl;
+            }
+        }
+    }
+
 
     std::vector<int> dummy;    
     {
@@ -146,7 +181,8 @@ int main(int argc, char *argv[])
         dti_estimator.SetBmatrix(Bmatrix);
         dti_estimator.SetDWIData(final_data);
         dti_estimator.SetWeightImage(weight_imgs);
-        dti_estimator.SetVoxelwiseBmatrix(dummyv);
+        dti_estimator.SetVoxelwiseBmatrix(vbmat_img);
+        dti_estimator.SetGradDev(graddev_img);
         dti_estimator.SetMaskImage(mask_image);
         dti_estimator.SetVolIndicesForFitting(dummy);
         dti_estimator.SetFittingMode("WLLS");
@@ -189,7 +225,8 @@ int main(int argc, char *argv[])
     mapmri_estimator.SetBmatrix(Bmatrix);
     mapmri_estimator.SetDWIData(final_data);
     mapmri_estimator.SetWeightImage(weight_imgs);
-    mapmri_estimator.SetVoxelwiseBmatrix(dummyv);
+    mapmri_estimator.SetVoxelwiseBmatrix(vbmat_img);
+    mapmri_estimator.SetGradDev(graddev_img);
     mapmri_estimator.SetMaskImage(mask_image);
     mapmri_estimator.SetVolIndicesForFitting(dummy);
     mapmri_estimator.SetSmallDelta(small_delta);

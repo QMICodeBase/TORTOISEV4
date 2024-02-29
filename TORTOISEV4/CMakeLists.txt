@@ -495,8 +495,8 @@ target_link_libraries(Combine3DImagesTo4D  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  
 
 
 
-#add_executable(BrukerBmatToTORTOISEBMTXT   ../src/tools/BrukerBmatToTORTOISEBMTXT/BrukerBmatToTORTOISEBMTXT.cxx ${SOURCES})
-#target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+add_executable(BrukerBmatToTORTOISEBMTXT   ../src/tools/BrukerBmatToTORTOISEBMTXT/BrukerBmatToTORTOISEBMTXT.cxx ${SOURCES})
+target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 IF(USE_VTK)

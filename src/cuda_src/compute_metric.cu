@@ -51,7 +51,7 @@ ComputeMetric_CC_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                            cudaPitchedPtr updateFieldF, cudaPitchedPtr updateFieldM,
                            cudaPitchedPtr metric_img);
 
-__device__ float mf(float det)
+__device__ inline float mf(float det)
 {    
     return det;
 
@@ -62,7 +62,7 @@ __device__ float mf(float det)
 }
 
 
-__device__ float dmf(float x)
+__device__ inline float dmf(float x)
 {    
     return 1;
 //    float y= mf(x);
@@ -1445,24 +1445,6 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
 
 
 
-__device__ float c_wi(float x)
-{
-    return 1;
-
-  //  const float MXX=4E9;
-  //  return 0.999*exp(-30*x/MXX)+0.001;
-}
-
-__device__ float c_dwi_dx(float x)
-{
-    return 0;
-
-  //  const float MXX=4E9;
-  //  return 0.999*exp(-30*x/MXX)* -30/MXX;
-}
-
-
-
 
 
 __global__ void
@@ -1498,8 +1480,6 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
                 float a_b= a/b;
                 a_b=0;
-
-
 
 
                 ////////////////////////   at x ///////////////////////////////////////////
@@ -1542,18 +1522,15 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                     float valm = row_down[i]*detm;
                     float K= valf-valm;
 
-                    float wi = c_wi(valf*valm);
-                    float dwi = c_dwi_dx(valf*valm);
 
+                    row_metric[i]= K*K;
 
-                    row_metric[i]= wi*K*K;
-
-                    updateF[0]= 2*K*gradI2.x*detf *wi  + K*K*dwi* detf*valm * gradI2.x;
-                    updateF[1]= 2*K*gradI2.y*detf *wi  + K*K*dwi* detf*valm * gradI2.y;
-                    updateF[2]= 2*K*gradI2.z*detf *wi  + K*K*dwi* detf*valm * gradI2.z;
-                    updateM[0]= -2*K*gradJ2.x*detm *wi + K*K*dwi* detm*valf * gradJ2.x;
-                    updateM[1]= -2*K*gradJ2.y*detm *wi + K*K*dwi* detm*valf * gradJ2.y;
-                    updateM[2]= -2*K*gradJ2.z*detm *wi + K*K*dwi* detm*valf * gradJ2.z;
+                    updateF[0]= 2*K*gradI2.x*detf ;
+                    updateF[1]= 2*K*gradI2.y*detf ;
+                    updateF[2]= 2*K*gradI2.z*detf ;
+                    updateM[0]= -2*K*gradJ2.x*detm ;
+                    updateM[1]= -2*K*gradJ2.y*detm ;
+                    updateM[2]= -2*K*gradJ2.z*detm ;
                 }
 
 
@@ -1613,14 +1590,9 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
                             float K= valf-valm;
 
-                            float wi = c_wi(valf*valm);
-                            float dwi = c_dwi_dx(valf*valm);
+                            updateF[phase_xyz]+=  2 * K *   ( gradI[phase_xyz]*detf*a_b  + d_new_phase[phase_xyz]*dmf(detf2)* fval* -0.5/d_spc[phase]/h);
+                            updateM[phase_xyz]+= -2*  K *  ( gradJ[phase_xyz]*detm*a_b  + d_new_phase[phase_xyz]*dmf(detm2)* mval* -0.5/d_spc[phase]/h);
 
-                            updateF[phase_xyz]+=  2 * K * wi*  ( gradI[phase_xyz]*detf*a_b  + d_new_phase[phase_xyz]*dmf(detf2)* fval* -0.5/d_spc[phase]/h);
-                            updateM[phase_xyz]+= -2*  K * wi* ( gradJ[phase_xyz]*detm*a_b  + d_new_phase[phase_xyz]*dmf(detm2)* mval* -0.5/d_spc[phase]/h);
-
-                            updateF[phase_xyz]+= K*K*dwi*(valm*fval*d_new_phase[phase_xyz]*-0.5/d_spc[phase]/h);
-                            updateM[phase_xyz]+= K*K*dwi*(valf*mval*d_new_phase[phase_xyz]*-0.5/d_spc[phase]/h);
 
                         }
                     }
@@ -1683,14 +1655,10 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
                             float K= valf-valm;
 
-                            float wi = c_wi(valf*valm);
-                            float dwi = c_dwi_dx(valf*valm);
 
-                            updateF[phase_xyz]+=  2* K* wi* ( gradI[phase_xyz]*detf*a_b  + d_new_phase[phase_xyz]*dmf(detf2)*fval*  0.5/d_spc[phase]/h);
-                            updateM[phase_xyz]+= -2* K* wi* ( gradJ[phase_xyz]*detm*a_b  + d_new_phase[phase_xyz]*dmf(detm2)* mval* 0.5/d_spc[phase]/h);
+                            updateF[phase_xyz]+=  2* K*  ( gradI[phase_xyz]*detf*a_b  + d_new_phase[phase_xyz]*dmf(detf2)*fval*  0.5/d_spc[phase]/h);
+                            updateM[phase_xyz]+= -2* K*  ( gradJ[phase_xyz]*detm*a_b  + d_new_phase[phase_xyz]*dmf(detm2)* mval* 0.5/d_spc[phase]/h);
 
-                            updateF[phase_xyz]+= K*K*dwi*(valm*fval*d_new_phase[phase_xyz]*0.5/d_spc[phase]/h);
-                            updateM[phase_xyz]+= K*K*dwi*(valf*mval*d_new_phase[phase_xyz]*0.5/d_spc[phase]/h);
                         }
                     }
                } // x-1

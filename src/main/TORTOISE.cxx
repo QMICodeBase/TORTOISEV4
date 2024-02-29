@@ -933,13 +933,24 @@ void TORTOISE::DriftCorrect(std::string nii_name)
     //Least squares
     if(drift_option=="linear")
     {
+        int first_good_b0_id=0;
+        for(int v=0;v<b0_ids.size();v++)
+        {
+            if(mean_signals[v]!=0)
+            {
+                first_good_b0_id=v;
+                break;
+            }
+        }
+
+
         double nom=0,denom=0;
         for(int v=0;v<b0_ids.size();v++)
         {
             if(mean_signals[v]!=0)
             {
-                nom+= (mean_signals[v] - mean_signals[0])*b0_ids[v];
-                denom+= b0_ids[v]*b0_ids[v];
+                nom+= (mean_signals[v] - mean_signals[first_good_b0_id])*(b0_ids[v] -b0_ids[first_good_b0_id]) ;
+                denom+= (b0_ids[v] -b0_ids[first_good_b0_id])*(b0_ids[v] -b0_ids[first_good_b0_id]);
             }
         }
         double slope = nom/denom;
@@ -947,7 +958,12 @@ void TORTOISE::DriftCorrect(std::string nii_name)
 
         std::ofstream outfile(drift_name);
         outfile<<"linear"<<std::endl;
-        outfile<<mean_signals[0] << " " << slope;
+        if(mean_signals[0]!=0)
+            outfile<<mean_signals[0] << " " << slope;
+        else
+        {
+            outfile<<mean_signals[first_good_b0_id]-slope*b0_ids[first_good_b0_id] << " " << slope;
+        }
 
         //outfile<<"S_n^c = S_n "<<mean_signals[0]<<"/("<<slope<<    " vol_id + "<< mean_signals[0]<< ")";
         outfile.close();
@@ -1010,60 +1026,48 @@ void TORTOISE::AlignB0ToReorientation()
         else
             b0_img= read_3D_volume_from_4D(this->proc_infos[0].nii_name,0);
 
-        //b0_to_str_trans = RigidRegisterImagesEuler( target_img,  b0_img,parser->getRigidMetricType(),parser->getRigidLR());
-        auto b0_to_str_trans_CC = RigidRegisterImagesEuler( target_img,  b0_img,"CC",parser->getRigidLR());
-        auto params_CC=b0_to_str_trans_CC->GetParameters();
-        std::cout<<"CC: " << params_CC<<std::endl;
-        b0_to_str_trans = RigidRegisterImagesEuler( target_img,  b0_img,"MI",parser->getRigidLR());
-        auto params_MI=b0_to_str_trans->GetParameters();
-        std::cout<<"MI: " << params_MI<<std::endl;
 
-        auto p1=params_CC-params_MI;
+        RigidTransformType::Pointer rigid_trans1= RigidRegisterImagesEuler( target_img,  b0_img, "CC",parser->getRigidLR());
+        RigidTransformType::Pointer rigid_trans2= RigidRegisterImagesEuler( target_img,  b0_img, "MI",parser->getRigidLR());
+
+        auto params1= rigid_trans1->GetParameters();
+        auto params2= rigid_trans2->GetParameters();
+        auto p1=params1-params2;
+
         double diff=0;
         diff+= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] +
                p1[3]*p1[3]/400. + p1[4]*p1[4]/400. + p1[5]*p1[5]/400. ;
 
-        if(diff>0.01)
+        RigidTransformType::Pointer rigid_trans=nullptr;
+        std::cout<<"R1: "<< params1<<std::endl;
+        std::cout<<"R2: "<< params2<<std::endl;
+        std::cout<<"MI vs CC diff: "<< diff<<std::endl;
+
+
+        if(diff<0.005)
+            b0_to_str_trans=rigid_trans2;
+        else
         {
-            ImageType3D::IndexType target_center, b0_center;
-            target_center[0]=(target_img->GetLargestPossibleRegion().GetSize()[0]-1)/2.;
-            target_center[1]=(target_img->GetLargestPossibleRegion().GetSize()[1]-1)/2.;
-            target_center[2]=(target_img->GetLargestPossibleRegion().GetSize()[2]-1)/2.;
-            b0_center[0]=(b0_img->GetLargestPossibleRegion().GetSize()[0]-1)/2.;
-            b0_center[1]=(b0_img->GetLargestPossibleRegion().GetSize()[1]-1)/2.;
-            b0_center[2]=(b0_img->GetLargestPossibleRegion().GetSize()[2]-1)/2.;
+            std::cout<<"Could not compute the rigid transformation from the structural imageto b=0 image... Starting multistart.... This could take a while"<<std::endl;
+            std::cout<<"Better be safe than sorry, right?"<<std::endl;
 
-            vnl_vector<double> center_diff(3);
-            center_diff[0]= b0_center[0]-target_center[0];
-            center_diff[1]= b0_center[1]-target_center[1];
-            center_diff[2]= b0_center[2]-target_center[2];
 
-            double CC_diff= (params_CC[3]- center_diff[3])*(params_CC[3]- center_diff[3]) +
-                            (params_CC[4]- center_diff[4])*(params_CC[4]- center_diff[4]) +
-                            (params_CC[5]- center_diff[5])*(params_CC[5]- center_diff[5]) ;
-            double MI_diff= (params_MI[3]- center_diff[3])*(params_MI[3]- center_diff[3]) +
-                            (params_MI[4]- center_diff[4])*(params_MI[4]- center_diff[4]) +
-                            (params_MI[5]- center_diff[5])*(params_MI[5]- center_diff[5]) ;
+            std::vector<float> new_res; new_res.resize(3);
+            new_res[0]= b0_img->GetSpacing()[0] * 2;
+            new_res[1]= b0_img->GetSpacing()[1] * 2;
+            new_res[2]= b0_img->GetSpacing()[2] * 2;
+            std::vector<float> dummy;
+            ImageType3D::Pointer b02= resample_3D_image(b0_img,new_res,dummy,"Linear");
+            new_res[0]= target_img->GetSpacing()[0] * 2;
+            new_res[1]= target_img->GetSpacing()[1] * 2;
+            new_res[2]= target_img->GetSpacing()[2] * 2;
+            ImageType3D::Pointer str2= resample_3D_image(target_img,new_res,dummy,"Linear");
 
-            RigidTransformType::Pointer new_rigid= RigidTransformType::New();
-            new_rigid->SetIdentity();
-            auto pp = new_rigid->GetParameters();
-            if(CC_diff<MI_diff)
-            {
-                pp[3]=params_CC[3];
-                pp[4]=params_CC[4];
-                pp[5]=params_CC[5];
-            }
-            else
-            {
-                pp[3]=params_MI[3];
-                pp[4]=params_MI[4];
-                pp[5]=params_MI[5];
-            }
-            new_rigid->SetParameters(pp);
-            b0_to_str_trans = RigidRegisterImagesEuler( target_img,  b0_img,"MI",parser->getRigidLR(),new_rigid);
-            std::cout<<"Final trans: "<<b0_to_str_trans->GetParameters()<<std::endl;
+            rigid_trans1=MultiStartRigidSearch(str2,b02);
+            b0_to_str_trans= RigidRegisterImagesEuler( target_img, b0_img,   "MI",parser->getRigidLR()/2.,rigid_trans1);
         }
+        (*stream)<<"Final transformation: " << b0_to_str_trans->GetParameters()<<std::endl;
+
     }
     else
     {

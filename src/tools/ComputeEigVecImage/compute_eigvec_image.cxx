@@ -79,6 +79,18 @@ int main( int argc , char * argv[] )
     vec_image->SetDirection(image4D->GetDirection());
     vec_image->FillBuffer(0.);
     
+
+
+    nsize[3]=3;
+    ImageType4D::RegionType reg2(index,nsize);
+    ImageType4D::Pointer val_image = ImageType4D::New();
+    val_image->SetRegions(reg2);
+    val_image->Allocate();
+    val_image->SetOrigin(image4D->GetOrigin());
+    val_image->SetSpacing(image4D->GetSpacing());
+    val_image->SetDirection(image4D->GetDirection());
+    val_image->FillBuffer(0.);
+
     
     
     ImageType3D::IndexType ind;
@@ -134,6 +146,14 @@ int main( int argc , char * argv[] )
                 double mn = (eig.D(0,0)+ eig.D(1,1)+ eig.D(2,2))/3.;
                 double nom = (eig.D(0,0)-mn)*(eig.D(0,0)-mn)+ (eig.D(1,1)-mn)*(eig.D(1,1)-mn)+(eig.D(2,2)-mn)*(eig.D(2,2)-mn);
                 double denom= eig.D(0,0)*eig.D(0,0)+eig.D(1,1)*eig.D(1,1)+eig.D(2,2)*eig.D(2,2);
+
+
+                index[3]=0;
+                val_image->SetPixel(index, eig.D(0,0));
+                index[3]=1;
+                val_image->SetPixel(index, eig.D(1,1));
+                index[3]=2;
+                val_image->SetPixel(index, eig.D(2,2));
                 
 
                 index[3]=0;
@@ -166,11 +186,11 @@ int main( int argc , char * argv[] )
        
     
        
-        
-         std::string filename(argv[1]);
+{
+    std::string filename(argv[1]);
     std::string::size_type idx=filename.rfind('.');
     std::string basename= filename.substr(mypos+1,idx-mypos-1);
-    std::string output_name=currdir + basename + std::string("_EV.nii");
+    std::string output_name=currdir + basename + std::string("_EVEC.nii");
        
     
     
@@ -179,7 +199,22 @@ int main( int argc , char * argv[] )
     writer->SetFileName(output_name);
     writer->SetInput(vec_image);
     writer->Update();
+}
 
+   {
+    std::string filename(argv[1]);
+    std::string::size_type idx=filename.rfind('.');
+    std::string basename= filename.substr(mypos+1,idx-mypos-1);
+    std::string output_name=currdir + basename + std::string("_EVAL.nii");
+
+
+
+    typedef itk::ImageFileWriter<ImageType4D> WriterType;
+    WriterType::Pointer writer= WriterType::New();
+    writer->SetFileName(output_name);
+    writer->SetInput(val_image);
+    writer->Update();
+    }
                     
     
     

@@ -455,7 +455,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
     {
         DRBUDDIStageSettings curr_stage;                                   //16
         curr_stage.niter=300;
-        curr_stage.img_smoothing_std=3.5;
+        curr_stage.img_smoothing_std=4.;
         curr_stage.downsample_factor=4;
         curr_stage.learning_rate=0.75;
         curr_stage.update_gaussian_sigma=7.5;
@@ -486,7 +486,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
     {
         DRBUDDIStageSettings curr_stage;                                //17
         curr_stage.niter=300;
-        curr_stage.img_smoothing_std=4;
+        curr_stage.img_smoothing_std=3.5;
         curr_stage.downsample_factor=4;
         curr_stage.learning_rate=0.5;
         curr_stage.update_gaussian_sigma=5.5;
@@ -517,7 +517,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
     {
         DRBUDDIStageSettings curr_stage;                                   //18
         curr_stage.niter=300;
-        curr_stage.img_smoothing_std=3.5;
+        curr_stage.img_smoothing_std=3;
         curr_stage.downsample_factor=4;
         curr_stage.learning_rate=0.35;
         curr_stage.update_gaussian_sigma=4.5;
