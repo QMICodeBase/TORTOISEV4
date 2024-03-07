@@ -144,7 +144,7 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
     }
 
     {
-        std::string description = std::string( "Flip X gradient? Boolean (0/1). Optional. Default:0  " );
+        std::string description = std::string( "Flip X gradient? This is done AFTER swapping. Boolean (0/1). Optional. Default:0  " );
 
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "flipX");
@@ -153,7 +153,7 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
         this->AddOption( option );
     }
     {
-        std::string description = std::string( "Flip Y gradient? Boolean (0/1). Optional. Default:0  " );
+        std::string description = std::string( "Flip Y gradient? This is done AFTER swapping. Boolean (0/1). Optional. Default:0  " );
 
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "flipY");
@@ -162,7 +162,7 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
         this->AddOption( option );
     }
     {
-        std::string description = std::string( "Flip Z gradient? Boolean (0/1). Optional. Default:0  " );
+        std::string description = std::string( "Flip Z gradient? This is done AFTER swapping. Boolean (0/1). Optional. Default:0  " );
 
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "flipZ");
@@ -170,6 +170,40 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
         option->SetModule(0);
         this->AddOption( option );
     }
+
+
+
+
+    {
+        std::string description = std::string( "Swap X and Y gradients?  Boolean (0/1). Optional. Default:0  " );
+
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "swapXY");
+        option->SetDescription( description );
+        option->SetModule(0);
+        this->AddOption( option );
+    }
+    {
+        std::string description = std::string( "Swap  X and Z gradients?  Boolean (0/1). Optional. Default:0  " );
+
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "swapXZ");
+        option->SetDescription( description );
+        option->SetModule(0);
+        this->AddOption( option );
+    }
+    {
+        std::string description = std::string( "Swap Y and Z gradients?  Boolean (0/1). Optional. Default:0  " );
+
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "swapYZ");
+        option->SetDescription( description );
+        option->SetModule(0);
+        this->AddOption( option );
+    }
+
+
+
     {
         std::string description = std::string( "Big Delta. In case it is not in JSON file and high b-value processing is needed. Default:0  " );
 
@@ -651,6 +685,38 @@ int TORTOISE_PARSER::getFlipZ()
     }
     return 1;
 }
+
+
+
+bool TORTOISE_PARSER::getSwapXY()
+{
+    OptionType::Pointer option = this->GetOption( "swapXY");
+    if(option->GetNumberOfFunctions())
+    {
+        return (bool)( atoi(option->GetFunction(0)->GetName().c_str()));
+    }
+    return 0;
+}
+bool TORTOISE_PARSER::getSwapXZ()
+{
+    OptionType::Pointer option = this->GetOption( "swapXZ");
+    if(option->GetNumberOfFunctions())
+    {
+        return (bool)( atoi(option->GetFunction(0)->GetName().c_str()));
+    }
+    return 0;
+}
+bool TORTOISE_PARSER::getSwapYZ()
+{
+    OptionType::Pointer option = this->GetOption( "swapYZ");
+    if(option->GetNumberOfFunctions())
+    {
+        return (bool)( atoi(option->GetFunction(0)->GetName().c_str()));
+    }
+    return 0;
+}
+
+
 
 float TORTOISE_PARSER::getBigDelta()
 {

@@ -37,7 +37,10 @@ public:
 
     int getFlipX();
     int getFlipY();
-    int getFlipZ();
+    int getFlipZ();    
+    bool getSwapXY();
+    bool getSwapXZ();
+    bool getSwapYZ();
 
     float getBigDelta();
     float getSmallDelta();

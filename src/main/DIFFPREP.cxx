@@ -573,7 +573,7 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
                 n_omp_threads= NGPUs;
             else
             {
-                n_omp_threads=   Nvols%(GPU_CPU_ratio * NGPUs) + NGPUs;
+                n_omp_threads=   Nvols- (GPU_CPU_ratio * NGPUs) + NGPUs;
             }
         }
         omp_set_num_threads(n_omp_threads);

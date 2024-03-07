@@ -8,6 +8,7 @@
 #include "itkNearestNeighborInterpolateImageFunction.h"
 #include "itkResampleImageFilter.h"
 #include "itkIdentityTransform.h"
+#include "../utilities/extract_3Dvolume_from_4D.h"
 
 
 #include <boost/algorithm/string.hpp>
@@ -186,6 +187,7 @@ ImageType4D::Pointer  ReorientDWIs(ImageType4D::Pointer dwis, vnl_vector_fixed<i
     ImageType4D::IndexType new_orig_index; new_orig_index.Fill(0);
 
     new_size[3] = dwis->GetLargestPossibleRegion().GetSize()[3];
+    int Nvols=new_size[3];
 
     vnl_matrix_fixed<double,4,4> orig_dir = dwis->GetDirection().GetVnlMatrix();
 
@@ -212,35 +214,69 @@ ImageType4D::Pointer  ReorientDWIs(ImageType4D::Pointer dwis, vnl_vector_fixed<i
 
 
 
-    using InterpolatorType = itk::NearestNeighborInterpolateImageFunction<ImageType4D>;
-    using ResamplerType = itk::ResampleImageFilter<ImageType4D,ImageType4D>;
-    using TransformType = itk::IdentityTransform<double,4>;
-    InterpolatorType::Pointer interp = InterpolatorType::New();
-    interp->SetInputImage(dwis);
 
+
+    using InterpolatorType = itk::NearestNeighborInterpolateImageFunction<ImageType3D>;
+    using ResamplerType = itk::ResampleImageFilter<ImageType3D,ImageType3D>;
+    using TransformType = itk::IdentityTransform<double,3>;
     TransformType::Pointer id_trans=TransformType::New();
     id_trans->SetIdentity();
 
 
     ImageType4D::IndexType start; start.Fill(0);
     ImageType4D::RegionType reg(start,new_size);
-
     ImageType4D::Pointer new_dwis = ImageType4D::New();
     new_dwis->SetRegions(reg);
+    new_dwis->Allocate();
     new_dwis->SetDirection(new_dir);
     new_dwis->SetOrigin(new_orig);
     new_dwis->SetSpacing(new_spc);
+    new_dwis->FillBuffer(0);
+
+    ImageType3D::Pointer new_dwis_v0 = extract_3D_volume_from_4D(new_dwis,0);
+
+    for(int v=0;v<Nvols;v++)
+    {
+        ImageType3D::Pointer dwis_v= extract_3D_volume_from_4D(dwis,v);
+        InterpolatorType::Pointer interp = InterpolatorType::New();
+        interp->SetInputImage(dwis_v);
+
+        ResamplerType::Pointer resampler = ResamplerType::New();
+        resampler->SetInput(dwis_v);
+        resampler->SetInterpolator(interp);
+        resampler->SetTransform(id_trans);
+        resampler->SetOutputParametersFromImage(new_dwis_v0);
+        resampler->Update();
+        ImageType3D::Pointer dwi_reoriented= resampler->GetOutput();
+
+        ImageType4D::IndexType cind; cind.Fill(0);
+        cind[3]=v;
+        ImageType3D::IndexType cind3;
+
+        for(int k=0;k<new_size[2];k++)
+        {
+            cind[2]=k;
+            cind3[2]=k;
+            for(int j=0;j<new_size[1];j++)
+            {
+                cind[1]=j;
+                cind3[1]=j;
+                for(int i=0;i<new_size[0];i++)
+                {
+                    cind[0]=i;
+                    cind3[0]=i;
+
+                    new_dwis->SetPixel(cind, dwi_reoriented->GetPixel(cind3));
+                }
+            }
+        }
 
 
 
+    }
 
-    ResamplerType::Pointer resampler = ResamplerType::New();
-    resampler->SetInput(dwis);
-    resampler->SetInterpolator(interp);
-    resampler->SetTransform(id_trans);
-    resampler->SetOutputParametersFromImage(new_dwis);
-    resampler->Update();
-    return resampler->GetOutput();
+
+    return new_dwis;
 
 }
 
@@ -496,33 +532,41 @@ int main(int argc, char * argv[])
         phase=parser->getPhase();
 
 
-    if(phase=="vertical")
-    {
-        if(fabs(permutes[1])==1)
-            phase="horizontal";
-        else if(fabs(permutes[1])==2)
-            phase="vertical";
-        else if(fabs(permutes[1])==3)
-            phase="slice";
-    }
     if(phase=="horizontal")
     {
         if(fabs(permutes[0])==1)
             phase="horizontal";
-        else if(fabs(permutes[0])==2)
+        else if(fabs(permutes[1])==1)
             phase="vertical";
-        else if(fabs(permutes[0])==3)
+        else if(fabs(permutes[2])==1)
             phase="slice";
     }
-    if(phase=="slice")
+    else
     {
-        if(fabs(permutes[0])==1)
-            phase="horizontal";
-        else if(fabs(permutes[0])==2)
-            phase="vertical";
-        else if(fabs(permutes[0])==3)
-            phase="slice";
+        if(phase=="vertical")
+        {
+            if(fabs(permutes[0])==2)
+                phase="horizontal";
+            else if(fabs(permutes[1])==2)
+                phase="vertical";
+            else if(fabs(permutes[2])==2)
+                phase="slice";
+        }
+        else
+        {
+            if(fabs(permutes[0])==3)
+                phase="horizontal";
+            else if(fabs(permutes[1])==3)
+                phase="vertical";
+            else if(fabs(permutes[2])==3)
+                phase="slice";
+        }
     }
+
+
+
+
+
 
 
     vnl_matrix<double> new_Bmatrix= RotateBmatrix(Bmatrix,permutes);

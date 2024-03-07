@@ -406,6 +406,9 @@ void TORTOISE::UpdateSettingsFromCommandLine()
     RegistrationSettings::get().setValue<int>("flipX", parser->getFlipX());
     RegistrationSettings::get().setValue<int>("flipY", parser->getFlipY());
     RegistrationSettings::get().setValue<int>("flipZ", parser->getFlipZ());
+    RegistrationSettings::get().setValue<int>("swapXY", parser->getSwapXY());
+    RegistrationSettings::get().setValue<int>("swapXZ", parser->getSwapXZ());
+    RegistrationSettings::get().setValue<int>("swapYZ", parser->getSwapYZ());
 
     RegistrationSettings::get().setValue<float>("big_delta", parser->getBigDelta());
     RegistrationSettings::get().setValue<float>("small_delta", parser->getSmallDelta());
@@ -1292,6 +1295,10 @@ void TORTOISE::CheckAndCopyInputData()
     int flipY=parser->getFlipY();
     int flipZ=parser->getFlipZ();
 
+    bool swapXY = parser->getSwapXY();
+    bool swapXZ = parser->getSwapXZ();
+    bool swapYZ = parser->getSwapYZ();
+
     std::vector<std::string> input_names={parser->getUpInputName(),parser->getDownInputName()};
     std::vector<std::string> bval_names={parser->getUpBvalName(),parser->getDownBvalName()};
     std::vector<std::string> bvec_names={parser->getUpBvecName(),parser->getDownBvecName()};
@@ -1454,6 +1461,32 @@ void TORTOISE::CheckAndCopyInputData()
                 vnl_matrix<double> Bmatrix= read_bmatrix_file(input_basename+std::string(".bmtxt"));
                 for(int v=0;v< Bmatrix.rows();v++)
                 {
+                    auto bmat_vec= Bmatrix.get_row(v);
+                    if(swapXY)
+                    {
+                        Bmatrix(v,0)= bmat_vec[3];
+                        Bmatrix(v,2)= bmat_vec[4];
+                        Bmatrix(v,3)= bmat_vec[0];
+                        Bmatrix(v,4)= bmat_vec[2];
+                    }
+                    if(swapXZ)
+                    {
+                        Bmatrix(v,0)= bmat_vec[5];
+                        Bmatrix(v,1)= bmat_vec[4];
+                        Bmatrix(v,5)= bmat_vec[0];
+                        Bmatrix(v,4)= bmat_vec[1];
+                    }
+                    if(swapYZ)
+                    {
+                        Bmatrix(v,3)= bmat_vec[5];
+                        Bmatrix(v,5)= bmat_vec[3];
+                        Bmatrix(v,1)= bmat_vec[2];
+                        Bmatrix(v,2)= bmat_vec[1];
+                    }
+                }
+
+                for(int v=0;v< Bmatrix.rows();v++)
+                {
                     Bmatrix(v,1)*= flipX*flipY;
                     Bmatrix(v,2)*= flipX*flipZ;
                     Bmatrix(v,4)*= flipY*flipZ;
@@ -1555,6 +1588,25 @@ void TORTOISE::CheckAndCopyInputData()
                         vec(0,0)/=nrm;
                         vec(1,0)/=nrm;
                         vec(2,0)/=nrm;
+                    }
+
+                    if(swapXY)
+                    {
+                        auto tvec= vec;
+                        vec(0,0)=tvec(1,0);
+                        vec(1,0)=tvec(0,0);
+                    }
+                    if(swapXZ)
+                    {
+                        auto tvec= vec;
+                        vec(0,0)=tvec(2,0);
+                        vec(2,0)=tvec(0,0);
+                    }
+                    if(swapYZ)
+                    {
+                        auto tvec= vec;
+                        vec(1,0)=tvec(2,0);
+                        vec(2,0)=tvec(1,0);
                     }
 
                     vec(0,0)*= flipX;
