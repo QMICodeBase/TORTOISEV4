@@ -36,6 +36,8 @@ void CombineDWIsWithBMatrix(std::vector<std::string> nii_names, std::string outp
         ImageType4D::Pointer img = readImageD<ImageType4D>(nii_name) ;
         int Nvols = img->GetLargestPossibleRegion().GetSize()[3];
 
+
+
         std::string bmtxt_name = nii_name.substr(0,nii_name.rfind(".nii"))+".bmtxt";
 
         vnl_matrix<double> Bmatrix= read_bmatrix_file(bmtxt_name);
@@ -43,7 +45,8 @@ void CombineDWIsWithBMatrix(std::vector<std::string> nii_names, std::string outp
 
         for(int v=0;v<Nvols;v++)
         {
-            ImageType3D::Pointer vol = extract_3D_volume_from_4D(img,v);
+            ImageType3D::Pointer vol = extract_3D_volume_from_4D(img,v);        
+
             write_3D_image_to_4D_file<float>(vol,output_name,vols_so_far+v,tot_Nvols);
         }
         vols_so_far+=Nvols;

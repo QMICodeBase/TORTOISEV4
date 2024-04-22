@@ -325,6 +325,8 @@ void DRTAMASStage::RunDRTAMASStage()
                 warped_fixed_tensor = ExpTensor(warped_fixed_tensor) ;
                 warped_moving_tensor = ExpTensor(warped_moving_tensor) ;
 
+                // We are not rotating the tensors here because the metric will internally rotate them.
+
                 metric_value = ComputeMetric_DEV(warped_fixed_tensor, warped_moving_tensor,
                                                this->def_FINV , this->def_MINV ,
                                                updateFieldF_temp,  updateFieldM_temp);
