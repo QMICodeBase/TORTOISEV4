@@ -129,6 +129,12 @@ int select_best_b0(ImageType4D::Pointer img4d, vnl_vector<double> bvals, ImageTy
             b0_ids.push_back(v);
     }
 
+    if(b0_ids.size() ==1)
+    {
+        avg_best_b0_img = extract_3D_volume_from_4D(img4d, b0_ids[0]);
+        return b0_ids[0];
+    }
+
 
     std::vector<ImageType3D::Pointer> registered_imgs;    //put the b=0 images in a vector
     for(int v=0;v<b0_ids.size();v++)

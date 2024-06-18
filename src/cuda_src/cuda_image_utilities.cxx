@@ -32,6 +32,80 @@ void ContrainDefFields(CUDAIMAGE::Pointer  ufield, CUDAIMAGE::Pointer  dfield)
 
 
 
+std::vector<CUDAIMAGE::Pointer> ContrainVelocityFields(std::vector<CUDAIMAGE::Pointer>  vfield)
+{
+    int NT=vfield.size();
+
+
+    cudaPitchedPtr *cuda_vfield2= new cudaPitchedPtr[NT];
+    for(int t=0;t<NT;t++)
+        cuda_vfield2[t]=vfield[t]->getFloatdata();
+
+    cudaPitchedPtr *cuda_vfield;
+    cudaMalloc((void**) &cuda_vfield, NT*sizeof(cudaPitchedPtr));
+    cudaMemcpy(cuda_vfield, cuda_vfield2, NT*sizeof(cudaPitchedPtr), cudaMemcpyHostToDevice);
+
+
+    std::vector<CUDAIMAGE::Pointer> new_vfield;
+    new_vfield.resize(NT);
+    for(int T=0;T<NT;T++)
+    {
+        CUDAIMAGE::Pointer field= CUDAIMAGE::New();
+        field->orig=  vfield[0]->orig;
+        field->dir=  vfield[0]->dir;
+        field->spc=  vfield[0]->spc;
+        field->sz=  vfield[0]->sz;
+        field->components_per_voxel= 3;
+        field->Allocate();
+
+        new_vfield[T]=field;
+    }
+
+    cudaPitchedPtr *cuda_newvfield2= new cudaPitchedPtr[NT];
+    for(int t=0;t<NT;t++)
+        cuda_newvfield2[t]=new_vfield[t]->getFloatdata();
+
+    cudaPitchedPtr *cuda_newvfield;
+    cudaMalloc((void**) &cuda_newvfield, NT*sizeof(cudaPitchedPtr));
+    cudaMemcpy(cuda_newvfield, cuda_newvfield2, NT*sizeof(cudaPitchedPtr), cudaMemcpyHostToDevice);
+
+
+
+    CUDAIMAGE::Pointer dfield=CUDAIMAGE::New();
+    dfield->sz =vfield[0]->sz;
+    dfield->dir = vfield[0]->dir;
+    dfield->orig = vfield[0]->orig;
+    dfield->spc = vfield[0]->spc;
+    dfield->components_per_voxel = 3;
+    dfield->Allocate();
+
+
+    IntegrateVelocityFieldGPU(vfield, 0.5,0,dfield);
+
+
+    CUDAIMAGE::Pointer output_field = vfield[0];
+    ContrainVelocityFields_cuda(cuda_vfield,
+                                cuda_newvfield,
+                                dfield->getFloatdata(),
+                                NT,
+                                output_field->sz,
+                                output_field->spc,
+                                output_field->dir(0,0),output_field->dir(0,1),output_field->dir(0,2),output_field->dir(1,0),output_field->dir(1,1),output_field->dir(1,2),output_field->dir(2,0),output_field->dir(2,1),output_field->dir(2,2),
+                                output_field->orig);
+
+    delete[] cuda_vfield2;
+    cudaFree(cuda_vfield);
+
+    delete[] cuda_newvfield2;
+    cudaFree(cuda_newvfield);
+
+    return new_vfield;
+}
+
+
+
+
+
 
 CUDAIMAGE::Pointer ComposeFields(CUDAIMAGE::Pointer main_field, CUDAIMAGE::Pointer update_field)
 {

@@ -50,6 +50,17 @@ void ContrainDefFields(CUDAIMAGE::Pointer  ufield, CUDAIMAGE::Pointer  dfield);
 void ContrainDefFields_cuda(cudaPitchedPtr ufield, cudaPitchedPtr dfield, int3 data_sz);
 
 
+std::vector<CUDAIMAGE::Pointer> ContrainVelocityFields(std::vector<CUDAIMAGE::Pointer>  vfield);
+void ContrainVelocityFields_cuda(cudaPitchedPtr *vfield,
+                                 cudaPitchedPtr *new_vfield,
+                                 cudaPitchedPtr ufield,
+                                 int NTimePoints,
+                                 int3 data_sz,float3 data_res,
+                                 float data_d00,  float data_d01,float data_d02,float data_d10,float data_d11,float data_d12,float data_d20,float data_d21,float data_d22,
+                                 float3 data_orig);
+
+
+
 
 CUDAIMAGE::Pointer ComposeFields(CUDAIMAGE::Pointer main_field, CUDAIMAGE::Pointer update_field);
 void ComposeFields_cuda(cudaPitchedPtr main_field,cudaPitchedPtr update_field,

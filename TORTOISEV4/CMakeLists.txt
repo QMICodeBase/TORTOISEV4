@@ -9,7 +9,7 @@ SET(USEOPENMP 1)
 
 
 if ( NOT DEFINED USECUDA)
-    SET(USECUDA 0)
+    SET(USECUDA 1)
 endif()
 if ( NOT DEFINED USE_VTK)
     SET(USE_VTK 0)
@@ -497,6 +497,9 @@ target_link_libraries(Combine3DImagesTo4D  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  
 
 #add_executable(BrukerBmatToTORTOISEBMTXT   ../src/tools/BrukerBmatToTORTOISEBMTXT/BrukerBmatToTORTOISEBMTXT.cxx ${SOURCES})
 #target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
+add_executable(Affine2Rigid   ../src/tools/AffineToRigid/affine_to_rigid.cxx ${SOURCES})
+target_link_libraries(Affine2Rigid ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
 
 IF(USE_VTK)

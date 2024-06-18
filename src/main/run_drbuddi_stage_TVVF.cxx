@@ -263,6 +263,7 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
         for(int met=0; met< Nmetrics;met++)
             metric_values[met]=0;
 
+
         for(int T=0;T<NTimePoints;T++)
         {
             float t= 1.*T/(NTimePoints-1);
@@ -297,6 +298,43 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
                 field_down= ComposeFields(settings->init_minv_const,field_down);
             }
 
+            if(this->settings->constrain)
+            {
+
+               // if(t>=0.25 && t<=0.75)
+                if(t!=0 && t!=1)
+                {
+                    auto aa= MultiplyImage(field_up,1./t);
+                    auto bb= MultiplyImage(field_down,1./(1-t));
+
+                    ContrainDefFields(aa,bb);
+
+                    field_up = MultiplyImage(aa,t);
+                    field_down = MultiplyImage(bb,1-t);
+
+                    /*
+                    aa=MultiplyImage(aa,t);
+                    bb=MultiplyImage(bb,1-t);
+                    auto du= MultiplyImage(field_up,-1);
+                    auto dd= MultiplyImage(field_down,-1);
+
+                    du = AddImages(aa,du);
+                    dd = AddImages(bb,dd);
+
+                    du = MultiplyImage(du,-2*fabs(t-0.5)) ;
+                    field_up = AddImages(aa,du);
+                    dd = MultiplyImage(dd,-2*fabs(t-0.5)) ;
+                    field_down = AddImages(bb,dd);
+                    */
+
+
+                   // field_up = GaussianSmoothImage(field_up,0.15);
+                   // field_down = GaussianSmoothImage(field_down,0.15);
+                }
+
+            }
+
+
             for(int met=0; met< Nmetrics;met++)
             {
                 CurrentImageType::Pointer warped_up_img = WarpImage(this->resampled_smoothed_up_images[met],field_up);
@@ -328,7 +366,7 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
                 }
                 if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCSK)
                 {
-                    metric_value = ComputeMetric_CCSK(warped_up_img,warped_down_img, warped_str_img_jac,updateFieldF_temp,updateFieldM_temp,0.5 );
+                    metric_value = ComputeMetric_CCSK(warped_up_img,warped_down_img, warped_str_img_jac,updateFieldF_temp,updateFieldM_temp,t );
                 }
                 if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CC)
                 {
@@ -352,7 +390,12 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
 
                 if(Nmetrics>1)
                 {
-                    AddToUpdateField(updateFieldF,updateFieldF_temp,this->settings->metrics[met].weight);               
+                    if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCSK)
+                    {
+                        AddToUpdateField(updateFieldF,updateFieldF_temp,this->settings->metrics[met].weight);
+                    }
+                    else
+                        AddToUpdateField(updateFieldF,updateFieldF_temp,this->settings->metrics[met].weight);
                 }
                 else
                 {
@@ -361,32 +404,81 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
 
             } //for met
 
-            updateFieldF=GaussianSmoothImage(updateFieldF,this->settings->update_gaussian_sigma);         
+
+            //TVVF needs more smoothing
+            updateFieldF=GaussianSmoothImage(updateFieldF,this->settings->update_gaussian_sigma*1.5);
+
 
             if(this->settings->restrct)
             {
-                RestrictPhase(updateFieldF,this->up_phase_vector);            
+                RestrictPhase(updateFieldF,this->up_phase_vector);
             }
 
+            // max disp vector is of norm 1
             ScaleUpdateField(updateFieldF,1);                             
 
-            if(this->settings->constrain)
-            {
-             //   ContrainDefFields(updateFieldF,updateFieldM);
-            }
 
+            //make the update velocity field diffeomorphic
             CurrentFieldType::Pointer updateFieldF_inv= InvertField(updateFieldF );
             updateFieldF=InvertField(updateFieldF_inv );
 
-            update_velocity_field[T]=updateFieldF;
+
+            // momentum on going in the same direction
+            if(update_velocity_field[T]==nullptr)
+                update_velocity_field[T]=updateFieldF;
+            else
+            {
+                update_velocity_field[T]= MultiplyImage(update_velocity_field[T],0.1);
+                updateFieldF= MultiplyImage(updateFieldF,0.9);
+                update_velocity_field[T]=AddImages(update_velocity_field[T],updateFieldF);
+            }
 
         } //T loop
 
+
+        //update field time domain gaussian smoothing
         for(int T=0;T<NTimePoints;T++)
         {
-            update_velocity_field[T]= MultiplyImage(update_velocity_field[T],this->settings->learning_rate);
-            this->velocity_field[T]= AddImages(this->velocity_field[T],update_velocity_field[T]);
-            this->velocity_field[T]=GaussianSmoothImage(this->velocity_field[T],this->settings->total_gaussian_sigma);
+            CUDAIMAGE::Pointer  toadd=nullptr;
+            if(T==0)
+            {
+                toadd= MultiplyImage(update_velocity_field[0],0.8);
+                auto temp =  MultiplyImage(update_velocity_field[1],0.2);
+                toadd=AddImages(toadd,temp);
+            }
+            else
+            {
+                if(T==NTimePoints-1)
+                {
+                    toadd= MultiplyImage(update_velocity_field[NTimePoints-1],0.8);
+                    auto temp =  MultiplyImage(update_velocity_field[NTimePoints-2],0.2);
+                    toadd=AddImages(toadd,temp);
+                }
+                else
+                {
+                    toadd= MultiplyImage(update_velocity_field[T],0.6);
+                    auto temp1= MultiplyImage(update_velocity_field[T-1],0.2);
+                    auto temp2= MultiplyImage(update_velocity_field[T+1],0.2);
+                    toadd=AddImages(toadd,temp1);
+                    toadd=AddImages(toadd,temp2);
+                }
+            }
+
+
+            toadd= MultiplyImage(toadd,this->settings->learning_rate);
+            this->velocity_field[T]= AddImages(this->velocity_field[T],toadd);
+            //this->velocity_field[T]=GaussianSmoothImage(this->velocity_field[T],this->settings->total_gaussian_sigma);
+            this->velocity_field[T]=GaussianSmoothImage(this->velocity_field[T],this->settings->update_gaussian_sigma/30.);
+        }
+
+        if(this->settings->constrain)
+        {
+            for(int T=0; T<NTimePoints/2; T++)
+            {
+                this->velocity_field[T] = AddImages(this->velocity_field[T],this->velocity_field[T+1+NTimePoints/2]);
+                this->velocity_field[T] = MultiplyImage(this->velocity_field[T],0.5);
+                this->velocity_field[T+1+ NTimePoints/2] = this->velocity_field[T] ;
+            }
         }
 
 

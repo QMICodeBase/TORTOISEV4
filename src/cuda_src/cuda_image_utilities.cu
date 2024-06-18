@@ -1460,6 +1460,114 @@ __device__ float3 InterpolateVF(cudaPitchedPtr *vf,float *xp,int NT)
     return disp;
 }
 
+
+__device__ float3 InterpolateVFAtT(cudaPitchedPtr *vf,float *xp, int T, int NT)
+{
+    float3 disp={0,0,0};
+
+
+    float iw = (d_dir[0]*xp[0]  + d_dir[3]*xp[1]  + d_dir[6]*xp[2])/ d_spc[0] ;
+    float jw = (d_dir[1]*xp[0]  + d_dir[4]*xp[1]  + d_dir[7]*xp[2])/ d_spc[1] ;
+    float kw = (d_dir[2]*xp[0]  + d_dir[5]*xp[1]  + d_dir[8]*xp[2])/ d_spc[2] ;
+
+
+    if(  !(iw<0 || iw> d_sz[0]-1 || jw<0 || jw> d_sz[1]-1 || kw<0 || kw> d_sz[2]-1 ))
+    {
+        int floor_x = __float2int_rd(iw);
+        int floor_y = __float2int_rd(jw);
+        int floor_z = __float2int_rd(kw);
+
+        int ceil_x = __float2int_ru(iw);
+        int ceil_y = __float2int_ru(jw);
+        int ceil_z = __float2int_ru(kw);
+
+
+        float xd= iw - floor_x;
+        float yd= jw - floor_y;
+        float zd= kw - floor_z;
+
+
+
+        float ia1[3],ib1[3],ia2[3],ib2[3], ja1[3],jb1[3],ja2[3],jb2[3];
+
+
+        {
+            cudaPitchedPtr update_field =vf[T];
+
+
+            size_t dpitch= update_field.pitch;
+            char *d_ptr= (char *)(update_field.ptr);
+            {
+                size_t dslicePitch= dpitch*d_sz[1]*floor_z;
+                char * slice_d= d_ptr+  dslicePitch;
+                {
+                    size_t dcolPitch= floor_y*dpitch;
+                    float * row_data= (float *)(slice_d+ dcolPitch);
+                    for(int mm=0;mm<3;mm++)
+                    {
+                        ia1[mm] = row_data[3*floor_x +mm];
+                        ja1[mm] = row_data[3*ceil_x +mm];
+                    }
+
+                }
+                {
+                    size_t dcolPitch= ceil_y*dpitch;
+                    float * row_data= (float *)(slice_d+ dcolPitch);
+                    for(int mm=0;mm<3;mm++)
+                    {
+                        ia2[mm] = row_data[3*floor_x +mm];
+                        ja2[mm] = row_data[3*ceil_x +mm];
+                    }
+                }
+            }
+            {
+                size_t dslicePitch= dpitch*d_sz[1]*ceil_z;
+                char * slice_d= d_ptr+  dslicePitch;
+                {
+                    size_t dcolPitch= floor_y*dpitch;
+                    float * row_data= (float *)(slice_d+ dcolPitch);
+                    for(int mm=0;mm<3;mm++)
+                    {
+                        ib1[mm] = row_data[3*floor_x +mm];
+                        jb1[mm] = row_data[3*ceil_x +mm];
+                    }
+                }
+                {
+                    size_t dcolPitch= ceil_y*dpitch;
+                    float * row_data= (float *)(slice_d+ dcolPitch);
+                    for(int mm=0;mm<3;mm++)
+                    {
+                        ib2[mm] = row_data[3*floor_x +mm];
+                        jb2[mm] = row_data[3*ceil_x +mm];
+                    }
+                }
+            }
+        }
+
+
+
+        float update[3];
+        for(int mm=0;mm<3;mm++)
+        {
+            float i1= ia1[mm]*(1-zd) + ib1[mm]*zd;
+            float i2= ia2[mm]*(1-zd) + ib2[mm]*zd;
+            float j1= ja1[mm]*(1-zd) + jb1[mm]*zd;
+            float j2= ja2[mm]*(1-zd) + jb2[mm]*zd;
+
+            float w1= i1*(1-yd) + i2*yd;
+            float w2= j1*(1-yd) + j2*yd;
+
+            update[mm]= w1*(1-xd) + w2*xd;
+        }
+        disp.x=update[0];
+        disp.y=update[1];
+        disp.z=update[2];
+    }
+
+    return disp;
+}
+
+
 __global__ void
 IntegrateVelocityField_kernel(cudaPitchedPtr *vf, cudaPitchedPtr output_field, float lowt,float hight, int NT)
 {
@@ -1547,7 +1655,6 @@ IntegrateVelocityField_kernel(cudaPitchedPtr *vf, cudaPitchedPtr output_field, f
 
         }
     }
-
 }
 
 
@@ -1591,6 +1698,179 @@ void IntegrateVelocityField_cuda(cudaPitchedPtr *velocity_field,
     gpuErrchk(cudaDeviceSynchronize());
 
 }
+
+
+
+
+
+
+
+
+
+
+
+__global__ void
+ConstrainVelocityFields_kernel(cudaPitchedPtr *vfield, cudaPitchedPtr *new_vfield, cudaPitchedPtr ufield,  int NT)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+
+    int halfT= NT/2;
+    float deltaT= 1./(NT-1);
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+        if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2])
+        {
+
+            float x[3], x0[3];
+            x[0]= (d_dir[0]*i  + d_dir[1]*j + d_dir[2]*k)* d_spc[0] ;
+            x[1]= (d_dir[3]*i  + d_dir[4]*j + d_dir[5]*k)* d_spc[1] ;
+            x[2]= (d_dir[6]*i  + d_dir[7]*j + d_dir[8]*k)* d_spc[2] ;
+
+            size_t upitch= ufield.pitch;
+            size_t uslicePitch= upitch*d_sz[1]*k;
+            size_t ucolPitch= j*upitch;
+            char *u_ptr= (char *)(ufield.ptr);
+            char * slice_u= u_ptr+  uslicePitch;
+            float * row_u= (float *)(slice_u+ ucolPitch);
+
+
+            size_t vpitch= vfield[halfT].pitch;
+            size_t vslicePitch= vpitch*d_sz[1]*k;
+            size_t vcolPitch= j*vpitch;
+            char *v_ptr= (char *)(vfield[halfT].ptr);
+            char * slice_v= v_ptr+  vslicePitch;
+            float * row_v= (float *)(slice_v+ vcolPitch);
+
+
+            x0[0]= x[0] + row_u[3*i+0];
+            x0[1]= x[1] + row_u[3*i+1];
+            x0[2]= x[2] + row_u[3*i+2];
+
+            for(int T=0;T<halfT;T++)
+            {
+
+                float curru[3];
+                curru[0]=x0[0];
+                curru[1]=x0[1];
+                curru[2]=x0[2];
+                for(int T2=0;T2<T;T2++)
+                {
+                    float3 udisp= InterpolateVFAtT(vfield,curru,T2,NT);
+                    curru[0]+= udisp.x * deltaT;
+                    curru[1]+= udisp.y * deltaT;
+                    curru[2]+= udisp.z * deltaT;
+                }
+                float3 udisp= InterpolateVFAtT(vfield,curru,T,NT);
+
+
+
+                float currd[3];
+                currd[0]=x[0] + deltaT * row_v[3*i+0];
+                currd[1]=x[1] + deltaT * row_v[3*i+1];
+                currd[2]=x[2] + deltaT * row_v[3*i+2];
+                for(int T2=0;T2<T;T2++)
+                {
+                    float3 ddisp= InterpolateVFAtT(vfield,currd,T2+halfT+1,NT);
+                    currd[0]+= ddisp.x * deltaT;
+                    currd[1]+= ddisp.y * deltaT;
+                    currd[2]+= ddisp.z * deltaT;
+                }
+                float3 ddisp= InterpolateVFAtT(vfield,currd,T+halfT+1,NT);
+
+                float3 disp;
+                disp.x= (udisp.x + ddisp.x)/2.;
+                disp.y= (udisp.y + ddisp.y)/2.;
+                disp.z= (udisp.z + ddisp.z)/2.;
+
+
+                int iuw = round((d_dir[0]*curru[0]  + d_dir[3]*curru[1]  + d_dir[6]*curru[2])/ d_spc[0]) ;
+                int juw = round((d_dir[1]*curru[0]  + d_dir[4]*curru[1]  + d_dir[7]*curru[2])/ d_spc[1]) ;
+                int kuw = round((d_dir[2]*curru[0]  + d_dir[5]*curru[1]  + d_dir[8]*curru[2])/ d_spc[2]) ;
+
+                int idw = round((d_dir[0]*currd[0]  + d_dir[3]*currd[1]  + d_dir[6]*currd[2])/ d_spc[0]) ;
+                int jdw = round((d_dir[1]*currd[0]  + d_dir[4]*currd[1]  + d_dir[7]*currd[2])/ d_spc[1]) ;
+                int kdw = round((d_dir[2]*currd[0]  + d_dir[5]*currd[1]  + d_dir[8]*currd[2])/ d_spc[2]) ;
+
+
+                size_t vupitch= new_vfield[T].pitch;
+                size_t vuslicePitch= vupitch*d_sz[1]*kuw;
+                size_t vucolPitch= juw*vupitch;
+                char *vu_ptr= (char *)(new_vfield[T].ptr);
+                char * slice_vu= vu_ptr+  vuslicePitch;
+                float * row_vu= (float *)(slice_vu+ vucolPitch);
+
+                size_t vdpitch= new_vfield[halfT+T+1].pitch;
+                size_t vdslicePitch= vdpitch*d_sz[1]*kdw;
+                size_t vdcolPitch= jdw*vdpitch;
+                char *vd_ptr= (char *)(new_vfield[halfT+T+1].ptr);
+                char * slice_vd= vd_ptr+  vdslicePitch;
+                float * row_vd= (float *)(slice_vd+ vdcolPitch);
+
+                row_vu[3*iuw+0] = disp.x;
+                row_vu[3*iuw+1] = disp.y;
+                row_vu[3*iuw+2] = disp.z;
+
+                row_vd[3*idw+0] = disp.x;
+                row_vd[3*idw+1] = disp.y;
+                row_vd[3*idw+2] = disp.z;
+            }
+        }
+    }
+}
+
+
+
+
+
+void ContrainVelocityFields_cuda(cudaPitchedPtr *vfield,
+                                 cudaPitchedPtr *new_vfield,
+                                 cudaPitchedPtr ufield,
+                                 int NT,
+                                 int3 data_sz,float3 data_spc,
+                                 float data_d00,  float data_d01,float data_d02,float data_d10,float data_d11,float data_d12,float data_d20,float data_d21,float data_d22,
+                                 float3 data_orig)
+{
+
+
+    float h_d_dir[]= {data_d00,data_d01,data_d02,data_d10,data_d11,data_d12,data_d20,data_d21,data_d22};
+    gpuErrchk(cudaMemcpyToSymbol(d_dir, &h_d_dir, 9 * sizeof(float)));
+
+    float h_d_orig[]= {data_orig.x,data_orig.y,data_orig.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_orig, &h_d_orig, 3 * sizeof(float)));
+
+    float h_d_spc[]= {data_spc.x,data_spc.y,data_spc.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_spc, &h_d_spc, 3 * sizeof(float)));
+
+    int h_d_sz[]= {data_sz.x,data_sz.y,data_sz.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
+
+
+
+
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
+
+    ConstrainVelocityFields_kernel<<< blockSize,gridSize>>>( vfield,new_vfield, ufield,  NT );
+
+
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+}
+
+
+
 
 
 __global__ void

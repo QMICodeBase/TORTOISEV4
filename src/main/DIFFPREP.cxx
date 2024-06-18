@@ -481,6 +481,13 @@ std::vector<float> DIFFPREP::choose_range(ImageType3D::Pointer b0_img,ImageType3
      //lim_arr[2]=moving_min;
      lim_arr[3]= moving_max;
 
+     if(fixed_signal[ind]<10)
+         lim_arr[0]/=100;
+     if(moving_max<10)
+         lim_arr[2]/=100;
+
+
+
      return lim_arr;
 }
 
@@ -1273,8 +1280,8 @@ void DIFFPREP::MotionAndEddy()
     if(Nepoch==0)
         iterative=false;
 
-    if(iterative && ! slice_to_volume && !outlier_replacement)
-        Nepoch=1;
+    //if(iterative  &&  ! slice_to_volume && !outlier_replacement)
+      //  Nepoch=1;
 
     if(Nvols < 20 )
     {
