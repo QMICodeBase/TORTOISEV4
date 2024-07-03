@@ -16,6 +16,7 @@
 void DRTAMAS_Diffeo::SetUpStages()
 {
     int Nstg= parser->getNumberOfStages();
+    int Nstr=parser->getNumberOfStructurals();
 
     if(Nstg==0)
     {
@@ -34,24 +35,44 @@ void DRTAMAS_Diffeo::SetUpStages()
             this->stages[st].total_gaussian_sigma=parser->GetTStd(st);            
 
             int Nmetrics= parser->GetNMetrics(st);
-            for(int m=0;m<Nmetrics;m++)
+            if(Nmetrics==0)
             {
-                DRTAMASMetric metric;
-                std::string metric_string = parser->GetMetricString(st,m);
-                if(metric_string=="DEV")
-                {
-                    metric.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
-                }
-                if(metric_string=="TR")
-                {
-                    metric.SetMetricType( DRTAMASMetricEnumeration::DTTR);
-                }
-                if(metric_string.find("CC")!=std::string::npos)
-                {
-                    metric.SetMetricType( DRTAMASMetricEnumeration::DTCC);
-                }                
+                DRTAMASMetric metric1;
+                metric1.SetMetricType( DRTAMASMetricEnumeration::DTTR);
+                this->stages[st].metrics.push_back(metric1);
+                DRTAMASMetric metric2;
+                metric2.SetMetricType( DRTAMASMetricEnumeration::DTDEV);
+                this->stages[st].metrics.push_back(metric2);
 
-                this->stages[st].metrics.push_back(metric);
+                if(Nstr!=0)
+                {
+                    DRTAMASMetric metric3;
+                    metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
+                    this->stages[st].metrics.push_back(metric3);
+                }
+            }
+            else
+            {
+                for(int m=0;m<Nmetrics;m++)
+                {
+                    DRTAMASMetric metric;
+                    std::string metric_string = parser->GetMetricString(st,m);
+                    if(metric_string=="DEV")
+                    {
+                        metric.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
+                    }
+                    if(metric_string=="TR")
+                    {
+                        metric.SetMetricType( DRTAMASMetricEnumeration::DTTR);
+                    }
+                    if(metric_string.find("CC")!=std::string::npos)
+                    {
+                        metric.SetMetricType( DRTAMASMetricEnumeration::DTCC);
+                    }
+
+                    this->stages[st].metrics.push_back(metric);
+                }
+
             }
         }
     }
