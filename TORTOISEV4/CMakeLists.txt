@@ -359,6 +359,9 @@ target_link_libraries(ComputeWSMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 add_executable(ComputeADMap  ../src/tools/ComputeADMap/compute_ad_map.cxx)
 target_link_libraries(ComputeADMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
+add_executable(ComputeSKMap  ../src/tools/ComputeSKMap/compute_sk_map.cxx)
+target_link_libraries(ComputeSKMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+
 add_executable(ComputeRDMap  ../src/tools/ComputeRDMap/compute_rd_map.cxx)
 target_link_libraries(ComputeRDMap ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
@@ -490,8 +493,8 @@ target_link_libraries(Combine3DImagesTo4D  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  
 #target_link_libraries(MultiplyFieldwithScalar ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
-#add_executable(ReorderDWIVolumes   ../src/tools/ReorderDWIVolumes/ReorderDWIVolumes.cxx ${SOURCES})
-#target_link_libraries(ReorderDWIVolumes ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+add_executable(ReorderDWIVolumes   ../src/tools/ReorderDWIVolumes/ReorderDWIVolumes.cxx ${SOURCES})
+target_link_libraries(ReorderDWIVolumes ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 

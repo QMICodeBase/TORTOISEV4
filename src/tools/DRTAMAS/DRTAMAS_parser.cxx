@@ -144,7 +144,7 @@ void DRTAMAS_PARSER::InitializeCommandLineOptions()
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "only_affine");
         option->SetDescription( description );
-        option->SetModule(6);
+        option->SetModule(0);
         this->AddOption( option );
     }
 
