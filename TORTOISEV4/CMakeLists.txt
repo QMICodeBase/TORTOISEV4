@@ -493,16 +493,16 @@ target_link_libraries(Combine3DImagesTo4D  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  
 #target_link_libraries(MultiplyFieldwithScalar ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
-add_executable(ReorderDWIVolumes   ../src/tools/ReorderDWIVolumes/ReorderDWIVolumes.cxx ${SOURCES})
-target_link_libraries(ReorderDWIVolumes ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+#add_executable(ReorderDWIVolumes   ../src/tools/ReorderDWIVolumes/ReorderDWIVolumes.cxx ${SOURCES})
+#target_link_libraries(ReorderDWIVolumes ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 
 #add_executable(BrukerBmatToTORTOISEBMTXT   ../src/tools/BrukerBmatToTORTOISEBMTXT/BrukerBmatToTORTOISEBMTXT.cxx ${SOURCES})
 #target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
-add_executable(Affine2Rigid   ../src/tools/AffineToRigid/affine_to_rigid.cxx ${SOURCES})
-target_link_libraries(Affine2Rigid ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+#add_executable(Affine2Rigid   ../src/tools/AffineToRigid/affine_to_rigid.cxx ${SOURCES})
+#target_link_libraries(Affine2Rigid ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
 
 IF(USE_VTK)
