@@ -17,7 +17,7 @@ extern __constant__ float d_spc[3];
 const int bSize2=1024 ;
 const int gSize2=24 ;
 
-#define DPHI 0.05
+#define DPHI 0.1
 
 
 extern __global__ void

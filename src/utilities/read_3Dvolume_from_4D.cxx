@@ -129,7 +129,11 @@ ImageType3D::Pointer read_3D_volume_from_4D(std::string fname, int vol_id)
       case NIFTI_TYPE_FLOAT64:
         bytepix=8;
         break;
+      case NIFTI_TYPE_UINT16:
+        bytepix=2;
+        break;
       default:
+        std::cout<<"NIFTI datatype not supported. Exiting..."<<std::endl;
         break;
     }
 
@@ -151,6 +155,7 @@ ImageType3D::Pointer read_3D_volume_from_4D(std::string fname, int vol_id)
      double *data_double=nullptr;
      int  *data_int=nullptr;
      short *data_short=nullptr;
+     unsigned short *data_ushort=nullptr;
      char *data_char=nullptr;
 
      
@@ -159,6 +164,22 @@ ImageType3D::Pointer read_3D_volume_from_4D(std::string fname, int vol_id)
          std::cout<< "error seeking file"<<std::endl;
      }
 
+     if(component_type == NIFTI_TYPE_UINT16)
+     {
+         data_ushort= new unsigned short[Npixelspervolume];
+         if(fread(data_ushort,sizeof(unsigned short),Npixelspervolume,fp)!=Npixelspervolume)
+         {
+             std::cout<<"Could not read file " << fname << std::endl;
+         }
+         for(int i=0;i<Npixelspervolume;i++)
+         {
+             if(change_endian)
+                 boost::endian::endian_reverse_inplace(data_ushort[i]);
+             data[i]=data_ushort[i];
+         }
+         delete[] data_ushort;
+         data_ushort=nullptr;
+     }
      if(component_type == NIFTI_TYPE_INT8)
      {
          data_char= new char[Npixelspervolume];
