@@ -323,8 +323,8 @@ add_executable(ReorientImage3D ../src/tools/ReorientImage3D/reorient_image3d.cxx
 target_link_libraries(ReorientImage3D ${ITK_LIBRARIES}  ${Boost_LIBRARIES})
 
 
-add_executable(ReorientImageDEC ../src/tools/ReorientImage3D/reorient_imageDEC.cxx  ../src/tools/ReorientImage3D/reorient_image_parser.cxx  ${SOURCES})
-target_link_libraries(ReorientImageDEC ${ITK_LIBRARIES}  ${Boost_LIBRARIES})
+#add_executable(ReorientImageDEC ../src/tools/ReorientImage3D/reorient_imageDEC.cxx  ../src/tools/ReorientImage3D/reorient_image_parser.cxx  ${SOURCES})
+#target_link_libraries(ReorientImageDEC ${ITK_LIBRARIES}  ${Boost_LIBRARIES})
 
 
 add_executable(EstimateExperimentalDeviationScalar ../src/tools/EstimateExperimentalDeviationScalar/estimate_experimental_deviation_scalar.cxx ../src/tools/EstimateExperimentalDeviationScalar/estimate_experimental_deviation_scalar_parser.cxx  ../src/external_src/cmpfit-1.3a/mpfit.c ../src/tools/EstimateTensor/DTIModel.cxx ${SOURCES})
