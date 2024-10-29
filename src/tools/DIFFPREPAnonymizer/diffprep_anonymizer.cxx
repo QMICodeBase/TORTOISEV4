@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <boost/endian/conversion.hpp>
 #include <boost/math/special_functions/round.hpp>
+#include <boost/filesystem.hpp>
 
 
 #include "itkImportImageFilter.h"
@@ -221,6 +222,7 @@ bool CheckIfDICOM(std::string fname)
 std::vector<fs::path> getDICOMPaths(fs::path input_path)
 {
     std::vector<fs::path> series_directory;
+
 
     fs::recursive_directory_iterator it(input_path);
     fs::recursive_directory_iterator endit;

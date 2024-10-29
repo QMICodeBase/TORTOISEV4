@@ -74,8 +74,28 @@ float ComputeMetric_DEV(const CUDAIMAGE::Pointer up_img_or, const CUDAIMAGE::Poi
 }
 
 
+float ComputeMetric_DEV_ONLY(const CUDAIMAGE::Pointer fixed_img, const CUDAIMAGE::Pointer moving_img)
+{
+    CUDAIMAGE::Pointer up_img= CUDAIMAGE::New();
+    up_img->DuplicateFromCUDAImage(fixed_img);
+    CUDAIMAGE::Pointer down_img= CUDAIMAGE::New();
+    down_img->DuplicateFromCUDAImage(moving_img);
+
+    ComputeDeviatoricTensor_cuda(up_img->getFloatdata(),   up_img->sz);
+    ComputeDeviatoricTensor_cuda(down_img->getFloatdata(),   down_img->sz);
+
+    
+    float metric_value;
+
+    ComputeMetric_DEV_ONLY_cuda(up_img->getFloatdata(), down_img->getFloatdata(),
+                             up_img->sz, 
+                             metric_value
+                             );
 
 
+    return metric_value;
+
+}
 
 
 

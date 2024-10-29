@@ -3403,15 +3403,11 @@ void FINALDATA::GenerateGradNonlinOutput()
         std::string final_folder= fs::path(this->output_name).parent_path().string();
 
         {
-            std::string name = data_names[0];
-            fs::path path(name);
-            std::string basename= fs::path(path).filename().string();
-            basename=basename.substr(0,basename.rfind(".nii"));
             std::string gb_name;
             if(output_gradnonlin_type=="vbmat")
-                gb_name= final_folder + "/"+basename + "_TORTOISE_final_vbmat.nii";
+                gb_name= this->output_name.substr(0,this->output_name.rfind(".nii")) + "_vbmat.nii";
             else
-                gb_name= final_folder + "/"+basename + "_TORTOISE_final_graddev.nii";
+                gb_name= this->output_name.substr(0,this->output_name.rfind(".nii")) + "_graddev.nii";
 
             for(int v=0;v<graddev_vbmat_img_up.size();v++)
             {

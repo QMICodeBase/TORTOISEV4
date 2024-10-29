@@ -25,4 +25,16 @@ void ComputeMetric_DEV_cuda(cudaPitchedPtr fixed_img, cudaPitchedPtr moving_img,
 
 void ComputeDeviatoricTensor_cuda(cudaPitchedPtr img,   int3 data_sz);
 
+
+
+
+
+float ComputeMetric_DEV_ONLY(const CUDAIMAGE::Pointer fixed_img, const CUDAIMAGE::Pointer moving_img);
+
+void ComputeMetric_DEV_ONLY_cuda(cudaPitchedPtr fixed_img, cudaPitchedPtr moving_img,
+		   int3 data_sz, 
+           float &metric_value);
+
+
+
 #endif

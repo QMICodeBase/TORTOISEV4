@@ -1054,6 +1054,43 @@ void TORTOISE::AlignB0ToReorientation()
             std::cout<<"Could not compute the rigid transformation from the structural imageto b=0 image... Starting multistart.... This could take a while"<<std::endl;
             std::cout<<"Better be safe than sorry, right?"<<std::endl;
 
+            RigidTransformType::Pointer rigid_trans1a= RigidRegisterImagesEuler( b0_img, target_img,  "CC",parser->getRigidLR());
+            RigidTransformType::ParametersType b1= rigid_trans1a->GetParameters();
+
+            auto tra1=  rigid_trans1a->GetMatrix().GetTranspose() * rigid_trans1a->GetTranslation().GetVnlVector();
+            p1[0]= params1[0]+ b1[0];
+            p1[1]= params1[1]+ b1[1];
+            p1[2]= params1[2]+ b1[2];
+            p1[3]= params1[3] + tra1[0];
+            p1[3]= params1[4] + tra1[1];
+            p1[3]= params1[5] + tra1[2];
+
+            double diff1= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] +
+                   p1[3]*p1[3]/400. + p1[4]*p1[4]/400. + p1[5]*p1[5]/400. ;
+
+
+            RigidTransformType::Pointer rigid_trans2a= RigidRegisterImagesEuler( b0_img, target_img, "MI",parser->getRigidLR());
+            RigidTransformType::ParametersType b2= rigid_trans2a->GetParameters();
+
+            auto tra2= rigid_trans2a->GetMatrix().GetTranspose() * rigid_trans2a->GetTranslation().GetVnlVector();
+            p1[0]= params2[0]+ b2[0];
+            p1[1]= params2[1]+ b2[1];
+            p1[2]= params2[2]+ b2[2];
+            p1[3]= params2[3] + tra2[0];
+            p1[3]= params2[4] + tra2[1];
+            p1[3]= params2[5] + tra2[2];
+
+            double diff2= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] +
+                   p1[3]*p1[3]/400. + p1[4]*p1[4]/400. + p1[5]*p1[5]/400. ;
+
+            std::string new_metric_type="MI";
+            if(diff1< diff2)
+            {
+                (*stream)<< "CC was determined to be more robust than MI. Switching..."<<std::endl;
+                new_metric_type="CC";
+            }
+
+
 
             std::vector<float> new_res; new_res.resize(3);
             new_res[0]= b0_img->GetSpacing()[0] * 2;
@@ -1066,8 +1103,8 @@ void TORTOISE::AlignB0ToReorientation()
             new_res[2]= target_img->GetSpacing()[2] * 2;
             ImageType3D::Pointer str2= resample_3D_image(target_img,new_res,dummy,"Linear");
 
-            rigid_trans1=MultiStartRigidSearch(str2,b02);
-            b0_to_str_trans= RigidRegisterImagesEuler( target_img, b0_img,   "MI",parser->getRigidLR()/2.,rigid_trans1);
+            rigid_trans1=MultiStartRigidSearch(str2,b02,new_metric_type);
+            b0_to_str_trans= RigidRegisterImagesEuler( target_img, b0_img, new_metric_type  ,parser->getRigidLR()/2.,rigid_trans1);
         }
         (*stream)<<"Final transformation: " << b0_to_str_trans->GetParameters()<<std::endl;
 
@@ -1387,12 +1424,12 @@ void TORTOISE::CheckAndCopyInputData()
             bool json_exists =  fs::exists(json_name);
             if(json_exists)
             {
-                fs::copy_file(input_basename+std::string(".json"), this->proc_infos[PE].json_name, fs::copy_option::overwrite_if_exists );
+                fs::copy_file(input_basename+std::string(".json"), this->proc_infos[PE].json_name, fs::copy_options::overwrite_existing );
             }
             else
             {
                 json_name=input_basename + std::string(".JSON");
-                fs::copy_file(json_name, this->proc_infos[PE].json_name, fs::copy_option::overwrite_if_exists );
+                fs::copy_file(json_name, this->proc_infos[PE].json_name, fs::copy_options::overwrite_existing );
             }
 
 

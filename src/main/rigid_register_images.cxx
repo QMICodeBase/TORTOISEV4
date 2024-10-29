@@ -209,7 +209,7 @@ QuadraticTransformType::Pointer RigidRegisterImages(ImageType3D::Pointer fixed_i
 }
 
 
-RigidTransformType::Pointer MultiStartRigidSearch(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img)
+RigidTransformType::Pointer MultiStartRigidSearch(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string metric_type)
 {
     typedef double RealType;
     typedef float  PixelType;
@@ -230,9 +230,18 @@ RigidTransformType::Pointer MultiStartRigidSearch(ImageType3D::Pointer fixed_img
     typedef itk::Vector<float, 3>                              VectorType;
     typedef itk::MultiStartOptimizerv4         OptimizerType;
     typedef  OptimizerType::ScalesType ScalesType;
-    typedef itk::MattesMutualInformationImageToImageMetricv4<ImageType3D, ImageType3D, ImageType3D> MetricType;
+    //typedef itk::MattesMutualInformationImageToImageMetricv4<ImageType3D, ImageType3D, ImageType3D> MetricType;
+
+
+    typedef itk::MattesMutualInformationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType3;
+    typedef itk::CorrelationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType2;
+    using MetricType =itk::ImageToImageMetricv4<ImageType3D,ImageType3D> ;
+
     typedef itk::RegistrationParameterScalesFromPhysicalShift<MetricType>        RegistrationParameterScalesFromPhysicalShiftType;
     typedef  itk::ConjugateGradientLineSearchOptimizerv4 LocalOptimizerType;
+
+
+
 
 
     VectorType ccg1,ccg2;
@@ -295,8 +304,26 @@ RigidTransformType::Pointer MultiStartRigidSearch(ImageType3D::Pointer fixed_img
 
     OptimizerType::Pointer  mstartOptimizer = OptimizerType::New();
     MetricType::ParametersType newparams(  affine1->GetParameters() );
-    MetricType::Pointer mimetric = MetricType::New();
-    mimetric->SetNumberOfHistogramBins( mibins );
+
+
+
+
+
+    MetricType3::Pointer m= MetricType3::New();
+    m->SetNumberOfHistogramBins(mibins);
+
+    MetricType2::Pointer m2= MetricType2::New();
+
+
+    MetricType::Pointer         mimetric        = nullptr;
+    if(metric_type=="CC")
+        mimetric=m2;
+    else
+        mimetric=m;
+
+
+    //MetricType::Pointer mimetric = MetricType::New();
+    //mimetric->SetNumberOfHistogramBins( mibins );
     mimetric->SetFixedImage( image1 );
     mimetric->SetMovingImage( image2 );
     mimetric->SetMovingTransform( affinesearch );

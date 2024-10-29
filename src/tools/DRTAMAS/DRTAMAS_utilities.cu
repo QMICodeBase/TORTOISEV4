@@ -461,7 +461,6 @@ ExpTensor_kernel(cudaPitchedPtr tens, cudaPitchedPtr output,  const int3 d_sz )
                 row_o[6*i+3] = final[1][1];
                 row_o[6*i+4] = final[1][2];
                 row_o[6*i+5] = final[2][2];
-
            }
     }
 }
@@ -478,6 +477,98 @@ void  ExpTensor_cuda(cudaPitchedPtr tens, cudaPitchedPtr output, const int3 data
     gpuErrchk(cudaDeviceSynchronize());
 
 }
+
+
+
+__global__ void
+RotateTensors_kernel(cudaPitchedPtr tens, cudaPitchedPtr output,  const int3 d_sz , float *drotmat)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+            if(i<d_sz.x && j <d_sz.y && k<d_sz.z)
+            {
+                size_t opitch= output.pitch;
+                size_t oslicePitch= opitch*d_sz.y*k;
+                size_t ocolPitch= j*opitch;
+                char *o_ptr= (char *)(output.ptr);
+                char * slice_o= o_ptr+  oslicePitch;
+                float * row_o= (float *)(slice_o+ ocolPitch);
+
+                size_t tpitch= tens.pitch;
+                size_t tslicePitch= tpitch*d_sz.y*k;
+                size_t tcolPitch= j*tpitch;
+                char *t_ptr= (char *)(tens.ptr);
+                char * slice_t= t_ptr+  tslicePitch;
+                float * row_t= (float *)(slice_t+ tcolPitch);
+
+                float vals[3]={0};
+                float vecs[3][3]={0};
+                float mat[3][3];
+                mat[0][0]=row_t[6*i+0];mat[0][1]=row_t[6*i+1];mat[0][2]=row_t[6*i+2];
+                mat[1][0]=row_t[6*i+1];mat[1][1]=row_t[6*i+3];mat[1][2]=row_t[6*i+4];
+                mat[2][0]=row_t[6*i+2];mat[2][1]=row_t[6*i+4];mat[2][2]=row_t[6*i+5];
+                
+                
+                float R[3][3]={0};
+                R[0][0]= drotmat[0]; R[0][1]= drotmat[1]; R[0][2]= drotmat[2];
+                R[1][0]= drotmat[3]; R[1][1]= drotmat[4]; R[1][2]= drotmat[5];
+                R[2][0]= drotmat[6]; R[2][1]= drotmat[7]; R[2][2]= drotmat[8];  
+                
+                float RT[3][3]={0};
+                MatrixTranspose(R,RT);              
+                
+                float temp[3][3]={0};
+                float final[3][3]={0};
+                MatrixMultiply(RT,mat,temp);
+                MatrixMultiply(temp,R,final);
+                
+                row_o[6*i+0] = final[0][0];
+                row_o[6*i+1] = final[0][1];
+                row_o[6*i+2] = final[0][2];
+                row_o[6*i+3] = final[1][1];
+                row_o[6*i+4] = final[1][2];
+                row_o[6*i+5] = final[2][2];
+           }
+    }
+}
+
+
+
+void RotateTensors_cuda(cudaPitchedPtr tens, cudaPitchedPtr output, const int3 data_sz, float rotmat_arr[] )
+{
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+
+    ExpTensor_kernel<<< blockSize,gridSize>>>(tens,output,data_sz);
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+        
+    float *d_rotmat;
+    cudaMalloc((void**)&d_rotmat, sizeof(float)*9);
+    cudaMemcpy(d_rotmat, rotmat_arr, sizeof(float)*9, cudaMemcpyHostToDevice);
+    
+
+    RotateTensors_kernel<<< blockSize,gridSize>>>(tens,output,data_sz, d_rotmat);
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+    
+    cudaFree(d_rotmat);
+
+}
+
+
+
+
+
+
+
+
+
 
 
 #endif

@@ -70,9 +70,9 @@ set(Boost_USE_MULTITHREADED      ON)
 set(Boost_USE_STATIC_RUNTIME    ON)
 set(Boost_USE_STATIC_LIBS   ON)
 set(Boost_NO_BOOST_CMAKE ON)
-set(BOOST_ROOT /usr/local/boost176)
-set(Boost_LIBRARY_DIRS /usr/local/boost176/lib)
-set(Boost_INCLUDE_DIRS /usr/local/boost176/include)
+set(BOOST_ROOT /usr/local/boost186)
+set(Boost_LIBRARY_DIRS /usr/local/boost186/lib)
+set(Boost_INCLUDE_DIRS /usr/local/boost186/include)
 find_package(Boost COMPONENTS iostreams filesystem system REQUIRED)
 
 if(Boost_FOUND)
@@ -170,6 +170,10 @@ IF(USECUDA)
      add_executable(DRTAMAS_cuda  ../src/tools/DRTAMAS/compute_metric_dev.cu ../src/tools/DRTAMAS/compute_metric_dev.cxx   ../src/cuda_src/compute_metric.cu ../src/cuda_src/compute_metric.cxx ../src/cuda_src/warp_image.cu ../src/cuda_src/warp_image.cxx  ../src/cuda_src/gaussian_smooth_image.cu ../src/cuda_src/gaussian_smooth_image.cxx ../src/tools/DRTAMAS/run_drtamas_stage.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities.cu   ../src/tools/DRTAMAS/DRTAMAS_Diffeo.cxx ../src/cuda_src/resample_image.cu ../src/cuda_src/resample_image.cxx ../src/cuda_src/cuda_image_utilities.cu ../src/cuda_src/cuda_image_utilities.cxx ../src/cuda_src/cuda_image.cxx ../src/main/rigid_register_images.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/DRTAMAS/DRTAMAS_main.cxx ../src/tools/DRTAMAS/DRTAMAS.cxx ../src/tools/DRTAMAS/DRTAMAS_parser.cxx   ${SOURCES} )
      target_include_directories(DRTAMAS_cuda   PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
      target_link_libraries(DRTAMAS_cuda   ${ITK_LIBRARIES} ${Boost_LIBRARIES}    -static-libgcc -static-libstdc++ libc.a -lgcc)
+
+ #    add_executable(DRTAMASRigid_cuda  ../src/cuda_src/rigid_transform_image.cu ../src/cuda_src/rigid_transform_image.cxx   ../src/tools/DRTAMAS/run_drtamas_stage_rigid.cxx  ../src/tools/DRTAMAS/compute_metric_dev.cu ../src/tools/DRTAMAS/compute_metric_dev.cxx   ../src/cuda_src/compute_metric.cu ../src/cuda_src/compute_metric.cxx   ../src/cuda_src/gaussian_smooth_image.cu ../src/cuda_src/gaussian_smooth_image.cxx  ../src/tools/DRTAMAS/DRTAMAS_utilities.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities.cu   ../src/tools/DRTAMAS/DRTAMASRigid_Bulk.cxx ../src/cuda_src/resample_image.cu ../src/cuda_src/resample_image.cxx ../src/cuda_src/cuda_image_utilities.cu ../src/cuda_src/cuda_image_utilities.cxx ../src/cuda_src/cuda_image.cxx  ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/DRTAMAS/DRTAMASRigid_main.cxx ../src/tools/DRTAMAS/DRTAMASRigid.cxx ../src/tools/DRTAMAS/DRTAMAS_parser.cxx   ${SOURCES} )
+ #    target_include_directories(DRTAMASRigid_cuda   PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+ #    target_link_libraries(DRTAMASRigid_cuda   ${ITK_LIBRARIES} ${Boost_LIBRARIES}    -static-libgcc -static-libstdc++ libc.a -lgcc)
 
 
 
@@ -318,6 +322,9 @@ target_link_libraries(ReorientImage ${ITK_LIBRARIES}  ${Boost_LIBRARIES})
 add_executable(ReorientImage3D ../src/tools/ReorientImage3D/reorient_image3d.cxx  ../src/tools/ReorientImage3D/reorient_image_parser.cxx  ${SOURCES})
 target_link_libraries(ReorientImage3D ${ITK_LIBRARIES}  ${Boost_LIBRARIES})
 
+
+add_executable(ReorientImageDEC ../src/tools/ReorientImage3D/reorient_imageDEC.cxx  ../src/tools/ReorientImage3D/reorient_image_parser.cxx  ${SOURCES})
+target_link_libraries(ReorientImageDEC ${ITK_LIBRARIES}  ${Boost_LIBRARIES})
 
 
 add_executable(EstimateExperimentalDeviationScalar ../src/tools/EstimateExperimentalDeviationScalar/estimate_experimental_deviation_scalar.cxx ../src/tools/EstimateExperimentalDeviationScalar/estimate_experimental_deviation_scalar_parser.cxx  ../src/external_src/cmpfit-1.3a/mpfit.c ../src/tools/EstimateTensor/DTIModel.cxx ${SOURCES})

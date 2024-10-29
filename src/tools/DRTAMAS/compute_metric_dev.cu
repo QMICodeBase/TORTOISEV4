@@ -757,6 +757,128 @@ void ComputeMetric_DEV_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
 
 
+
+
+
+__global__ void
+ComputeMetric_DEV_ONLY_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
+                            cudaPitchedPtr metric_image)
+{
+    uint ii2 = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint k = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int i=PER_GROUP*ii2;i<PER_GROUP*ii2+PER_GROUP;i++)
+    {
+        if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2])
+        {
+            {                
+
+
+                size_t fpitch= up_img.pitch;
+                size_t fslicePitch= fpitch*d_sz[1]*k;
+                size_t fcolPitch= j*fpitch;
+                char *f_ptr= (char *)(up_img.ptr);
+                char * slice_f= f_ptr+  fslicePitch;
+                float * row_f= (float *)(slice_f+ fcolPitch);
+
+                size_t mpitch= down_img.pitch;
+                size_t mslicePitch= mpitch*d_sz[1]*k;
+                size_t mcolPitch= j*mpitch;
+                char *m_ptr= (char *)(down_img.ptr);
+                char * slice_m= m_ptr+  mslicePitch;
+                float * row_m= (float *)(slice_m+ mcolPitch);
+
+
+                size_t metpitch= metric_image.pitch;
+                size_t metslicePitch= metpitch*d_sz[1]*k;
+                size_t metcolPitch= j*metpitch;
+                char *met_ptr= (char *)(metric_image.ptr);
+                char * slice_met= met_ptr+  metslicePitch;
+                float * row_metric= (float *)(slice_met+ metcolPitch);
+
+
+                //////////////////////////at x/////////////////////////////////
+                {
+
+
+                    /////////////////// Metric computation////////////////
+                    float F[3][3], M[3][3];
+                    F[0][0]=row_f[6*i+0]; F[0][1]=row_f[6*i+1]; F[0][2]=row_f[6*i+2];
+                    F[1][0]=row_f[6*i+1]; F[1][1]=row_f[6*i+3]; F[1][2]=row_f[6*i+4];
+                    F[2][0]=row_f[6*i+2]; F[2][1]=row_f[6*i+4]; F[2][2]=row_f[6*i+5];
+
+                    M[0][0]=row_m[6*i+0]; M[0][1]=row_m[6*i+1]; M[0][2]=row_m[6*i+2];
+                    M[1][0]=row_m[6*i+1]; M[1][1]=row_m[6*i+3]; M[1][2]=row_m[6*i+4];
+                    M[2][0]=row_m[6*i+2]; M[2][1]=row_m[6*i+4]; M[2][2]=row_m[6*i+5];
+
+
+                    float metric_val = (F[0][0]-M[0][0])*(F[0][0]-M[0][0])+
+                                     2*(F[0][1]-M[0][1])*(F[0][1]-M[0][1])+
+                                     2*(F[0][2]-M[0][2])*(F[0][2]-M[0][2])+
+                                       (F[1][1]-M[1][1])*(F[1][1]-M[1][1])+
+                                     2*(F[1][2]-M[1][2])*(F[1][2]-M[1][2])+
+                                       (F[2][2]-M[2][2])*(F[2][2]-M[2][2]);
+
+
+                    metric_val=sqrt(metric_val);
+                    row_metric[i]=metric_val;
+                 }
+
+            }
+        }
+     }
+}
+
+
+
+
+
+
+void ComputeMetric_DEV_ONLY_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
+		   int3 data_sz, 
+           float &metric_value)
+{
+
+     int h_d_sz[]= {data_sz.x,data_sz.y,data_sz.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
+
+
+    cudaPitchedPtr metric_image={0};
+    cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
+    cudaMalloc3D(&metric_image, extent);
+    cudaMemset3D(metric_image,0,extent);
+
+
+    const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+
+
+    ComputeMetric_DEV_ONLY_kernel<<< blockSize,gridSize>>>( up_img, down_img, metric_image);
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+
+
+    float* dev_out;
+    float out;
+    cudaMalloc((void**)&dev_out, sizeof(float)*gSize2);
+
+    ScalarFindSum<<<gSize2, bSize2>>>((float *)metric_image.ptr, metric_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+    cudaDeviceSynchronize();
+    ScalarFindSum<<<1, bSize2>>>(dev_out, gSize2, dev_out);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+    cudaFree(dev_out);
+    metric_value=out/data_sz.x/data_sz.y/data_sz.z;
+
+    cudaFree(metric_image.ptr);
+}
+
+
+
+
 void ComputeDeviatoricTensor_cuda(cudaPitchedPtr img,   int3 data_sz)
 {
     int h_d_sz[]= {data_sz.x,data_sz.y,data_sz.z};

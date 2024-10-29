@@ -8,6 +8,7 @@
 #include <boost/lexical_cast.hpp>
 #include <fstream>
 #include <iostream>
+#include <algorithm>
 
 class RegistrationSettings
 {

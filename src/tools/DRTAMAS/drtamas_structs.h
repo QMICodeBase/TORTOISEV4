@@ -5,6 +5,8 @@
 #include "defines.h"
 #include "cuda_image.h"
 
+#include "TORTOISE.h"
+
 
 enum DRTAMASMetricEnumeration
 {
@@ -53,6 +55,9 @@ struct DRTAMASStageSettings
     CUDAIMAGE::Pointer init_minv{nullptr};
     CUDAIMAGE::Pointer output_finv{nullptr};
     CUDAIMAGE::Pointer output_minv{nullptr};
+    using RigidTransformType=TORTOISE::RigidTransformType;
+
+    RigidTransformType::Pointer rigid_trans{nullptr};
 
     std::vector<DRTAMASMetric> metrics;
 

@@ -163,4 +163,30 @@ CUDAIMAGE::Pointer  ExpTensor(CUDAIMAGE::Pointer tensor_img)
 }
 
 
+CUDAIMAGE::Pointer  RotateTensors(CUDAIMAGE::Pointer tensor_img,TransformType::Pointer rigid_trans)
+{
+    cudaPitchedPtr d_output={0};
+
+    cudaExtent extent =  make_cudaExtent(tensor_img->components_per_voxel*sizeof(float)*tensor_img->sz.x,tensor_img->sz.y,tensor_img->sz.z);
+    cudaMalloc3D(&d_output, extent);
+    cudaMemset3D(d_output,0,extent);
+    
+    
+    TransformType::MatrixType mat= rigid_trans->GetMatrix();        
+    float mat_arr[9]={mat(0,0),mat(0,1),mat(0,2),mat(1,0),mat(1,1),mat(1,2),mat(2,0),mat(2,1),mat(2,2)};
+
+
+    RotateTensors_cuda(tensor_img->getFloatdata(), d_output,  tensor_img->sz,  mat_arr);
+
+    CUDAIMAGE::Pointer output = CUDAIMAGE::New();
+    output->sz=tensor_img->sz;
+    output->dir=tensor_img->dir;
+    output->orig=tensor_img->orig;
+    output->spc=tensor_img->spc;
+    output->components_per_voxel= tensor_img->components_per_voxel;
+    output->SetFloatDataPointer( d_output);
+    return output;
+}
+
+
 #endif
