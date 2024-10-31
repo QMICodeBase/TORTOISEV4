@@ -116,7 +116,7 @@ void DRTAMAS::Step2_WriteImages()
 
 
     {
-        itk::ImageRegionIteratorWithIndex<DTMatrixImageType> it(this->fixed_tensor,this->fixed_tensor->GetLargestPossibleRegion());
+        itk::ImageRegionIteratorWithIndex<DisplacementFieldType> it(comb_field,comb_field->GetLargestPossibleRegion());
         for(it.GoToBegin();!it.IsAtEnd();++it)
         {
             ImageType3D::IndexType ind3 = it.GetIndex();
@@ -247,7 +247,27 @@ void DRTAMAS::Step0_AffineRegistration()
     }
 
 
-    RigidTransformType::Pointer rigid_trans= RigidRegisterImagesEuler( fixed_TR, moving_TR, "MI", 0.5);
+    AffineTransformType::Pointer transform= AffineTransformType::New();
+
+    if(parser->getInitialRigidTransform()=="")
+    {
+        RigidTransformType::Pointer rigid_trans=RigidRegisterImagesEuler( fixed_TR, moving_TR, "MI", 0.5);
+        transform->SetTranslation(rigid_trans->GetTranslation());
+        transform->SetOffset(rigid_trans->GetOffset());
+        transform->SetFixedParameters(rigid_trans->GetFixedParameters());
+        transform->SetMatrix(rigid_trans->GetMatrix());
+    }
+    else
+    {
+
+        itk::TransformFileReader::Pointer reader=itk::TransformFileReader::New();
+        reader->SetFileName(parser->getInitialRigidTransform());
+        reader->Update();
+        typedef itk::TransformFileReader::TransformListType * TransformListType;
+        TransformListType transforms = reader->GetTransformList();
+        itk::TransformFileReader::TransformListType::const_iterator it = transforms->begin();
+        transform = static_cast<AffineTransformType*>((*it).GetPointer());
+    }
 
 
 
@@ -258,17 +278,14 @@ void DRTAMAS::Step0_AffineRegistration()
     OptimizerType::Pointer      optimizer     = OptimizerType::New();
     MetricType::Pointer         metric        = MetricType::New();
     RegistrationType::Pointer   registration  = RegistrationType::New();
-    AffineTransformType::Pointer transform= AffineTransformType::New();
+
 
     registration->SetMetric(        metric        );
     registration->SetOptimizer(     optimizer     );
     metric->SetVirtualDomainFromImage( fixed_TR );
     metric->SetNumberOfHistogramBins(50 );
 
-    transform->SetTranslation(rigid_trans->GetTranslation());
-    transform->SetOffset(rigid_trans->GetOffset());
-    transform->SetFixedParameters(rigid_trans->GetFixedParameters());
-    transform->SetMatrix(rigid_trans->GetMatrix());
+
 
     registration->SetMetricSamplingStrategy(RegistrationType::MetricSamplingStrategyEnum::NONE);
     registration->SetInitialTransform(transform);

@@ -93,20 +93,29 @@ int main( int argc , char * argv[] )
     {
         index_old[2]=k;
         index_new[2]=k+pad_low;
-        for(int j=0;j<orig_size[1];j++)
-        {
-            index_old[1]=j;
-            index_new[1]=j+pad_top;
-            for(int i=0;i<orig_size[0];i++)
-            {
-                index_old[0]=i;
-                index_new[0]=i+pad_left;
 
-                for(int v=0;v<orig_size[3];v++)
+        if(index_new[2]>=0 && index_new[2]<new_size[2])
+        {
+            for(int j=0;j<orig_size[1];j++)
+            {
+                index_old[1]=j;
+                index_new[1]=j+pad_top;
+                if(index_new[1]>=0 && index_new[1]<new_size[1])
                 {
-                    index_old[3]=v;
-                    index_new[3]=v;
-                    new_image->SetPixel(index_new,image4D->GetPixel(index_old));
+                    for(int i=0;i<orig_size[0];i++)
+                    {
+                        index_old[0]=i;
+                        index_new[0]=i+pad_left;
+                        if(index_new[0]>=0 && index_new[0]<new_size[0])
+                        {
+                            for(int v=0;v<orig_size[3];v++)
+                            {
+                                index_old[3]=v;
+                                index_new[3]=v;
+                                new_image->SetPixel(index_new,image4D->GetPixel(index_old));
+                            }
+                        }
+                    }
                 }
             }
         }

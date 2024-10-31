@@ -113,7 +113,16 @@ void DRTAMAS_PARSER::InitializeCommandLineOptions()
         option->SetDescription( description );
         option->SetModule(0);
         this->AddOption( option );
-    }    
+    }
+    {
+        std::string description = std::string("Initial rigid transform that maps moving onto fixed")  ;
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "initial_rigid_transform");
+        option->SetDescription( description );
+        option->SetModule(0);
+        this->AddOption( option );
+    }
+
 
     {
         std::string description = std::string("Initial transform field for the fixed data.")  ;
@@ -157,6 +166,16 @@ bool DRTAMAS_PARSER::getOnlyAffine()
         return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
     else
        return 0;
+}
+
+std::string DRTAMAS_PARSER::getInitialRigidTransform()
+{
+    OptionType::Pointer option = this->GetOption( "initial_rigid_transform");
+   if(option->GetNumberOfFunctions())
+        return option->GetFunction(0)->GetName();
+   else
+       return std::string("");
+
 }
 
 std::string DRTAMAS_PARSER::GetInitialFINV()

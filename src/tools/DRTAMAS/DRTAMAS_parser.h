@@ -28,6 +28,8 @@ public:
     std::string GetInitialMINV();
     std::string GetInitialFINV();
 
+    std::string getInitialRigidTransform();
+
 
     int getNumberOfStages();
     std::vector<std::string>  getStageString(int st);
