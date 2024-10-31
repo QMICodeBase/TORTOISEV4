@@ -96,7 +96,7 @@ docker run --gpus all --net=host -e DISPLAY -v /mydatadrive:/mydatadrive eurotom
 
 ### TORTOISEV4 Prerequisite Libraries
 TORTOISE requires the following libraries to be installed beforehand:
- * ITK 5.3.0,  Boost 1.76, CUDA 11.3 (for CUDA executables), Eigen 3.3, FFTW3,  VTK 8.0.1 (only for a single executable). It also uses the nlohmann/json C++ library (https://github.com/nlohmann/json), MPFIT library from  C. Markwardt (http://cow.physics.wisc.edu/~craigm/idl/idl.html) and bet brain masking library from FSL, which are included in the distribution.
+ * ITK 5.3.0,  Boost 1.86, CUDA 11.3 (for CUDA executables), Eigen 3.3, FFTW3,  VTK 8.0.1 (only for a single executable). It also uses the nlohmann/json C++ library (https://github.com/nlohmann/json), MPFIT library from  C. Markwardt (http://cow.physics.wisc.edu/~craigm/idl/idl.html) and bet brain masking library from FSL, which are included in the distribution.
 
 The compilation has been tested with GCC-9/G++9 and  GCC-11/G++11.  Nnewer compilers should be okay but we ran into compilation issues compiling with GCC/G++-7.  You also need Cmake for compilation. The version used for testing was Cmake-3.20.
 
@@ -131,9 +131,9 @@ sudo apt install libeigen3-dev
 #### 4) Boost installation 
 
 ```
-wget https://boostorg.jfrog.io/artifactory/main/release/1.76.0/source/boost_1_76_0.tar.gz
-tar -xvf boost_1_76_0.tar.gz
-cd boost_1_76_0
+wget https://boostorg.jfrog.io/artifactory/main/release/1.86.0/source/boost_1_86_0.tar.gz
+tar -xvf boost_1_86_0.tar.gz
+cd boost_1_86_0
 ./bootstrap.sh --with-libraries=iostreams,filesystem,system,regex --prefix=/usr/local/boost176
 sudo ./b2 install
 cd ..
