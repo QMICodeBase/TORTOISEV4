@@ -4,6 +4,8 @@
 #include "../utilities/write_3D_image_to_4D_file.h"
 #include "../utilities/extract_3Dvolume_from_4D.h"
 
+#include "boost/filesystem.hpp"
+
 
 int main(int argc, char *argv[])
 {
