@@ -15,6 +15,8 @@
 #include <chrono>
 #include <thread>
 
+#include "boost/filesystem.hpp"
+
 
 #include "register_dwi_to_b0.hxx"
 #ifdef USECUDA
