@@ -175,7 +175,7 @@ cd ..
 
 ```
 cd ..
-git clone https://github.com/eurotomania/TORTOISEV4.git
+git clone https://github.com/QMICodeBase/TORTOISEV4.git
 cd TORTOISEV4/TORTOISEV4
 ```
 For nonCUDA version:
