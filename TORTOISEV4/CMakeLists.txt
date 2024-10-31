@@ -171,9 +171,9 @@ IF(USECUDA)
      target_include_directories(DRTAMAS_cuda   PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
      target_link_libraries(DRTAMAS_cuda   ${ITK_LIBRARIES} ${Boost_LIBRARIES}    -static-libgcc -static-libstdc++ libc.a -lgcc)
 
- #    add_executable(DRTAMASRigid_cuda  ../src/cuda_src/rigid_transform_image.cu ../src/cuda_src/rigid_transform_image.cxx   ../src/tools/DRTAMAS/run_drtamas_stage_rigid.cxx  ../src/tools/DRTAMAS/compute_metric_dev.cu ../src/tools/DRTAMAS/compute_metric_dev.cxx   ../src/cuda_src/compute_metric.cu ../src/cuda_src/compute_metric.cxx   ../src/cuda_src/gaussian_smooth_image.cu ../src/cuda_src/gaussian_smooth_image.cxx  ../src/tools/DRTAMAS/DRTAMAS_utilities.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities.cu   ../src/tools/DRTAMAS/DRTAMASRigid_Bulk.cxx ../src/cuda_src/resample_image.cu ../src/cuda_src/resample_image.cxx ../src/cuda_src/cuda_image_utilities.cu ../src/cuda_src/cuda_image_utilities.cxx ../src/cuda_src/cuda_image.cxx  ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/DRTAMAS/DRTAMASRigid_main.cxx ../src/tools/DRTAMAS/DRTAMASRigid.cxx ../src/tools/DRTAMAS/DRTAMAS_parser.cxx   ${SOURCES} )
- #    target_include_directories(DRTAMASRigid_cuda   PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
- #    target_link_libraries(DRTAMASRigid_cuda   ${ITK_LIBRARIES} ${Boost_LIBRARIES}    -static-libgcc -static-libstdc++ libc.a -lgcc)
+     add_executable(DRTAMASRigid_cuda  ../src/cuda_src/rigid_transform_image.cu ../src/cuda_src/rigid_transform_image.cxx   ../src/tools/DRTAMAS/run_drtamas_stage_rigid.cxx  ../src/tools/DRTAMAS/compute_metric_dev.cu ../src/tools/DRTAMAS/compute_metric_dev.cxx   ../src/cuda_src/compute_metric.cu ../src/cuda_src/compute_metric.cxx   ../src/cuda_src/gaussian_smooth_image.cu ../src/cuda_src/gaussian_smooth_image.cxx  ../src/tools/DRTAMAS/DRTAMAS_utilities.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities.cu   ../src/tools/DRTAMAS/DRTAMASRigid_Bulk.cxx ../src/cuda_src/resample_image.cu ../src/cuda_src/resample_image.cxx ../src/cuda_src/cuda_image_utilities.cu ../src/cuda_src/cuda_image_utilities.cxx ../src/cuda_src/cuda_image.cxx  ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/DRTAMAS/DRTAMASRigid_main.cxx ../src/tools/DRTAMAS/DRTAMASRigid.cxx ../src/tools/DRTAMAS/DRTAMAS_parser.cxx   ${SOURCES} )
+     target_include_directories(DRTAMASRigid_cuda   PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+     target_link_libraries(DRTAMASRigid_cuda   ${ITK_LIBRARIES} ${Boost_LIBRARIES}    -static-libgcc -static-libstdc++ libc.a -lgcc)
 
 
 
