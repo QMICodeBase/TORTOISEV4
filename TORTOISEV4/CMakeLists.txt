@@ -513,8 +513,8 @@ target_link_libraries(ImportBruker  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 #target_link_libraries(Affine2Rigid ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
 
-add_executable(SimulateS2Vmotion   ../src/tools/SimulateS2Vmotion/SimulateS2Vmotion.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateMAPMRI/MAPMRIModel.cxx ${SOURCES})
-target_link_libraries(SimulateS2Vmotion ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+#add_executable(SimulateS2Vmotion   ../src/tools/SimulateS2Vmotion/SimulateS2Vmotion.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateMAPMRI/MAPMRIModel.cxx ${SOURCES})
+#target_link_libraries(SimulateS2Vmotion ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
 
 IF(USE_VTK)
