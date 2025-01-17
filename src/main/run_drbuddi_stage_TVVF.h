@@ -59,7 +59,7 @@ public:
 private:
     std::vector<CurrentFieldType::Pointer> velocity_field;
 public:
-    int NTimePoints{17};
+    static const int NTimePoints{7};
 };
 
 

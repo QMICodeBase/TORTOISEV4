@@ -1679,7 +1679,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                             {
                                 // If neigbor exists within one voxel distance
                                 // do inverse powered distance weighted interpolation
-                                // power is 6 to make images sharper.
+                                // power is 8 to make images sharper.
 
                                 double sm_weight=0;
                                 double sm_val=0;

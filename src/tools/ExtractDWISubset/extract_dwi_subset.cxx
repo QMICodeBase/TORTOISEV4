@@ -176,5 +176,30 @@ int main(int argc, char * argv[])
 
 
 
+    std::string vbmat_name= nii_file.substr(0,nii_file.rfind(".nii")) + "_vbmat.nii";
+    if(fs::exists(vbmat_name))
+    {
+        std::string vbmat_output= oname.substr(0,oname.rfind(".nii")) + "_vbmat.nii";
+
+        new_index=-6;
+        for(int i=0;i<nvols;i++)
+        {
+            if(pickits[i])
+            {
+                new_index+=6;
+
+                for(int vv=0;vv<6;vv++)
+                {
+                    ImageType3D::Pointer img= read_3D_volume_from_4D(vbmat_name,i*6+vv);
+                    write_3D_image_to_4D_file<float>(img,vbmat_output,new_index+vv,new_Nvolumes*6);
+                }
+            }
+        }
+
+    }
+
+
+
+
     return EXIT_SUCCESS;
 }

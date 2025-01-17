@@ -437,7 +437,7 @@ ImageType3D::Pointer ForwardTransformImage(ImageType3D::Pointer img, std::vector
             float dz=aa[2]-ind3[2];
 
             float dist= sqrt(dx*dx+dy*dy+dz*dz);
-            float dist2= pow(dist,2.);
+            float dist2= pow(dist,4.);
 
             if(dist<0.1)
             {

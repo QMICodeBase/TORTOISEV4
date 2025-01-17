@@ -1282,8 +1282,8 @@ void DIFFPREP::MotionAndEddy()
     if(Nepoch==0)
         iterative=false;
 
-    //if(iterative  &&  ! slice_to_volume && !outlier_replacement)
-      //  Nepoch=1;
+    if(iterative  &&  ! slice_to_volume && !outlier_replacement)
+        Nepoch=1;
 
     if(Nvols < 20 )
     {
@@ -1295,10 +1295,14 @@ void DIFFPREP::MotionAndEddy()
 
     //READ all the volumes as 3D images into a vector
     std::vector<ImageType3D::Pointer> native_native_raw_dwis;
-    for( int vol=0; vol<Nvols;vol++)
     {
-        ImageType3D::Pointer img=read_3D_volume_from_4D(this->nii_name,vol);
-        native_native_raw_dwis.push_back(img);
+        ImageType4D::Pointer temp_img = readImageD<ImageType4D>(this->nii_name);
+        for( int vol=0; vol<Nvols;vol++)
+        {
+            //ImageType3D::Pointer img=read_3D_volume_from_4D(this->nii_name,vol);
+            ImageType3D::Pointer img=extract_3D_volume_from_4D(temp_img,vol);
+            native_native_raw_dwis.push_back(img);
+        }
     }
 
 

@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.20)
 PROJECT(TORTOISEV4  )
 
 SET(USEOPENMP 1)
- #  SET(CMAKE_BUILD_TYPE Debug)
- #  SET(ISDEBUG 1)
+  # SET(CMAKE_BUILD_TYPE Debug)
+  # SET(ISDEBUG 1)
 
 
 
@@ -84,6 +84,7 @@ else(Boost_FOUND)
 endif()
 
 
+message(${Boost_LIBRARIES})
 
 IF(USECUDA)
     include(CheckLanguage)
@@ -480,8 +481,8 @@ add_executable(Combine3DImagesTo4D ../src/tools/Combine3DImagesTo4D/Combine3DIma
 target_link_libraries(Combine3DImagesTo4D  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
-#add_executable(ImportBruker ../src/tools/import_bruker/ImportBruker.cxx ../src/tools/import_bruker/bruker_parser.cxx   ../src/utilities/write_bmatrix_file.cxx  ${SOURCES})
-#target_link_libraries(ImportBruker  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+add_executable(ImportBruker ../src/tools/import_bruker/ImportBruker.cxx ../src/tools/import_bruker/bruker_parser.cxx   ../src/utilities/write_bmatrix_file.cxx  ${SOURCES})
+target_link_libraries(ImportBruker  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 #add_executable(AnhApplyTransformationstoGhostImages  ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/AnhApplyTransformationstoGhostImages/AnhApplyTransformationstoGhostImages.cxx ${SOURCES})
@@ -506,10 +507,14 @@ target_link_libraries(Combine3DImagesTo4D  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  
 
 
 #add_executable(BrukerBmatToTORTOISEBMTXT   ../src/tools/BrukerBmatToTORTOISEBMTXT/BrukerBmatToTORTOISEBMTXT.cxx ${SOURCES})
-#target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
+#target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
 
 #add_executable(Affine2Rigid   ../src/tools/AffineToRigid/affine_to_rigid.cxx ${SOURCES})
 #target_link_libraries(Affine2Rigid ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+
+
+add_executable(SimulateS2Vmotion   ../src/tools/SimulateS2Vmotion/SimulateS2Vmotion.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateMAPMRI/MAPMRIModel.cxx ${SOURCES})
+target_link_libraries(SimulateS2Vmotion ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
 
 IF(USE_VTK)

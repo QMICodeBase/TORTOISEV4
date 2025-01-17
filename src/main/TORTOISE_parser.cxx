@@ -1100,7 +1100,7 @@ int TORTOISE_PARSER::getPOW()
     if(option->GetNumberOfFunctions())
         return atoi(option->GetFunction(0)->GetName().c_str());
     else
-       return 6;
+       return 8;
 
 }
 

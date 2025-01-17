@@ -5,7 +5,10 @@
 #include "defines.h"
 #include "itkImportImageFilter.h"
 #include "itkImageRegionIteratorWithIndex.h"
+#include "MAPMRIModel.h"
 
+using EVecImageType= MAPMRIModel::EVecImageType;
+using EValImageType= MAPMRIModel::EValImageType;
 
 ImageType3D::Pointer SynthesizeDWIFromMAPMRI(MAPImageType::Pointer mapmri_image,ImageType3D::Pointer A0_image,EVecImageType::Pointer evec_image,EValImageType::Pointer eval_image, vnl_matrix<double> bmat_vec, double small_delta,double big_delta )
 {
