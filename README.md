@@ -67,7 +67,7 @@ Please note that the source code here will always be up-to-date. However, the as
 
 ## TORTOISEV4 installation and use with WSL (recommended way for Windows)
 
-Windows Subsystem for Linux (WSL)  enable users to call Linux executables under Windows. Therefore, it is the recommended way to run TORTOISEV4 under Linux. Here are the instructions:
+Windows Subsystem for Linux (WSL)  enables users to call Linux executables under Windows. Therefore, it is the recommended way to run TORTOISEV4 under Linux. Here are the instructions:
 1) Install WSL by following the instructions at https://learn.microsoft.com/en-us/windows/wsl/install
 2) TORTOISEV4 is being developed under Ubuntu24, which is the suggested distribution.
 3) Once WSL is installed, open a Windows Powershell and type "bash" . Now you are in Linux.
