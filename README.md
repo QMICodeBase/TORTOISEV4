@@ -65,6 +65,16 @@ There are 3 ways you can use TORTOISEV4:
 
 Please note that the source code here will always be up-to-date. However, the assembled packages might take a while to be updated.
 
+## TORTOISEV4 installation and use with WSL (recommended way for Windows)
+
+Windows Subsystem for Linux (WSL)  enables users to call Linux executables under Windows. Therefore, it is the recommended way to run TORTOISEV4 under Linux. Here are the instructions:
+1) Install WSL by following the instructions at https://learn.microsoft.com/en-us/windows/wsl/install
+2) TORTOISEV4 is being developed under Ubuntu24, which is the suggested distribution.
+3) Once WSL is installed, open a Windows Powershell and type "bash" . Now you are in Linux.
+4) All your windows drives are mounted under /mnt
+5) Follow the TORTOISEV4 Source code compilation instructions to compile and install TORTOISE under WSL
+   
+
 ## TORTOISEV4 Docker installation and use (recommended way for MACOSX)
 1) Download and install docker from: https://docs.docker.com/engine/install/
 2) Make sure docker works with:  docker run hello-world
