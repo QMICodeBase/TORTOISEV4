@@ -652,6 +652,9 @@ void TORTOISE::Process()
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::Denoising) //these are self explanatory :))))
     {
+
+        std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
+
         for(int PE=0;PE<2;PE++)
         {
             double b0_noise_mean,b0_noise_std;
@@ -664,20 +667,26 @@ void TORTOISE::Process()
             out_json << std::setw(4) << this->my_jsons[PE] << std::endl;
             out_json.close();
         }
+
+        std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
+        std::cout << "Total denoising time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
     }
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::Gibbs)
     {
+        std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
         for(int PE=0;PE<2;PE++)
         {
-
             if(this->proc_infos[PE].nii_name!="")
                 GibbsUnringData(this->proc_infos[PE].nii_name,this->my_jsons[PE]["PartialFourier"],this->my_jsons[PE]["PhaseEncodingDirection"] );
         }
+        std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
+        std::cout << "Total gibbs time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
     }
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::MotionEddy)
-    {        
+    {
+        std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
         for(int PE=0;PE<2;PE++)
         {
             if(this->proc_infos[PE].nii_name!="")
@@ -686,6 +695,8 @@ void TORTOISE::Process()
                 DIFFPREP myDIFFPREP(this->proc_infos[PE].nii_name,this->my_jsons[PE]);
             }
         }
+        std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
+        std::cout << "Total DIFFPREP time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
     }
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::Drift)
@@ -694,6 +705,7 @@ void TORTOISE::Process()
 
         if(drift_option!="off")
         {
+             std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
             for(int PE=0;PE<2;PE++)
             {
                 (*stream)<<"Drift correcting dataset: "<<PE<<std::endl;
@@ -705,6 +717,8 @@ void TORTOISE::Process()
                     DriftCorrect(DP_name);
                 }
             }
+            std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
+            std::cout << "Total gibbs time: " << std::chrono::duration_cast<std::chrono::seconds> (Tend - Tbegin).count() << "sec" << std::endl;
         }
     }
     //re read jsons after DIFFPREP changes it.
@@ -761,14 +775,22 @@ void TORTOISE::Process()
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::EPI)
     {
+        std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
         (*stream)<<"Starting EPI distortion correction..."<<std::endl;
         EPICorrectData();
+
+        std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
+        std::cout << "TOTAL EPI time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
     }
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::StructuralAlignment)
     {
+        std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
         (*stream)<<"Starting b=0 to structural registration..."<<std::endl;
         AlignB0ToReorientation();
+
+        std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
+        std::cout << "TOTAL Rigid to Str time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
     }
 
 
@@ -790,12 +812,18 @@ void TORTOISE::Process()
             }
         }
 
+        std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
+
+
         (*stream)<<"Writing final outputs..."<<std::endl;
         FINALDATA my_final_data_generator(this->proc_infos[0].nii_name,this->my_jsons[0],this->proc_infos[1].nii_name,this->my_jsons[1]);
         my_final_data_generator.SetTempFolder(this->temp_proc_folder);
         my_final_data_generator.SetParser(this->parser);
         my_final_data_generator.SetOutputName(this->output_name);
         my_final_data_generator.Generate();
+
+        std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
+        std::cout << "TOTAL Final data generation time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
     }
 
     if(parser->getRemoveTempFolder())

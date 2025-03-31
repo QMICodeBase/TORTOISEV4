@@ -1,8 +1,7 @@
+#undef USECUDA
+
 #include "defines.h"
 #include "register_dwi_to_slice.h"
-#ifdef USECUDA
-    #include "../cuda_src/register_dwi_to_slice_cuda.h"
-#endif
 #include "itkOkanQuadraticTransform.h"
 
 #include <iostream>
@@ -188,7 +187,7 @@ int main(int argc, char*argv[])
         writeImageD<ImageType3D>(native_native_synth_dwis,oname);
     }
     {
-       ImageType3D::Pointer sl_img_reg= ForwardTransformImage(target, s2v_transformations);
+       ImageType3D::Pointer sl_img_reg= ForwardTransformImage2(target, s2v_transformations);
        std::string nm(argv[2]);
        std::string oname = nm.substr(0,nm.rfind(".nii")) +std::string("_reg.nii");
        writeImageD<ImageType3D>(sl_img_reg,oname);

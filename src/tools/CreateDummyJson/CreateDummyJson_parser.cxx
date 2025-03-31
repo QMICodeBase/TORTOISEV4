@@ -83,6 +83,15 @@ void CreateDummyJson_PARSER::InitializeCommandLineOptions()
     }
 
     {
+        std::string description = std::string( "Just interleaved" );
+        OptionType::Pointer option = OptionType::New();
+        option->SetShortName( 'l');
+        option->SetLongName( "interleave");
+        option->SetDescription( description );
+        this->AddOption( option );
+    }
+
+    {
         std::string description = std::string( "Partial Fourier. Options: 1, 0.875 , 0.75" );
         OptionType::Pointer option = OptionType::New();
         option->SetShortName( 'f');
@@ -106,6 +115,15 @@ void CreateDummyJson_PARSER::InitializeCommandLineOptions()
     }
 }
 
+
+bool CreateDummyJson_PARSER::getInterLeave()
+{
+    OptionType::Pointer option = this->GetOption( "interleave");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+        return 0;
+}
 
 float CreateDummyJson_PARSER::getBigDelta()
 {

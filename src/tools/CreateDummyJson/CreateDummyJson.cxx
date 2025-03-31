@@ -27,21 +27,54 @@ int main(int argc, char *argv[])
         my_json["SmallDelta"]=parser->getSmallDelta();
 
 
-    ImageType3D::Pointer first_vol = read_3D_volume_from_4D(parser->getInputImageName(),0);
+
+    ImageType3D::Pointer first_vol = readImageD<ImageType3D>(parser->getInputImageName());
+
+    //ImageType3D::Pointer first_vol = read_3D_volume_from_4D(parser->getInputImageName(),0);
     ImageType3D::SizeType sz= first_vol->GetLargestPossibleRegion().GetSize();
 
     std::vector<float> times;
     times.resize(sz[2]);
 
-    int Nexc= sz[2]/MBf;
-
-    for(int k=0;k<Nexc;k++)
+    if(parser->getInterLeave()==0)
     {
-        for(int m=0;m<MBf;m++)
+        int Nexc= sz[2]/MBf;
+        for(int k=0;k<Nexc;k++)
         {
-            int id = Nexc*m + k;
-            times[id]=k;
+            for(int m=0;m<MBf;m++)
+            {
+                int id = Nexc*m + k;
+                times[id]=k;
+            }
         }
+    }
+    else
+    {
+        int cnt=0;
+        for(int s=0;s<sz[2];s+=4)
+        {
+            times[s]=cnt;
+            cnt++;
+        }
+        cnt=0;
+        for(int s=2;s<sz[2];s+=4)
+        {
+            times[s]=cnt;
+            cnt++;
+        }
+        cnt=sz[2]/4;
+        for(int s=1;s<sz[2];s+=4)
+        {
+            times[s]=cnt;
+            cnt++;
+        }
+        cnt=sz[2]/4;
+        for(int s=3;s<sz[2];s+=4)
+        {
+            times[s]=cnt;
+            cnt++;
+        }
+
     }
 
     my_json["SliceTiming"]= times;

@@ -111,10 +111,11 @@ void EstimateTensorWLLS_PARSER::InitializeCommandLineOptions()
         option->SetLongName( "reg_mode");
         option->SetUsageOption(0,"WLLS: Weighted linear least squares");
         option->SetUsageOption(1,"NLLS: Nonlinear least squares");
-        option->SetUsageOption(2,"RESTORE: Robust NLLS");
-        option->SetUsageOption(3,"DIAG: Diagonal Only NLLS");
-        option->SetUsageOption(4,"N2: Full diffusion tensor + free water NLLS");
-        option->SetUsageOption(5,"NT2: One full parenchymal diffusion tensor + one full flow tensor");
+        option->SetUsageOption(2,"SPD: Positive semi-definite Nonlinear least squares");
+        option->SetUsageOption(3,"RESTORE: Robust NLLS");
+        option->SetUsageOption(4,"DIAG: Diagonal Only NLLS");
+        option->SetUsageOption(5,"N2: Full diffusion tensor + free water NLLS");
+        option->SetUsageOption(6,"NT2: One full parenchymal diffusion tensor + one full flow tensor");
         option->SetDescription( description );
         this->AddOption( option );
     }

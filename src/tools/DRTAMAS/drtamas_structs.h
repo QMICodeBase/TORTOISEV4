@@ -37,6 +37,7 @@ public:
 
     float weight{1};
     float param{5};
+    bool to{1};
 
     std::string metric_name;
     DRTAMASMetricEnumeration MetricType;

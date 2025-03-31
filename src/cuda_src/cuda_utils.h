@@ -81,6 +81,4 @@ inline void copy3DHostToPitchedPtr(float *_src, cudaPitchedPtr _dst, int width, 
 
 
 
-
-
 #endif

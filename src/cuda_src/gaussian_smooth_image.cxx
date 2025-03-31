@@ -8,8 +8,10 @@
 
  CUDAIMAGE::Pointer GaussianSmoothImage(CUDAIMAGE::Pointer main_image, float std)
 {
-     if(std==0)
+    if(std==0)
+    {
          return main_image;
+    }
 
      if(main_image==nullptr)
          return nullptr;

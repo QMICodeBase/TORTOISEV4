@@ -7,11 +7,11 @@
 #include <math.h>
 #include "../external_src/cmpfit-1.3a/mpfit.h"
 #include "itkImageDuplicator.h"
-
+#include "vnl/algo/vnl_cholesky.h"
 
 void DTIModel::PerformFitting()
 {
-    if(fitting_mode!="WLLS" &&  fitting_mode!="NLLS" && fitting_mode!="N2" && fitting_mode!="RESTORE" && fitting_mode!="DIAG"  && fitting_mode!="NT2")
+    if(fitting_mode!="SPD" &&  fitting_mode!="WLLS" &&  fitting_mode!="NLLS" && fitting_mode!="N2" && fitting_mode!="RESTORE" && fitting_mode!="DIAG"  && fitting_mode!="NT2")
     {
         std::cout<<"DTI fitting mode not set correctly. Defaulting to WLLS"<<std::endl;
         fitting_mode="WLLS";
@@ -24,6 +24,10 @@ void DTIModel::PerformFitting()
     if(fitting_mode=="NLLS")
     {
         EstimateTensorNLLS();
+    }
+    if(fitting_mode=="SPD")
+    {
+        EstimateTensorSPD();
     }
     if(fitting_mode=="N2")
     {
@@ -43,6 +47,59 @@ void DTIModel::PerformFitting()
     }
 }
 
+
+int myNLLSSPD_with_derivs(int m, int n, double *p, double *deviates,   double **derivs, void *vars)
+{
+    int i;
+    // m points, n params
+
+    struct vars_struct *v = (struct vars_struct *) vars;
+    vnl_matrix<double> *Bmat= v->Bmat;
+    vnl_vector<double> *signal= v->signal;
+    vnl_vector<double> *weights=v->weights;
+
+    vnl_matrix_fixed<double,3,3> lta; lta.fill(0);
+    lta(0,0)=p[1];
+    lta(1,0)=p[2];
+    lta(2,0)=p[3];
+    lta(1,1)=p[4];
+    lta(1,2)=p[5];
+    lta(2,2)=p[6];
+
+    vnl_matrix<double> lt= lta* lta.transpose();
+
+
+    for (i=0; i<m; i++)
+    {
+        double expon = (*Bmat)[i][1]* lt(0,0) + (*Bmat)[i][2]* lt(0,1)+(*Bmat)[i][3]* lt(0,2)+(*Bmat)[i][4]* lt(1,1)+(*Bmat)[i][5]* lt(1,2)+(*Bmat)[i][6]* lt(2,2);
+
+        double est=  exp(expon);
+        if(v->useWeights)
+            deviates[i] =  ((*signal)[i]- p[0]*est) * (*weights)[i];
+        else
+            deviates[i] =(*signal)[i]- p[0]*est;
+
+        if (derivs)
+        {
+            derivs[0][i]= -est;
+            est= -est*p[0];
+
+            if(v->useWeights)
+            {
+                derivs[0][i]*=  (*weights)[i];
+                est*=  (*weights)[i];
+            }
+            derivs[1][i]=  est*  (*Bmat)[i][1] *  2* lta(0,0)  ;
+            derivs[2][i]=  est*  (2* (*Bmat)[i][1]*lta(1,0) +  (*Bmat)[i][2]*lta(1,1)   );
+            derivs[3][i]=  est*  (2* (*Bmat)[i][1]*lta(2,0) +  (*Bmat)[i][2]*lta(2,1)  +  (*Bmat)[i][3]*lta(2,2)   );
+            derivs[4][i]=  est*  ( (*Bmat)[i][2]*lta(1,0) +  2*(*Bmat)[i][4]*lta(1,1)   );
+            derivs[5][i]=  est*  ( (*Bmat)[i][2]*lta(2,0) +  2*(*Bmat)[i][4]*lta(2,1)  +  (*Bmat)[i][5]*lta(2,2)   );
+            derivs[6][i]=  est*  ( (*Bmat)[i][3]*lta(2,0) +  (*Bmat)[i][5]*lta(2,1)  +  2*(*Bmat)[i][6]*lta(2,2)   );
+        }
+    }
+
+    return 0;
+}
 
 
 int myNLLS_with_derivs(int m, int n, double *p, double *deviates,   double **derivs, void *vars)
@@ -226,6 +283,247 @@ int myNLLS_t2(int m, int n, double *p, double *deviates,   double **derivs, void
      }
     return 0;
 }
+
+
+
+void DTIModel::EstimateTensorSPD()
+{
+    EstimateTensorWLLS();
+
+
+
+    int Nvols=Bmatrix.rows();
+
+    std::vector<int> all_indices;
+    if(indices_fitting.size()>0)
+        all_indices= indices_fitting;
+    else
+    {
+        for(int ma=0;ma<Nvols;ma++)
+            all_indices.push_back(ma);
+    }
+
+    if(stream)
+        (*stream)<<"Computing Tensors NLLS SPD ..."<<std::endl;
+    else
+        std::cout<<"Computing Tensors NLLS SPD ..."<<std::endl;
+
+    ImageType3D::SizeType size = dwi_data[0]->GetLargestPossibleRegion().GetSize();
+
+    mp_config_struct config;
+    config.maxiter=500;
+    config.ftol=1E-10;
+    config.xtol=1E-10;
+    config.gtol=1E-10;
+    config.epsfcn=MP_MACHEP0;
+    config.stepfactor=100;
+    config.covtol=1E-14;
+    config.maxfev=0;
+    config.nprint=1;
+    config.douserscale=0;
+    config.nofinitecheck=0;
+
+    CS_img=ImageType3D::New();
+    CS_img->SetRegions(A0_img->GetLargestPossibleRegion());
+    CS_img->Allocate();
+    CS_img->SetSpacing(A0_img->GetSpacing());
+    CS_img->SetOrigin(A0_img->GetOrigin());
+    CS_img->SetDirection(A0_img->GetDirection());
+    CS_img->FillBuffer(0.);
+
+
+
+#pragma omp parallel for
+    for(int k=0;k<size[2];k++)
+    {
+#ifndef NOTORTOISE
+        TORTOISE::EnableOMPThread();
+#endif
+        ImageType3D::IndexType ind3;
+        ind3[2]=k;
+
+        mp_par pars[7];
+        memset(&pars[0], 0, sizeof(pars));
+        pars[0].side=3;
+        pars[1].side=3;
+        pars[2].side=3;
+        pars[3].side=3;
+        pars[4].side=3;
+        pars[5].side=3;
+        pars[6].side=3;
+
+
+        for(int j=0;j<size[1];j++)
+        {
+            ind3[1]=j;
+            for(int i=0;i<size[0];i++)
+            {
+                ind3[0]=i;
+
+                if(mask_img && mask_img->GetPixel(ind3)==0)
+                    continue;
+
+                std::vector<int> curr_all_indices;
+                if(this->weight_imgs.size())
+                {
+                    for(int v=0;v<all_indices.size();v++)
+                    {
+                        int vol_id= all_indices[v];
+                        if(this->weight_imgs[vol_id]->GetPixel(ind3)>0)
+                            curr_all_indices.push_back(vol_id);
+                    }
+                }
+                else
+                {
+                    curr_all_indices=all_indices;
+                }
+
+                vnl_vector<double> signal(curr_all_indices.size());
+                vnl_vector<double> weights(curr_all_indices.size(),1.);
+
+                vnl_matrix<double> curr_design_matrix(curr_all_indices.size(),7);
+                auto curr_Bmatrix = getCurrentBmatrix(ind3,curr_all_indices);
+
+                for(int vol=0;vol<curr_all_indices.size();vol++)
+                {
+                    int vol_id= curr_all_indices[vol];
+                    double nval = dwi_data[vol_id]->GetPixel(ind3);
+                    if(nval <=0)
+                    {
+                        std::vector<float> data_for_median;
+                        std::vector<float> noise_for_median;
+
+                        ImageType3D::IndexType newind;
+                        newind[2]=k;
+
+                        for(int i2= std::max(i-1,0);i2<=std::min(i+1,(int)size[0]-1);i2++)
+                        {
+                            newind[0]=i2;
+                            for(int j2= std::max(j-1,0);j2<=std::min(j+1,(int)size[1]-1);j2++)
+                            {
+                                newind[1]=j2;
+
+                                float newval= dwi_data[vol_id]->GetPixel(newind);
+                                if(newval >0)
+                                {
+                                    data_for_median.push_back(newval);
+                                }
+                            }
+                        }
+
+                        if(data_for_median.size())
+                        {
+                            nval=median(data_for_median);
+                        }
+                        else
+                        {
+                            nval= 1E-3;
+                        }
+                    }
+                    signal[vol] = nval;
+                    if(this->weight_imgs.size())
+                    {
+                        weights[vol] =this->weight_imgs[vol_id]->GetPixel(ind3);
+                    }
+
+                    curr_design_matrix(vol,0)=1;
+                    curr_design_matrix(vol,1)= -curr_Bmatrix(vol,0)/1000.;
+                    curr_design_matrix(vol,2)= -curr_Bmatrix(vol,1)/1000.;
+                    curr_design_matrix(vol,3)= -curr_Bmatrix(vol,2)/1000.;
+                    curr_design_matrix(vol,4)= -curr_Bmatrix(vol,3)/1000.;
+                    curr_design_matrix(vol,5)= -curr_Bmatrix(vol,4)/1000.;
+                    curr_design_matrix(vol,6)= -curr_Bmatrix(vol,5)/1000.;
+
+                } //for vol
+
+
+                DTImageType::PixelType dt_vec= this->output_img->GetPixel(ind3);
+                vnl_matrix_fixed<double,3,3> Dmat;
+                Dmat(0,0)=dt_vec[0]*1000;
+                Dmat(1,0)=dt_vec[1]*1000;
+                Dmat(0,1)=dt_vec[1]*1000;
+                Dmat(2,0)=dt_vec[2]*1000;
+                Dmat(0,2)=dt_vec[2]*1000;
+                Dmat(1,1)=dt_vec[3]*1000;
+                Dmat(1,2)=dt_vec[4]*1000;
+                Dmat(2,1)=dt_vec[4]*1000;
+                Dmat(2,2)=dt_vec[5]*1000;
+
+                vnl_symmetric_eigensystem<double> eig(Dmat);
+                if(eig.D(0,0)<=0)
+                    eig.D(0,0)=1E-8;
+                if(eig.D(1,1)<=0)
+                    eig.D(1,1)=1E-8;
+                if(eig.D(2,2)<=0)
+                    eig.D(2,2)=1E-8;
+                vnl_matrix_fixed<double,3,3> Dmat_corr= eig.recompose();
+
+                vnl_cholesky mchol(Dmat_corr);
+                vnl_matrix<double> lt= mchol.lower_triangle();
+
+
+                double p[7];
+                p[0]= this->A0_img->GetPixel(ind3);
+                p[1]= lt(0,0);
+                p[2]= lt(1,0);
+                p[3]= lt(2,0);
+                p[4]= lt(1,1);
+                p[5]= lt(1,2);
+                p[6]= lt(2,2);
+
+                vars_struct my_struct;
+                my_struct.useWeights=true;
+
+                mp_result_struct my_results_struct;
+                vnl_vector<double> my_resids(curr_all_indices.size());
+                my_results_struct.resid= my_resids.data_block();
+                my_results_struct.xerror=nullptr;
+                my_results_struct.covar=nullptr;
+                my_struct.signal= &signal;
+                my_struct.weights=&weights;
+                my_struct.Bmat= &curr_design_matrix;
+
+                int status = mpfit(myNLLSSPD_with_derivs, curr_design_matrix.rows(), 7, p, pars, &config, (void *) &my_struct, &my_results_struct);
+
+                double degrees_of_freedom= curr_all_indices.size()-7;
+                CS_img->SetPixel(ind3,my_results_struct.bestnorm/degrees_of_freedom);
+
+                vnl_matrix_fixed<double,3,3> mmat;
+                mmat.fill(0);
+                mmat(0,0)=p[1];
+                mmat(1,0)=p[2];
+                mmat(2,0)=p[3];
+                mmat(1,1)=p[4];
+                mmat(1,2)=p[5];
+                mmat(2,2)=p[6];
+
+                mmat=mmat * mmat.transpose();
+
+                dt_vec[0]= mmat(0,0)/1000.;
+                dt_vec[1]= mmat(1,0)/1000.;
+                dt_vec[2]= mmat(2,0)/1000.;
+                dt_vec[3]= mmat(1,1)/1000.;
+                dt_vec[4]= mmat(2,1)/1000.;
+                dt_vec[5]= mmat(2,2)/1000.;
+
+
+                if(p[1]> 3.2 || p[4] > 3.2 || p[6]>3.2)  //FLOW ARTIFACT
+                {
+                    dt_vec= output_img->GetPixel(ind3);
+                }
+
+                if(p[2]>1.1 || p[3]> 1.1 || p[5]>1.1)  //FLOW ARTIFACT
+                {
+                    dt_vec= output_img->GetPixel(ind3);
+                }
+
+                output_img->SetPixel(ind3,dt_vec);
+                A0_img->SetPixel(ind3,p[0]);
+            } //for i
+        } //for j
+    } //for k
+}
+
 
 
 

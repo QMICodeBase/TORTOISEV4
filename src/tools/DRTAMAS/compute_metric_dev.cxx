@@ -7,7 +7,7 @@
 
 float ComputeMetric_DEV(const CUDAIMAGE::Pointer up_img_or, const CUDAIMAGE::Pointer down_img_or,
                           const CUDAIMAGE::Pointer def_FINV, const CUDAIMAGE::Pointer def_MINV   ,
-                          CUDAIMAGE::Pointer &updateFieldF, CUDAIMAGE::Pointer &updateFieldM)
+                          CUDAIMAGE::Pointer &updateFieldF, CUDAIMAGE::Pointer &updateFieldM,bool to)
 
 {
     CUDAIMAGE::Pointer up_img= CUDAIMAGE::New();
@@ -66,13 +66,24 @@ float ComputeMetric_DEV(const CUDAIMAGE::Pointer up_img_or, const CUDAIMAGE::Poi
                              up_img->dir(0,0),up_img->dir(0,1),up_img->dir(0,2),up_img->dir(1,0),up_img->dir(1,1),up_img->dir(1,2),up_img->dir(2,0),up_img->dir(2,1),up_img->dir(2,2),
                              def_FINV->getFloatdata(), def_MINV->getFloatdata(),
                              updateFieldF->getFloatdata(), updateFieldM->getFloatdata(),
-                             metric_value
+                             metric_value, to
                              );
 
 
     return metric_value;
 }
 
+
+CUDAIMAGE::Pointer ComputeDeviatoricTensorImg(CUDAIMAGE::Pointer img)
+{
+    CUDAIMAGE::Pointer nimg= CUDAIMAGE::New();
+    nimg->DuplicateFromCUDAImage(img);
+
+
+    ComputeDeviatoricTensor_cuda(nimg->getFloatdata(),   nimg->sz);
+    return nimg;
+
+}
 
 float ComputeMetric_DEV_ONLY(const CUDAIMAGE::Pointer fixed_img, const CUDAIMAGE::Pointer moving_img)
 {

@@ -20,6 +20,7 @@ public:
     float getPF();
     float getBigDelta();
     float getSmallDelta();
+    bool getInterLeave();
 
 
      

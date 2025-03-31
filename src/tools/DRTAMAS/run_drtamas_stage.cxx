@@ -226,9 +226,12 @@ void DRTAMASStage::RunDRTAMASStage()
 
         }
         if(this->settings->metrics[met].MetricType== DRTAMASMetricEnumeration::DTDEV)
-        {                        
-            CurrentImageType::Pointer log_fixed_tensor= LogTensor(this->settings->metrics[met].fixed_img);
-            CurrentImageType::Pointer log_moving_tensor= LogTensor(this->settings->metrics[met].moving_img);
+        {
+           // CurrentImageType::Pointer log_fixed_tensor= LogTensor(this->settings->metrics[met].fixed_img);
+           // CurrentImageType::Pointer log_moving_tensor= LogTensor(this->settings->metrics[met].moving_img);
+
+            CurrentImageType::Pointer log_fixed_tensor= this->settings->metrics[met].fixed_img;
+            CurrentImageType::Pointer log_moving_tensor= this->settings->metrics[met].moving_img;
 
             log_fixed_tensor_vec= SplitImageComponents(log_fixed_tensor);
             log_moving_tensor_vec= SplitImageComponents(log_moving_tensor);
@@ -252,8 +255,6 @@ void DRTAMASStage::RunDRTAMASStage()
             }
         }
     }
-
-
 
     int iter=0;
     bool converged=false;
@@ -322,14 +323,15 @@ void DRTAMASStage::RunDRTAMASStage()
                 CurrentImageType::Pointer warped_fixed_tensor = CombineImageComponents(warped_fixed_tensorv);
                 CurrentImageType::Pointer warped_moving_tensor = CombineImageComponents(warped_moving_tensorv);
 
-                warped_fixed_tensor = ExpTensor(warped_fixed_tensor) ;
-                warped_moving_tensor = ExpTensor(warped_moving_tensor) ;
+              //  warped_fixed_tensor = ExpTensor(warped_fixed_tensor) ;
+              //  warped_moving_tensor = ExpTensor(warped_moving_tensor) ;
 
-                // We are not rotating the tensors here because the metric will internally rotate them.
+
 
                 metric_value = ComputeMetric_DEV(warped_fixed_tensor, warped_moving_tensor,
                                                this->def_FINV , this->def_MINV ,
-                                               updateFieldF_temp,  updateFieldM_temp);
+                                               updateFieldF_temp,  updateFieldM_temp,
+                                               this->settings->metrics[met].to);
 
             }
 
@@ -347,6 +349,7 @@ void DRTAMASStage::RunDRTAMASStage()
                 updateFieldM=updateFieldM_temp;
             }
 
+
         } //metric loop
 
 
@@ -358,29 +361,16 @@ void DRTAMASStage::RunDRTAMASStage()
         ScaleUpdateField(updateFieldM,this->settings->learning_rate);
 
 
+        this->def_F  = ComposeFields(this->def_F,updateFieldF);
+        this->def_M  = ComposeFields(this->def_M,updateFieldM);
+        this->def_F = GaussianSmoothImage(this->def_F,this->settings->total_gaussian_sigma);
+        this->def_M = GaussianSmoothImage(this->def_M,this->settings->total_gaussian_sigma);
 
-        {
-            CurrentFieldType::Pointer f2midtmp=nullptr,f2midtmp_inv=nullptr;
-            CurrentFieldType::Pointer m2midtmp=nullptr,m2midtmp_inv=nullptr;
 
-
-            f2midtmp  = ComposeFields(this->def_F,updateFieldF);
-            f2midtmp = GaussianSmoothImage(f2midtmp,this->settings->total_gaussian_sigma);
-            CurrentFieldType::Pointer f2midtotal_inv= InvertField(f2midtmp, this->def_FINV );
-
-            m2midtmp  = ComposeFields(this->def_M,updateFieldM);
-            m2midtmp = GaussianSmoothImage(m2midtmp,this->settings->total_gaussian_sigma);
-            CurrentFieldType::Pointer m2midtotal_inv= InvertField(m2midtmp, this->def_MINV );
-
-            CurrentFieldType::Pointer f2midtotal = InvertField(f2midtotal_inv, m2midtotal_inv );
-            CurrentFieldType::Pointer m2midtotal = InvertField(m2midtotal_inv, f2midtotal_inv );
-
-            this->def_FINV=f2midtotal_inv;
-            this->def_F=f2midtotal;
-            this->def_MINV=m2midtotal_inv;
-            this->def_M=m2midtotal;
-        }
-
+        this->def_FINV  = InvertField(this->def_F);
+        this->def_MINV  = InvertField(this->def_M);
+        this->def_F  = InvertField(this->def_FINV);
+        this->def_M  = InvertField(this->def_MINV);
 
 
 
@@ -398,19 +388,20 @@ void DRTAMASStage::RunDRTAMASStage()
         average_convergence/=tot_w;
         curr_convergence= average_convergence;
 
-        if( (0.7*curr_convergence+0.3*prev_conv) < 1E-6)
+        if( (0.7*curr_convergence+0.3*prev_conv) < 1E-7)
         {
-            converged = true;
+            if(this->settings->downsample_factor<=2)
+                converged = true;
         }
 
 
         m_clock.Stop();
         const itk::RealTimeClock::TimeStampType now = m_clock.GetTotal();
 
-        (*stream) << " "; // if the output of current iteration is written to disk, and star
+        std::cout << " "; // if the output of current iteration is written to disk, and star
                 // will appear before line, else a free space will be printed to keep visual alignment.
 
-        (*stream)<< std::setw(5) << iter << ", conv: "<<std::scientific << std::setprecision(5) << curr_convergence <<", time: "
+        std::cout << std::setw(5) << iter << ", conv: "<<std::scientific << std::setprecision(5) << curr_convergence <<", time: "
                        <<std::fixed << std::setprecision(2) << (now - m_lastTotalTime) <<"s, ";
 
          for(int i=0;i<metric_values.size()-1;i++)

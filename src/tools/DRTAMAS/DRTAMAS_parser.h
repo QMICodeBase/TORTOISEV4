@@ -51,6 +51,7 @@ public:
     std::string getRegistrationMethodType();
 
     bool getOnlyAffine();
+    bool getNoSmoothingLastStage();
 
 
 

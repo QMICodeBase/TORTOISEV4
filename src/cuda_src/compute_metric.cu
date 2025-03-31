@@ -12,7 +12,7 @@
 #define LIMCCJAC (1E-5)
 
 #define WIN_RAD 7
-#define WIN_RAD_Z 2
+#define WIN_RAD_Z 5
 
 #define WIN_RAD_JAC 9
 #define WIN_RAD_JAC_Z 4

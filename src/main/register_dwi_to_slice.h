@@ -7,6 +7,8 @@
 #include "itkMattesMutualInformationImageToImageMetricv4Okan.h"
 #include "itkOkanImageRegistrationMethodv4.h"
 #include "TORTOISE.h"
+#include "itkInvertDisplacementFieldImageFilterOkan.h"
+#include "itkBSplineInterpolateImageFunction.h"
 
 using OkanQuadraticTransformType=itk::OkanQuadraticTransform<CoordType,3,3>;
 
@@ -228,6 +230,9 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
     else
     {
         sz[2]=MB;
+#ifndef USECUDA
+//  #pragma omp parallel for
+#endif
         for(int e=0;e<Nexc;e++)
         {
             ImageType3D::Pointer  temp_slice_img_itk=ImageType3D::New();
@@ -457,6 +462,226 @@ ImageType3D::Pointer ForwardTransformImage(ImageType3D::Pointer img, std::vector
         else
         {
             it.Set(sm_val/sm_weight);
+        }
+
+
+        ++it;
+    }
+
+    return final_img;
+
+
+
+}
+
+
+
+
+ImageType3D::Pointer ForwardTransformImage2(ImageType3D::Pointer img, std::vector<OkanQuadraticTransformType::Pointer> s2v_trans)
+{
+    int NITK= TORTOISE::GetAvailableITKThreadFor();
+
+    ImageType3D::Pointer final_img = ImageType3D::New();
+    final_img->SetRegions(img->GetLargestPossibleRegion());
+    final_img->Allocate();
+    final_img->SetSpacing(img->GetSpacing());
+    final_img->SetDirection(img->GetDirection());
+    final_img->SetOrigin(img->GetOrigin());
+    final_img->FillBuffer(0.);
+
+
+    std::vector<float> values;
+
+    using MeasurementVectorType = itk::Vector<float, 3>;
+    using SampleType = itk::Statistics::ListSample<MeasurementVectorType>;
+    SampleType::Pointer sample = SampleType::New();
+    sample->SetMeasurementVectorSize(3);
+
+
+    ImageType3D::SizeType sz= img->GetLargestPossibleRegion().GetSize();
+
+
+    for(int k=0;k<sz[2];k++)
+    {
+        ImageType3D::IndexType ind3;
+        ind3[2]=k;
+        for(int j=0;j<sz[1];j++)
+        {
+            ind3[1]=j;
+            for(int i=0;i<sz[0];i++)
+            {
+                ind3[0]=i;
+
+                ImageType3D::PointType pt,pt_trans;
+
+                img->TransformIndexToPhysicalPoint(ind3,pt);
+                pt_trans=s2v_trans[k]->TransformPoint(pt);
+
+                itk::ContinuousIndex<double,3> ind3_t;
+                final_img->TransformPhysicalPointToContinuousIndex(pt_trans,ind3_t);
+                MeasurementVectorType tt;
+                tt[0]=ind3_t[0];
+                tt[1]=ind3_t[1];
+                tt[2]=ind3_t[2];
+
+                sample->PushBack(tt);
+                values.push_back(img->GetPixel(ind3));
+            }
+        }
+    }
+
+    using TreeGeneratorType = itk::Statistics::KdTreeGenerator<SampleType>;
+    TreeGeneratorType::Pointer treeGenerator = TreeGeneratorType::New();
+    treeGenerator->SetSample(sample);
+    treeGenerator->SetBucketSize(8);
+    treeGenerator->Update();
+
+    using TreeType = TreeGeneratorType::KdTreeType;
+    TreeType::Pointer tree = treeGenerator->GetOutput();
+
+
+
+    DisplacementFieldType::Pointer forward_s2v_field = DisplacementFieldType::New();
+    forward_s2v_field->SetRegions(img->GetLargestPossibleRegion());
+    forward_s2v_field->Allocate();
+    forward_s2v_field->SetSpacing(img->GetSpacing());
+    forward_s2v_field->SetSpacing(img->GetSpacing());
+    forward_s2v_field->SetOrigin(img->GetOrigin());
+    forward_s2v_field->SetDirection(img->GetDirection());
+    DisplacementFieldType::PixelType zero; zero.Fill(0);
+    forward_s2v_field->FillBuffer(zero);
+
+
+    itk::ImageRegionIteratorWithIndex<DisplacementFieldType> it2(forward_s2v_field,forward_s2v_field->GetLargestPossibleRegion());
+    for(it2.GoToBegin();!it2.IsAtEnd();++it2)
+    {
+        ImageType3D::IndexType ind3=it2.GetIndex();
+
+        DisplacementFieldType::PointType pt,pt_trans;
+        forward_s2v_field->TransformIndexToPhysicalPoint(ind3,pt);
+        pt_trans = s2v_trans[ind3[2]]->TransformPoint(pt);
+
+        DisplacementFieldType::PixelType vec;
+        vec[0]= pt_trans[0] - pt[0];
+        vec[1]= pt_trans[1] - pt[1];
+        vec[2]= pt_trans[2] - pt[2];
+        it2.Set(vec);
+    }
+
+
+    typedef itk::InvertDisplacementFieldImageFilterOkan<DisplacementFieldType> InverterType;
+    InverterType::Pointer inverter = InverterType::New();
+    inverter->SetInput( forward_s2v_field );
+    inverter->SetMaximumNumberOfIterations( 50 );
+    inverter->SetMeanErrorToleranceThreshold( 0.0004 );
+    inverter->SetMaxErrorToleranceThreshold( 0.04 );
+    //inverter->SetNumberOfWorkUnits(NITK);
+    inverter->SetNumberOfWorkUnits(1);
+    inverter->Update();
+    DisplacementFieldType::Pointer backward_s2v_field =inverter->GetOutput();
+
+    using DisplacementFieldTransformType= itk::DisplacementFieldTransform<double,3>;
+    DisplacementFieldTransformType::Pointer backward_s2v_field_trans= DisplacementFieldTransformType::New();
+    backward_s2v_field_trans->SetDisplacementField(backward_s2v_field);
+
+
+    using BSInterpolatorType = itk::BSplineInterpolateImageFunction<ImageType3D, double>;
+    BSInterpolatorType::Pointer BSinterpolator = BSInterpolatorType::New();
+    BSinterpolator->SetSplineOrder(3);
+    BSinterpolator->SetInputImage(img);
+
+
+    itk::ImageRegionIteratorWithIndex<ImageType3D> it(final_img, final_img->GetLargestPossibleRegion());
+    it.GoToBegin();
+    while(!it.IsAtEnd())
+    {
+        bool forward_interp=false;
+
+        ImageType3D::IndexType ind3 = it.GetIndex();
+        DisplacementFieldType::PointType pt,pt_trans;
+        final_img->TransformIndexToPhysicalPoint(ind3,pt);
+
+        ImageType3D::PointType pt_trans_backward= backward_s2v_field_trans->TransformPoint(pt);
+        itk::ContinuousIndex<double,3> ind3_ts2v;
+        img->TransformPhysicalPointToContinuousIndex(pt_trans_backward,ind3_ts2v);
+
+
+        int SL= (int)std::round(ind3_ts2v[2]);
+        if(SL<0 || SL > img->GetLargestPossibleRegion().GetSize()[2]-1)
+            forward_interp=true;
+        else
+        {
+            ImageType3D::PointType pt_trans_s2v_inv= s2v_trans[SL]->TransformPoint(pt_trans_backward);
+
+            DisplacementFieldType::PixelType diff;
+            diff[0]= pt_trans_s2v_inv[0] - pt[0];
+            diff[1]= pt_trans_s2v_inv[1] - pt[1];
+            diff[2]= pt_trans_s2v_inv[2] - pt[2];
+            double diff_mag = sqrt(diff[0]*diff[0]+diff[1]*diff[1]+diff[2]*diff[2]);
+
+            if(diff_mag > 0.1*img->GetSpacing()[2])
+                forward_interp=true;
+        }
+
+        if(!forward_interp )
+        {
+            if(BSinterpolator->IsInsideBuffer(pt_trans_backward))
+            {
+                ImageType3D::PixelType val = BSinterpolator->Evaluate(pt_trans_backward);
+                if(val<0)
+                    val=0;
+                final_img->SetPixel(ind3,val);
+            }
+        }
+        else
+        {
+
+
+
+
+
+            ImageType3D::IndexType ind3 = it.GetIndex();
+            MeasurementVectorType queryPoint;
+            queryPoint[0]=ind3[0];
+            queryPoint[1]=ind3[1];
+            queryPoint[2]=ind3[2];
+
+            unsigned int                           numberOfNeighbors = 8;
+            TreeType::InstanceIdentifierVectorType neighbors;
+            tree->Search(queryPoint, numberOfNeighbors, neighbors);
+
+            double sm_weight=0;
+            double sm_val=0;
+
+            for (unsigned long neighbor : neighbors)
+            {
+                MeasurementVectorType  aa= tree->GetMeasurementVector(neighbor) ;
+                float dx=aa[0]-ind3[0];
+                float dy=aa[1]-ind3[1];
+                float dz=aa[2]-ind3[2];
+
+                float dist= sqrt(dx*dx+dy*dy+dz*dz);
+                float dist2= pow(dist,8.);
+
+                if(dist<0.1)
+                {
+                    sm_val= values[neighbor];
+                    sm_weight=1;
+                    break;
+                }
+                else
+                {
+                    sm_val+= values[neighbor] / dist2;
+                    sm_weight+= 1./dist2;
+                }
+            }
+
+            if(sm_weight==0 || std::isnan(sm_weight) ||  !std::isfinite(sm_weight))
+                it.Set(0);
+            else
+            {
+                it.Set(sm_val/sm_weight);
+            }
         }
 
 

@@ -282,6 +282,8 @@ int main(int argc, char *argv[])
         ext="_N2";
     if(regresion_mode=="NT2")
         ext="_NT2";
+    if(regresion_mode=="SPD")
+        ext="_NSPD";
 
 
 

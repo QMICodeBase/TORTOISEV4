@@ -115,6 +115,14 @@ void DRTAMAS_PARSER::InitializeCommandLineOptions()
         this->AddOption( option );
     }
     {
+        std::string description = std::string("To do no smoothing of the deformation fields in the last stage of registration with he default settings. Ideal if you will analyze the Jacobian maps. Default: 0")  ;
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "no_smoothing_last_stage");
+        option->SetDescription( description );
+        option->SetModule(0);
+        this->AddOption( option );
+    }
+    {
         std::string description = std::string("Initial rigid transform that maps moving onto fixed")  ;
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "initial_rigid_transform");
@@ -158,6 +166,17 @@ void DRTAMAS_PARSER::InitializeCommandLineOptions()
     }
 
 }
+
+
+bool DRTAMAS_PARSER::getNoSmoothingLastStage()
+{
+    OptionType::Pointer option = this->GetOption( "no_smoothing_last_stage");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+        return 0;
+}
+
 
 bool DRTAMAS_PARSER::getOnlyAffine()
 {

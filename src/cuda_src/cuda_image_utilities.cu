@@ -980,9 +980,9 @@ void InvertField_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 data
     //const float m_MeanErrorToleranceThreshold=0.0008;
     //const int Niter=20;
 
-    const float m_MaxErrorToleranceThreshold=0.1;
-    const float m_MeanErrorToleranceThreshold=0.001;
-    const int Niter=20;
+    const float m_MaxErrorToleranceThreshold=0.01;
+    const float m_MeanErrorToleranceThreshold=0.0001;
+    const int Niter=30;
 
 //    const float m_MaxErrorToleranceThreshold=0.03;
 //    const float m_MeanErrorToleranceThreshold=0.0003;

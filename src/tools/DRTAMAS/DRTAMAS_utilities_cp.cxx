@@ -475,6 +475,9 @@ DTMatrixImageType::Pointer TransformAndWriteAffineImage(DTMatrixImageType::Point
     dup->Update();
     auto moving_tensor_aff=dup->GetOutput();
 
+    DTMatrixImageType::PixelType small_tens; small_tens.fill(0);small_tens.fill_diagonal(-1E10);
+    moving_tensor_aff->FillBuffer(small_tens);
+
 
     DTMatrixImageType::Pointer log_moving_tensor = LogTensorImage(moving_tensor);
 

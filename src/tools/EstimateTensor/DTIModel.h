@@ -73,6 +73,7 @@ private:
     void EstimateTensorNT2();
     void EstimateTensorWLLSDiagonal();
     void EstimateTensorRESTORE();
+    void EstimateTensorSPD();
 
     double check_condition_number(std::vector<int> &outlier_index, vnl_matrix<double> Bmatrix);
     std::vector<int> check_gradient_direction(std::vector<int> outlier_index_original,vnl_matrix<double> Bmatrix);
