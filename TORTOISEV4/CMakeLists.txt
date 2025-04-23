@@ -191,9 +191,9 @@ ELSE(USECUDA)
 ENDIF(USECUDA)
 
 
-add_executable(AffineTransformationDeterminant  ../src/tools/AffineTransformationDeterminant/AffineTransformationDeterminant.cxx  ${SOURCES})
-target_include_directories(AffineTransformationDeterminant   PRIVATE   )
-target_link_libraries(AffineTransformationDeterminant ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+#add_executable(AffineTransformationDeterminant  ../src/tools/AffineTransformationDeterminant/AffineTransformationDeterminant.cxx  ${SOURCES})
+#target_include_directories(AffineTransformationDeterminant   PRIVATE   )
+#target_link_libraries(AffineTransformationDeterminant ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
 
 
 add_executable(Vol2SlRegistration   ../src/tools/Vol2SlRegistration/vol2sl_registration_main.cxx ../src/tools/ResampleDWIs/resample_dwis.cxx ${SOURCES})
