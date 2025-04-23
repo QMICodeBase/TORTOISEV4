@@ -179,7 +179,7 @@ void DRBUDDI::Step0_CreateImages()
 
 
 
-std::vector<DRBUDDI::DisplacementFieldType::Pointer> DRBUDDI::DRBUDDI_Initial_Register_Up_Down(ImageType3D::Pointer b0_up_img,ImageType3D::Pointer b0_down_img, std::string phase)
+std::vector<DRBUDDI::DisplacementFieldType::Pointer> DRBUDDI::DRBUDDI_Initial_Register_Up_Down(ImageType3D::Pointer b0_up_img,ImageType3D::Pointer b0_down_img, std::string phase,bool small)
 {
     vnl_vector<double> phase_vector(3,0);
     if(phase=="vertical")
@@ -191,9 +191,107 @@ std::vector<DRBUDDI::DisplacementFieldType::Pointer> DRBUDDI::DRBUDDI_Initial_Re
 
 
     std::vector<DRBUDDIStageSettings> stages;
+
+    if(small)
+    {
+        stages.resize(2);
+        {
+            stages[0].niter=30;
+            stages[0].img_smoothing_std=2.;
+            stages[0].downsample_factor=4;
+            stages[0].learning_rate=0.2;
+            stages[0].update_gaussian_sigma=6.;
+            stages[0].total_gaussian_sigma=0.0;
+            stages[0].restrct=1;
+            stages[0].constrain=1;
+            DRBUDDIMetric metric;
+            metric.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+            metric.weight=1;
+            stages[0].metrics.push_back(metric);
+        }
+        {
+            stages[1].niter=10;
+            stages[1].img_smoothing_std=1.;
+            stages[1].downsample_factor=2;
+            stages[1].learning_rate=0.2;
+            stages[1].update_gaussian_sigma=6.;
+            stages[1].total_gaussian_sigma=0.0;
+            stages[1].restrct=1;
+            stages[1].constrain=1;
+            DRBUDDIMetric metric;
+            metric.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+            metric.weight=1;
+            stages[1].metrics.push_back(metric);
+        }
+    }
+    else
+    {
+        stages.resize(4);
+        {
+            stages[0].niter=300;
+            stages[0].img_smoothing_std=3.;
+            stages[0].downsample_factor=6;
+            stages[0].learning_rate=0.2;
+            stages[0].update_gaussian_sigma=8.;
+            stages[0].total_gaussian_sigma=0.0;
+            stages[0].restrct=1;
+            stages[0].constrain=1;
+            DRBUDDIMetric metric;
+            metric.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+            metric.weight=1;
+            stages[0].metrics.push_back(metric);
+        }
+        {
+            stages[1].niter=300;
+            stages[1].img_smoothing_std=2.;
+            stages[1].downsample_factor=4;
+            stages[1].learning_rate=0.25;
+            stages[1].update_gaussian_sigma=7.;
+            stages[1].total_gaussian_sigma=0.0;
+            stages[1].restrct=1;
+            stages[1].constrain=1;
+            DRBUDDIMetric metric;
+            metric.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+            metric.weight=1;
+            stages[1].metrics.push_back(metric);
+        }
+        {
+            stages[2].niter=300;
+            stages[2].img_smoothing_std=1;
+            stages[2].downsample_factor=2;
+            stages[2].learning_rate=0.25;
+            stages[2].update_gaussian_sigma=6.;
+            stages[2].total_gaussian_sigma=0.0;
+            stages[2].restrct=1;
+            stages[2].constrain=1;
+            DRBUDDIMetric metric;
+            metric.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+            metric.weight=1;
+            stages[2].metrics.push_back(metric);
+        }
+        {
+            stages[3].niter=10;
+            stages[3].img_smoothing_std=0.5;
+            stages[3].downsample_factor=1;
+            stages[3].learning_rate=0.3;
+            stages[3].update_gaussian_sigma=5.;
+            stages[3].total_gaussian_sigma=0.0;
+            stages[3].restrct=1;
+            stages[3].constrain=1;
+            DRBUDDIMetric metric;
+            metric.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
+            metric.weight=1;
+            stages[3].metrics.push_back(metric);
+        }
+    }
+
+
+
+    /*
+    std::vector<DRBUDDIStageSettings> stages;
     stages.resize(4);
     {
-        stages[0].niter=200;
+        stages[0].niter=300;
         stages[0].img_smoothing_std=3.;
         stages[0].downsample_factor=6;
         stages[0].learning_rate=0.2;
@@ -207,7 +305,7 @@ std::vector<DRBUDDI::DisplacementFieldType::Pointer> DRBUDDI::DRBUDDI_Initial_Re
         stages[0].metrics.push_back(metric);
     }
     {
-        stages[1].niter=100;
+        stages[1].niter=300;
         stages[1].img_smoothing_std=2.;
         stages[1].downsample_factor=4;
         stages[1].learning_rate=0.25;
@@ -221,7 +319,7 @@ std::vector<DRBUDDI::DisplacementFieldType::Pointer> DRBUDDI::DRBUDDI_Initial_Re
         stages[1].metrics.push_back(metric);
     }
     {
-        stages[2].niter=50;
+        stages[2].niter=300;
         stages[2].img_smoothing_std=1;
         stages[2].downsample_factor=2;
         stages[2].learning_rate=0.4;
@@ -235,11 +333,11 @@ std::vector<DRBUDDI::DisplacementFieldType::Pointer> DRBUDDI::DRBUDDI_Initial_Re
         stages[2].metrics.push_back(metric);
     }
     {
-        stages[3].niter=5;
-        stages[3].img_smoothing_std=0.;
+        stages[3].niter=10;
+        stages[3].img_smoothing_std=0.5;
         stages[3].downsample_factor=1;
         stages[3].learning_rate=0.5;
-        stages[3].update_gaussian_sigma=3.5;
+        stages[3].update_gaussian_sigma=3.;
         stages[3].total_gaussian_sigma=0.0;
         stages[3].restrct=1;
         stages[3].constrain=1;
@@ -248,6 +346,8 @@ std::vector<DRBUDDI::DisplacementFieldType::Pointer> DRBUDDI::DRBUDDI_Initial_Re
         metric.weight=1;
         stages[3].metrics.push_back(metric);
     }
+    */
+
 
     DRBUDDI_Diffeo *myDRBUDDI_processor = new DRBUDDI_Diffeo;
     myDRBUDDI_processor->SetB0UpImage(b0_up_img);
@@ -270,8 +370,125 @@ std::vector<DRBUDDI::DisplacementFieldType::Pointer> DRBUDDI::DRBUDDI_Initial_Re
     return fields;
 }
 
+
+
+DisplacementFieldType::Pointer DRBUDDI::CompositeToDispField(CompositeTransformType::Pointer comp_trans, ImageType3D::Pointer ref_img)
+{
+    DisplacementFieldType::Pointer disp_field= DisplacementFieldType::New();
+    disp_field->SetRegions(ref_img->GetLargestPossibleRegion());
+    disp_field->Allocate();
+    disp_field->SetOrigin(ref_img->GetOrigin());
+    disp_field->SetSpacing(ref_img->GetSpacing());
+    disp_field->SetDirection(ref_img->GetDirection());
+    DisplacementFieldType::PixelType zer; zer.Fill(0);
+    disp_field->FillBuffer(zer);
+
+    itk::ImageRegionIteratorWithIndex<DisplacementFieldType> it(disp_field,disp_field->GetLargestPossibleRegion());
+    for(it.GoToBegin();!it.IsAtEnd();++it)
+    {
+        ImageType3D::IndexType ind3= it.GetIndex();
+        ImageType3D::PointType pt,pt_trans;
+        disp_field->TransformIndexToPhysicalPoint(ind3,pt);
+        pt_trans = comp_trans->TransformPoint(pt);
+
+        DisplacementFieldType::PixelType vec;
+        vec[0]=pt_trans[0]-pt[0];
+        vec[1]=pt_trans[1]-pt[1];
+        vec[2]=pt_trans[2]-pt[2];
+
+        it.Set(vec);
+    }
+    return disp_field;
+}
+
 DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0Up(ImageType3D::Pointer b0_up_image, ImageType3D::Pointer b0_down_image, std::string mtype, ImageType3D::Pointer & initial_corrected_b0)
 {
+    (*stream)<<"Starting initial rigid registration."<<std::endl;
+
+    double diff=1E10;
+    int iter=0;
+
+    itk::IdentityTransform<double,3>::Pointer  id=itk::IdentityTransform<double,3>::New();
+    id->SetIdentity();
+
+    CompositeTransformType::Pointer up_trans = CompositeTransformType::New();
+    up_trans->AddTransform(id);
+    CompositeTransformType::Pointer down_trans = CompositeTransformType::New();
+    down_trans->AddTransform(id);
+
+    RigidTransformType::Pointer total_trans=RigidTransformType::New();
+    total_trans->SetIdentity();
+
+    while(diff>5E-5 && iter<4)
+    {
+        DisplacementFieldType::Pointer up_field=CompositeToDispField(up_trans,b0_up_image);
+        DisplacementFieldType::Pointer down_field=CompositeToDispField(down_trans,b0_up_image);
+
+        ImageType3D::Pointer new_up_img=   JacobianTransformImage(b0_up_image,up_field,b0_up_image);
+        ImageType3D::Pointer new_down_img=   JacobianTransformImage(b0_down_image,down_field,b0_up_image);
+
+        RigidTransformType::Pointer rigid1= RigidRegisterImagesEulerSmall(new_up_img,new_down_img,mtype);
+        down_trans->AddTransform(rigid1);
+        total_trans->Compose(rigid1,true);
+
+        using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+        ResampleImageFilterType::Pointer resampleFilter2 = ResampleImageFilterType::New();
+        resampleFilter2->SetOutputParametersFromImage(b0_up_image);
+        resampleFilter2->SetInput(b0_down_image);
+        resampleFilter2->SetTransform(down_trans);
+        resampleFilter2->Update();
+        ImageType3D::Pointer curr_down_quad_image= resampleFilter2->GetOutput();
+
+        std::vector<DisplacementFieldType::Pointer> epi_fields= DRBUDDI_Initial_Register_Up_Down(new_up_img, curr_down_quad_image, this->PE_string,true);
+
+        DisplacementFieldTransformType::Pointer up_diffeo=DisplacementFieldTransformType::New();
+        up_diffeo->SetDisplacementField(epi_fields[0]);
+        DisplacementFieldTransformType::Pointer down_diffeo=DisplacementFieldTransformType::New();
+        down_diffeo->SetDisplacementField(epi_fields[1]);
+
+        up_trans->AddTransform(up_diffeo);
+        down_trans->AddTransform(down_diffeo);
+
+        iter++;
+
+
+        auto p1= rigid1->GetParameters();
+
+        diff= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] +
+                p1[3]*p1[3]/400. + p1[4]*p1[4]/400. + p1[5]*p1[5]/400. ;
+    }
+
+    std::cout<<"DIFF: " <<diff<<std::endl;
+
+    using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+    ResampleImageFilterType::Pointer resampleFilter2 = ResampleImageFilterType::New();
+    resampleFilter2->SetOutputParametersFromImage(b0_up_image);
+    resampleFilter2->SetInput(b0_down_image);
+    resampleFilter2->SetTransform(total_trans);
+    resampleFilter2->Update();
+    ImageType3D::Pointer curr_down_quad_image= resampleFilter2->GetOutput();
+
+    std::vector<DisplacementFieldType::Pointer> epi_fields= DRBUDDI_Initial_Register_Up_Down(b0_up_image, curr_down_quad_image, this->PE_string,false);
+
+    ImageType3D::Pointer new_up_img=   JacobianTransformImage(b0_up_image,epi_fields[0],b0_up_image);
+    ImageType3D::Pointer new_down_img=   JacobianTransformImage(b0_down_image,epi_fields[1],b0_up_image);
+
+
+    typedef itk::AddImageFilter<ImageType3D,ImageType3D,ImageType3D> AdderType;
+    AdderType::Pointer adder= AdderType::New();
+    adder->SetInput1(new_up_img);
+    adder->SetInput2(new_down_img);
+    adder->Update();
+    initial_corrected_b0= adder->GetOutput();
+
+
+
+    return total_trans;
+
+
+
+
+    /*
     initial_corrected_b0=nullptr;
 
     (*stream)<<"Starting initial rigid registration."<<std::endl;
@@ -327,6 +544,73 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
     total_rigid->Compose(rigid2,true);
 
     return total_rigid;
+*/
+}
+
+#include "itkImageToHistogramFilter.h"
+#include "itkIntensityWindowingImageFilter.h"
+#include "itkHistogramMatchingImageFilter.h"
+
+ImageType3D::Pointer DRBUDDI::PreprocessImage(  ImageType3D::ConstPointer  inputImage,
+                                                ImageType3D::PixelType lowerScaleValue,
+                                                ImageType3D::PixelType upperScaleValue,
+                                                float winsorizeLowerQuantile, float winsorizeUpperQuantile,
+                                                ImageType3D::ConstPointer histogramMatchSourceImage )
+{
+    typedef itk::Statistics::ImageToHistogramFilter<ImageType3D>   HistogramFilterType;
+    typedef  HistogramFilterType::InputBooleanObjectType InputBooleanObjectType;
+    typedef  HistogramFilterType::HistogramSizeType      HistogramSizeType;
+    typedef  HistogramFilterType::HistogramType          HistogramType;
+
+    HistogramSizeType histogramSize( 1 );
+    histogramSize[0] = 256;
+
+    InputBooleanObjectType::Pointer autoMinMaxInputObject = InputBooleanObjectType::New();
+    autoMinMaxInputObject->Set( true );
+
+    HistogramFilterType::Pointer histogramFilter = HistogramFilterType::New();
+    histogramFilter->SetInput( inputImage );
+    histogramFilter->SetAutoMinimumMaximumInput( autoMinMaxInputObject );
+    histogramFilter->SetHistogramSize( histogramSize );
+    histogramFilter->SetMarginalScale( 10.0 );
+    histogramFilter->Update();
+
+    float lowerValue = histogramFilter->GetOutput()->Quantile( 0, winsorizeLowerQuantile );
+    float upperValue = histogramFilter->GetOutput()->Quantile( 0, winsorizeUpperQuantile );
+
+    typedef itk::IntensityWindowingImageFilter<ImageType3D, ImageType3D> IntensityWindowingImageFilterType;
+
+    IntensityWindowingImageFilterType::Pointer windowingFilter = IntensityWindowingImageFilterType::New();
+    windowingFilter->SetInput( inputImage );
+    windowingFilter->SetWindowMinimum( lowerValue );
+    windowingFilter->SetWindowMaximum( upperValue );
+    windowingFilter->SetOutputMinimum( lowerScaleValue );
+    windowingFilter->SetOutputMaximum( upperScaleValue );
+    windowingFilter->Update();
+
+    ImageType3D::Pointer outputImage = nullptr;
+    if( histogramMatchSourceImage )
+    {
+        typedef itk::HistogramMatchingImageFilter<ImageType3D, ImageType3D> HistogramMatchingFilterType;
+        HistogramMatchingFilterType::Pointer matchingFilter = HistogramMatchingFilterType::New();
+        matchingFilter->SetSourceImage( windowingFilter->GetOutput() );
+        matchingFilter->SetReferenceImage( histogramMatchSourceImage );
+        matchingFilter->SetNumberOfHistogramLevels( 256 );
+        matchingFilter->SetNumberOfMatchPoints( 12 );
+        matchingFilter->ThresholdAtMeanIntensityOn();
+        matchingFilter->Update();
+
+        outputImage = matchingFilter->GetOutput();
+        outputImage->Update();
+        outputImage->DisconnectPipeline();
+    }
+    else
+    {
+        outputImage = windowingFilter->GetOutput();
+        outputImage->Update();
+        outputImage->DisconnectPipeline();
+    }
+    return outputImage;
 }
 
 
@@ -350,6 +634,8 @@ void DRBUDDI::Step1_RigidRegistration()
     {
         down_to_up_rigid_trans = RigidDiffeoRigidRegisterB0DownToB0Up(this->b0_up_quad,this->b0_down,"CC",initial_corrected_b0);
     }
+
+    writeImageD<ImageType3D>(initial_corrected_b0,proc_folder+"/b0_str_registration_target.nii");
 
     using InterpolatorType= itk::BSplineInterpolateImageFunction<ImageType3D,double,double>;
     InterpolatorType::Pointer interp=InterpolatorType::New();
@@ -437,6 +723,18 @@ void DRBUDDI::Step1_RigidRegistration()
         ImageType3D::Pointer str_img_orig = readImageD<ImageType3D>(parser->getStructuralNames(str));
         ImageType3D::Pointer str_img= create_mask(str_img_orig);
 
+        {
+            itk::ImageRegionIteratorWithIndex<ImageType3D> it(str_img,str_img->GetLargestPossibleRegion());
+            for(it.GoToBegin();!it.IsAtEnd();++it)
+            {
+                ImageType3D::IndexType ind3= it.GetIndex();
+                it.Set(it.Get()* str_img_orig->GetPixel(ind3)*5 + str_img_orig->GetPixel(ind3) );
+            }
+        }
+
+        str_img=PreprocessImage(str_img,0,1,0,1);
+        initial_corrected_b0=PreprocessImage(initial_corrected_b0,0,1,0,1);
+
         RigidTransformType::Pointer rigid_trans1= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, "CC",parser->getRigidLR());
         RigidTransformType::Pointer rigid_trans2= RigidRegisterImagesEuler( initial_corrected_b0,  str_img,"MI",parser->getRigidLR());
 
@@ -459,56 +757,87 @@ void DRBUDDI::Step1_RigidRegistration()
             (*stream)<<"Could not compute the rigid transformation from the structural imageto b=0 image... Starting multistart.... This could take a while"<<std::endl;
             (*stream)<<"Better be safe than sorry, right?"<<std::endl;
 
-            RigidTransformType::Pointer rigid_trans1a= RigidRegisterImagesEuler( str_img, initial_corrected_b0,  "CC",parser->getRigidLR());
+            RigidTransformType::Pointer rigid_trans1a= RigidRegisterImagesEuler( str_img, initial_corrected_b0,  "CC",parser->getRigidLR(),false);
             RigidTransformType::ParametersType b1= rigid_trans1a->GetParameters();
 
-            auto tra1=  rigid_trans1a->GetMatrix().GetTranspose() * rigid_trans1a->GetTranslation().GetVnlVector();
             p1[0]= params1[0]+ b1[0];
             p1[1]= params1[1]+ b1[1];
             p1[2]= params1[2]+ b1[2];
-            p1[3]= params1[3] + tra1[0];
-            p1[3]= params1[4] + tra1[1];
-            p1[3]= params1[5] + tra1[2];
-
-            double diff1= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] +
-                   p1[3]*p1[3]/400. + p1[4]*p1[4]/400. + p1[5]*p1[5]/400. ;
 
 
-            RigidTransformType::Pointer rigid_trans2a= RigidRegisterImagesEuler( str_img, initial_corrected_b0,  "MI",parser->getRigidLR());
+
+            double diff1= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] ;
+
+
+
+            RigidTransformType::Pointer rigid_trans2a= RigidRegisterImagesEuler( str_img, initial_corrected_b0,  "MI",parser->getRigidLR(),false);
             RigidTransformType::ParametersType b2= rigid_trans2a->GetParameters();
 
-            auto tra2= rigid_trans2a->GetMatrix().GetTranspose() * rigid_trans2a->GetTranslation().GetVnlVector();
+
+            std::cout<< "Trans CC F" << rigid_trans1->GetParameters()<<std::endl;
+            std::cout<< "Trans CC B" << rigid_trans1a->GetParameters()<<std::endl;
+            std::cout<< "Trans MI F" << rigid_trans2->GetParameters()<<std::endl;
+            std::cout<< "Trans MI B" << rigid_trans2a->GetParameters()<<std::endl;
+
+
             p1[0]= params2[0]+ b2[0];
             p1[1]= params2[1]+ b2[1];
             p1[2]= params2[2]+ b2[2];
-            p1[3]= params2[3] + tra2[0];
-            p1[3]= params2[4] + tra2[1];
-            p1[3]= params2[5] + tra2[2];
 
-            double diff2= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] +
-                   p1[3]*p1[3]/400. + p1[4]*p1[4]/400. + p1[5]*p1[5]/400. ;
+            double diff2= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] ;
+            std::cout<< "diff1 "<<diff1 << " diff2 " <<diff2 <<std::endl;
 
             std::string new_metric_type="MI";
-            if(diff1< diff2)
+            if(diff1 < diff2)
             {
                 (*stream)<< "CC was determined to be more robust than MI. Switching..."<<std::endl;
                 new_metric_type="CC";
             }
 
+            if(diff1<0.001)
+            {
+                b1[0]= (params1[0] - b1[0])/2.;
+                b1[1]= (params1[1] - b1[1])/2.;
+                b1[2]= (params1[2] - b1[2])/2.;
+                b1[3]= (params1[3] );
+                b1[4]= (params1[4] );
+                b1[5]= (params1[5] );
+                rigid_trans1->SetParameters(b1);
 
-            std::vector<float> new_res; new_res.resize(3);
-            new_res[0]= initial_corrected_b0->GetSpacing()[0] * 2;
-            new_res[1]= initial_corrected_b0->GetSpacing()[1] * 2;
-            new_res[2]= initial_corrected_b0->GetSpacing()[2] * 2;
-            std::vector<float> dummy;
-            ImageType3D::Pointer b02= resample_3D_image(initial_corrected_b0,new_res,dummy,"Linear");
-            new_res[0]= str_img->GetSpacing()[0] * 2;
-            new_res[1]= str_img->GetSpacing()[1] * 2;
-            new_res[2]= str_img->GetSpacing()[2] * 2;
-            ImageType3D::Pointer str2= resample_3D_image(str_img,new_res,dummy,"Linear");
+                rigid_trans= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, "CC",parser->getRigidLR(),true, rigid_trans1);
+            }
+            else
+            {
+                if(diff2<0.001)
+                {
+                    b2[0]= (params2[0] - b2[0])/2.;
+                    b2[1]= (params2[1] - b2[1])/2.;
+                    b2[2]= (params2[2] - b2[2])/2.;
+                    b2[3]= (params2[3] );
+                    b2[4]= (params2[4] );
+                    b2[5]= (params2[5] );
+                    rigid_trans2->SetParameters(b2);
 
-            rigid_trans1=MultiStartRigidSearch(b02,  str2,new_metric_type);
-            rigid_trans= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, new_metric_type,parser->getRigidLR(),rigid_trans1);
+                    rigid_trans= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, "MI",parser->getRigidLR(),true,rigid_trans2);
+                }
+                else
+                {
+                    std::vector<float> new_res; new_res.resize(3);
+                    new_res[0]= initial_corrected_b0->GetSpacing()[0] * 2;
+                    new_res[1]= initial_corrected_b0->GetSpacing()[1] * 2;
+                    new_res[2]= initial_corrected_b0->GetSpacing()[2] * 2;
+                    std::vector<float> dummy;
+                    ImageType3D::Pointer b02= resample_3D_image(initial_corrected_b0,new_res,dummy,"Linear");
+                    new_res[0]= str_img->GetSpacing()[0] * 2;
+                    new_res[1]= str_img->GetSpacing()[1] * 2;
+                    new_res[2]= str_img->GetSpacing()[2] * 2;
+                    ImageType3D::Pointer str2= resample_3D_image(str_img,new_res,dummy,"Linear");
+
+                    rigid_trans1=MultiStartRigidSearch(b02,  str2,new_metric_type);
+                    rigid_trans= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, new_metric_type,parser->getRigidLR(),rigid_trans1);
+                }
+            }
+
         }
 
 

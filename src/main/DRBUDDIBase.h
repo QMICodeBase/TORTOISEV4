@@ -17,6 +17,7 @@ public:
     using DisplacementFieldTransformType= TORTOISE::DisplacementFieldTransformType;
     using DisplacementFieldType=DisplacementFieldTransformType::DisplacementFieldType;
     using RigidTransformType = TORTOISE::RigidTransformType;
+    using CompositeTransformType= TORTOISE::CompositeTransformType;
 
     using RGBPixelType=itk::RGBPixel< unsigned char >;
     using RGBImageType=itk::Image< RGBPixelType, 3 >;

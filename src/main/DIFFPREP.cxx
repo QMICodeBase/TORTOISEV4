@@ -18,7 +18,7 @@
 #include "boost/filesystem/path.hpp"
 
 
-#include "register_dwi_to_b0.hxx"
+#include "register_dwi_to_b0.h"
 #ifdef USECUDA
     #include "register_dwi_to_b0_cuda.h"
     #include "register_dwi_to_slice_cuda.h"
@@ -922,7 +922,10 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
 
     int aggressive_level = RegistrationSettings::get().getValue<int>("outlier_replacement_mode");
 
-    std::vector<int> shell_ids;     shell_ids.resize(Nvols);
+
+    int nvols = native_native_synth_dwis.size();
+    std::vector<int> shell_ids;
+    shell_ids.resize(nvols);
 
     std::vector< std::vector<float> >  logRMS_shell;
     logRMS_shell.resize(shells.size());
@@ -930,17 +933,18 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
     //The first few and last few slices are not touched
 
 
+
     ImageType3D::SizeType sz =native_native_synth_dwis[0]->GetLargestPossibleRegion().GetSize();
 
     //RMS holder per volume per slice
     std::vector< std::vector< double> > all_RMS;
-    all_RMS.resize(Nvols);
+    all_RMS.resize(nvols);
 
     std::vector< ImageType3D::Pointer> weight_img;
-    weight_img.resize(Nvols);
+    weight_img.resize(nvols);
 
     std::vector<int> volumes_per_shell;  volumes_per_shell.resize(shells.size(),0);
-    for(int vol=0;vol<Nvols; vol++)
+    for(int vol=0;vol<nvols; vol++)
     {
         float minval=1E10;
         int minid=-1;
@@ -958,7 +962,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
 
 
  //   #pragma omp parallel for
-    for(int vol=0;vol<Nvols; vol++)
+    for(int vol=0;vol<nvols; vol++)
     {
         TORTOISE::EnableOMPThread();
         all_RMS[vol].resize(sz[2],0.);
@@ -1077,7 +1081,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
     float THR = RegistrationSettings::get().getValue<float>("outlier_prob");
     //Check for each shell and for each slice, if we have at least one inlier
     vnl_matrix<int> covereds(shells.size(),sz[2],0);
-    for(int vol=0;vol<Nvols; vol++)
+    for(int vol=0;vol<nvols; vol++)
     {
         int si= shell_ids[vol];
         for(int k=SLICE_NOTCONSIDER;k<sz[2]-SLICE_NOTCONSIDER;k++)
@@ -1112,7 +1116,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
 
                 // first try with median/MAD
                 covereds(sh,k)=0;
-                for(int vol=0;vol<Nvols; vol++)
+                for(int vol=0;vol<nvols; vol++)
                 {
                     if(shell_ids[vol]==sh)
                     {
@@ -1142,7 +1146,7 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
                         meds_sl(sh,k)+= fabs(meds_sl(sh,k))*0.03;
                         // meds_sl(sh,k)*=1.1;
                         MADs_sl(sh,k)*=1.05;
-                        for(int vol=0;vol<Nvols; vol++)
+                        for(int vol=0;vol<nvols; vol++)
                         {
                             if(shell_ids[vol]==sh)
                             {
@@ -1168,51 +1172,54 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
 
 
 
-    // Saving residuals to files for reporting
-    std::string nname= fs::path(this->nii_name).filename().string();
-    fs::path proc_path2=fs::path(this->nii_name).parent_path();
-    std::string basename = nname.substr(0, nname.find(".nii"));
-    fs::path shell_resid_dist_path = proc_path2 / (basename + std::string("_shell_resid_dist.txt"));
+    if(this->nii_name!="")
     {
-        FILE *fp=fopen(shell_resid_dist_path.string().c_str(),"w");
-        for(int sh=0;sh<per_shell_inliers.size();sh++)
+        // Saving residuals to files for reporting
+        std::string nname= fs::path(this->nii_name).filename().string();
+        fs::path proc_path2=fs::path(this->nii_name).parent_path();
+        std::string basename = nname.substr(0, nname.find(".nii"));
+        fs::path shell_resid_dist_path = proc_path2 / (basename + std::string("_shell_resid_dist.txt"));
         {
-            fprintf(fp,"%f %f %f %f %f\n",per_shell_inliers[sh][0],per_shell_inliers[sh][1],per_shell_outliers[sh][0],per_shell_outliers[sh][1],Pin_per_shell[sh]);
-        }
-        fclose(fp);
-    }
-    fs::path slice_resids_path = proc_path2 / (basename + std::string("_slice_resids.txt"));
-    fs::path slice_resids_Z_path = proc_path2 / (basename + std::string("_slice_resids_Z.txt"));
-
-    {
-        FILE *fp=fopen(slice_resids_path.string().c_str(),"w");
-        FILE *fp2=fopen(slice_resids_Z_path.string().c_str(),"w");
-        for(int vol=0;vol<Nvols;vol++)
-        {
-            for(int k=0;k<sz[2];k++)
+            FILE *fp=fopen(shell_resid_dist_path.string().c_str(),"w");
+            for(int sh=0;sh<per_shell_inliers.size();sh++)
             {
-                double val = all_RMS[vol][k];
-                if(val>0)
-                    val=log(val);
-                else
-                    val=0;
-
-                double val_Z =0;
-                if( MADs_sl(shell_ids[vol],k)!=0)
-                    val_Z=(val - meds_sl(shell_ids[vol],k))/  MADs_sl(shell_ids[vol],k);
-
-                fprintf(fp,"%f ",val);
-                fprintf(fp2,"%f ",val_Z);
+                fprintf(fp,"%f %f %f %f %f\n",per_shell_inliers[sh][0],per_shell_inliers[sh][1],per_shell_outliers[sh][0],per_shell_outliers[sh][1],Pin_per_shell[sh]);
             }
-            fprintf(fp,"\n");
-            fprintf(fp2,"\n");
+            fclose(fp);
         }
-        fclose(fp);
-        fclose(fp2);
+        fs::path slice_resids_path = proc_path2 / (basename + std::string("_slice_resids.txt"));
+        fs::path slice_resids_Z_path = proc_path2 / (basename + std::string("_slice_resids_Z.txt"));
+
+        {
+            FILE *fp=fopen(slice_resids_path.string().c_str(),"w");
+            FILE *fp2=fopen(slice_resids_Z_path.string().c_str(),"w");
+            for(int vol=0;vol<nvols;vol++)
+            {
+                for(int k=0;k<sz[2];k++)
+                {
+                    double val = all_RMS[vol][k];
+                    if(val>0)
+                        val=log(val);
+                    else
+                        val=0;
+
+                    double val_Z =0;
+                    if( MADs_sl(shell_ids[vol],k)!=0)
+                        val_Z=(val - meds_sl(shell_ids[vol],k))/  MADs_sl(shell_ids[vol],k);
+
+                    fprintf(fp,"%f ",val);
+                    fprintf(fp2,"%f ",val_Z);
+                }
+                fprintf(fp,"\n");
+                fprintf(fp2,"\n");
+            }
+            fclose(fp);
+            fclose(fp2);
+        }
     }
 
     #pragma omp parallel for
-    for(int vol=0;vol<Nvols;vol++)
+    for(int vol=0;vol<nvols;vol++)
     {
         TORTOISE::EnableOMPThread();
 

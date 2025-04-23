@@ -41,7 +41,7 @@ private:
 
     enum STEPS
     {
-        Import,Denoising,Gibbs,MotionEddy,Drift,EPI,StructuralAlignment,FinalData,Unknown
+        Import,Denoising,Gibbs,MotionEddy,Drift,EPI,ExtraOutlier,StructuralAlignment,FinalData,Unknown
     };
 
     STEPS ConvertStringToStep(std::string str)
@@ -59,6 +59,8 @@ private:
             return STEPS::MotionEddy;
         if(str2=="epi")
             return STEPS::EPI;
+        if(str2=="extraoutlier")
+            return STEPS::ExtraOutlier;
         if(str2=="structuralalignment")
             return STEPS::StructuralAlignment;
         if(str2=="drift")

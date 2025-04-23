@@ -246,8 +246,9 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
         option->SetUsageOption(3, "motioneddy: Starts from motion&eddy correction. Assumes all previous steps are done. " );
         option->SetUsageOption(4, "drift: Starts with signal drift correction. Assumes all previous steps are done.  " );
         option->SetUsageOption(5, "epi: Starts from susceptibility distortion correction. Assumes all previous steps are done.  " );
-        option->SetUsageOption(6, "StructuralAlignment: Starts with aligning DWIs to the structural image. Assumes all previous steps are done.  " );
-        option->SetUsageOption(7, "finaldata: Writes the final data assuming all the previous steps are already performed.  " );
+        option->SetUsageOption(6, "ExtraOutlier: Starts from the step where an additional outlier detection istep is performed using ALL data if both blip-up and blip-down have DWIs.  " );
+        option->SetUsageOption(7, "StructuralAlignment: Starts with aligning DWIs to the structural image. Assumes all previous steps are done.  " );
+        option->SetUsageOption(8, "finaldata: Writes the final data assuming all the previous steps are already performed.  " );
         option->SetDescription( description );
         option->SetModule(1);
         this->AddOption( option );

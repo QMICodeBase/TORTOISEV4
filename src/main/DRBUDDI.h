@@ -12,6 +12,7 @@ class DRBUDDI : public DRBUDDIBase
     using DisplacementFieldTransformType= SuperClass::DisplacementFieldTransformType;
     using DisplacementFieldType=SuperClass::DisplacementFieldType;
     using RigidTransformType = SuperClass::RigidTransformType;
+    using CompositeTransformType= SuperClass::CompositeTransformType;
 
     using RGBPixelType=SuperClass::RGBPixelType;
     using RGBImageType=SuperClass::RGBImageType;
@@ -24,7 +25,7 @@ public:
 private:            //Subfunctions the main processing functions use        
 
     RigidTransformType::Pointer RigidDiffeoRigidRegisterB0DownToB0Up(ImageType3D::Pointer up_image, ImageType3D::Pointer b0_down_image, std::string mtype, ImageType3D::Pointer & initial_corrected_b0);
-    std::vector<DisplacementFieldType::Pointer> DRBUDDI_Initial_Register_Up_Down(ImageType3D::Pointer b0_up_img,ImageType3D::Pointer blip_down_img, std::string phase);    
+    std::vector<DisplacementFieldType::Pointer> DRBUDDI_Initial_Register_Up_Down(ImageType3D::Pointer b0_up_img,ImageType3D::Pointer blip_down_img, std::string phase,bool small);
 
 
 
@@ -37,6 +38,12 @@ private:                    //Main processing functions
     void Step2_DiffeoRegistration();
     void Step3_WriteOutput();
 
+    DisplacementFieldType::Pointer CompositeToDispField(CompositeTransformType::Pointer comp_trans, ImageType3D::Pointer ref_img);
+    ImageType3D::Pointer PreprocessImage(  ImageType3D::ConstPointer  inputImage,
+                                              ImageType3D::PixelType lowerScaleValue,
+                                              ImageType3D::PixelType upperScaleValue,
+                                              float winsorizeLowerQuantile, float winsorizeUpperQuantile,
+                                                  ImageType3D::ConstPointer histogramMatchSourceImage=nullptr );
 
 
 

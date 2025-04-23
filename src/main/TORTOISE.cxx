@@ -11,6 +11,7 @@
 #include "../tools/DWIDenoise/dwi_denoise.h"
 #include "../tools/UnRing/unring.h"
 #include "DIFFPREP.h"
+//#include "DIFFPREPReduced.h"
 #include "DRBUDDI.h"
 #include "EPIREG.h"
 #include "rigid_register_images.h"
@@ -572,6 +573,7 @@ void TORTOISE::Process()
     if(parser->getDownInputName()=="")
     {
         RegistrationSettings::get().setValue<std::string>("output_data_combination","");
+        RegistrationSettings::get().setValue<std::string>("output_signal_redist_method","Jac");
     }
     else
     {
@@ -608,12 +610,12 @@ void TORTOISE::Process()
                if(down_Bmatrix.rows()<=2)
                {
                    (*stream)<<"UP AND DOWN DATA MERGE REQUESTED. HOWEVER, THEY DO NOT HAVE IDENTICAL BMATRICES. REVERTING TO JACSEP."<<std::endl;
-                   RegistrationSettings::get().setValue<std::string>("output_data_combination","JacSep");
+                   RegistrationSettings::get().setValue<std::string>("output_data_combination","JacSep");                   
                }
                else
                {
                    (*stream)<<"UP AND DOWN DATA MERGE REQUESTED. HOWEVER, THEY DO NOT HAVE IDENTICAL BMATRICES. REVERTING TO JACCONCAT."<<std::endl;
-                   RegistrationSettings::get().setValue<std::string>("output_data_combination","JacConcat");
+                   RegistrationSettings::get().setValue<std::string>("output_data_combination","JacConcat");                   
                }
            }
         }
@@ -782,7 +784,24 @@ void TORTOISE::Process()
         std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
         std::cout << "TOTAL EPI time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
     }
+/*
+    if(ConvertStringToStep(parser->getStartStep())<= STEPS::ExtraOutlier)
+    {
+        if(parser->getRepol() && fs::exists(this->temp_proc_folder+ "/blip_up_FA.nii") && fs::exists(this->temp_proc_folder+ "/blip_down_FA.nii"))
+        {
+            std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
+            (*stream)<<"Starting Extra outlier detection step..."<<std::endl;
 
+            DIFFPREPReduced mydiffprep_reduced(this->proc_infos[0].nii_name,this->my_jsons[0],this->proc_infos[1].nii_name,this->my_jsons[1]);
+            mydiffprep_reduced.SetTempFolder(this->temp_proc_folder);
+            mydiffprep_reduced.SetParser(this->parser);
+            mydiffprep_reduced.Generate();
+
+            std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
+            std::cout << "TOTAL Extra Outlier Detection time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
+        }
+    }
+*/
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::StructuralAlignment)
     {
         std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();

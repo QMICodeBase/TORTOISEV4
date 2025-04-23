@@ -15,12 +15,15 @@ class FINALDATA
 
 public:
 
+    FINALDATA();
     FINALDATA(std::string orig_upname, json orig_upjson, std::string orig_downname, json orig_downjson)
     {
         epi_trans[0]=nullptr;
         epi_trans[1]=nullptr;
         Nvols[0]=0;
         Nvols[1]=0;
+        jac_imgs[0]=nullptr;
+        jac_imgs[1]=nullptr;
 
 
         data_names.push_back(orig_upname);
@@ -73,7 +76,10 @@ private:            //Subfunctions the main processing functions use
     void  GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer> > dwis);
     std::vector< std::vector<ImageType3D::Pointer> >  GenerateTransformedInterpolatedData();
     void GenerateGradNonlinOutput();
+
+    void ComputeJacImgs();
     ImageType3D::Pointer ComputeDetImgFromAllTransExceptStr(ImageType3D::Pointer ref_vol,int vol_id,int PE);
+
 
 
     ImageType3D::Pointer UnObliqueImage(ImageType3D::Pointer img);
@@ -83,6 +89,7 @@ private:            //Subfunctions the main processing functions use
     std::vector<ImageType3D::Pointer> ComputeVBMatImgFromField(int UPDOWN);
     std::vector<ImageType3D::Pointer> ComputeLImgFromField();
     InternalMatrixType  pixel_bmatrix(const GradCoef &E, ImageType3D::PointType point,const vnl_vector<double> &norms);
+
 
 
     std::vector<ImageType3D::Pointer>  ComputeS2VInverse(int PE);
@@ -95,7 +102,7 @@ public:                    //Main processing functions
 
 
 
-private:
+protected:
     RigidTransformType::Pointer b0_t0_str_trans{nullptr};
     RigidTransformType::Pointer b0down_t0_b0up_trans{nullptr};
 
@@ -133,6 +140,9 @@ private:
     std::vector<json> jsons;
     std::string temp_folder;
     std::string output_name;
+
+    ImageType3D::Pointer jac_imgs[2];
+
 
     TORTOISE::TeeStream *stream{nullptr};
     TORTOISE_PARSER *parser{nullptr};
