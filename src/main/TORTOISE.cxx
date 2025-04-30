@@ -1069,6 +1069,19 @@ void TORTOISE::AlignB0ToReorientation()
     {
         ImageType3D::Pointer b0_img=nullptr;
 
+        {
+            ImageType3D::Pointer target_mask= create_mask(target_img);
+            {
+                itk::ImageRegionIteratorWithIndex<ImageType3D> it(target_img,target_img->GetLargestPossibleRegion());
+                for(it.GoToBegin();!it.IsAtEnd();++it)
+                {
+                    ImageType3D::IndexType ind3= it.GetIndex();
+                    if(target_mask->GetPixel(ind3))
+                        it.Set(it.Get()*5);
+                }
+            }
+        }
+
         if(fs::exists(this->temp_proc_folder + std::string("/b0_corrected_final.nii")))
             b0_img = readImageD<ImageType3D>(this->temp_proc_folder + std::string("/b0_corrected_final.nii"));
         else if(fs::exists(this->temp_proc_folder + std::string("/blip_up_b0_corrected_JAC.nii")))
@@ -1104,31 +1117,25 @@ void TORTOISE::AlignB0ToReorientation()
             RigidTransformType::Pointer rigid_trans1a= RigidRegisterImagesEuler( b0_img, target_img,  "CC",parser->getRigidLR());
             RigidTransformType::ParametersType b1= rigid_trans1a->GetParameters();
 
-            auto tra1=  rigid_trans1a->GetMatrix().GetTranspose() * rigid_trans1a->GetTranslation().GetVnlVector();
             p1[0]= params1[0]+ b1[0];
             p1[1]= params1[1]+ b1[1];
             p1[2]= params1[2]+ b1[2];
-            p1[3]= params1[3] + tra1[0];
-            p1[3]= params1[4] + tra1[1];
-            p1[3]= params1[5] + tra1[2];
-
-            double diff1= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] +
-                   p1[3]*p1[3]/400. + p1[4]*p1[4]/400. + p1[5]*p1[5]/400. ;
+            double diff1= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] ;
 
 
             RigidTransformType::Pointer rigid_trans2a= RigidRegisterImagesEuler( b0_img, target_img, "MI",parser->getRigidLR());
             RigidTransformType::ParametersType b2= rigid_trans2a->GetParameters();
 
-            auto tra2= rigid_trans2a->GetMatrix().GetTranspose() * rigid_trans2a->GetTranslation().GetVnlVector();
             p1[0]= params2[0]+ b2[0];
             p1[1]= params2[1]+ b2[1];
-            p1[2]= params2[2]+ b2[2];
-            p1[3]= params2[3] + tra2[0];
-            p1[3]= params2[4] + tra2[1];
-            p1[3]= params2[5] + tra2[2];
+            p1[2]= params2[2]+ b2[2];            
+            double diff2= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] ;
+            std::cout<< "diff1 "<<diff1 << " diff2 " <<diff2 <<std::endl;
 
-            double diff2= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] +
-                   p1[3]*p1[3]/400. + p1[4]*p1[4]/400. + p1[5]*p1[5]/400. ;
+            std::cout<< "Trans CC F" << rigid_trans1->GetParameters()<<std::endl;
+            std::cout<< "Trans CC B" << rigid_trans1a->GetParameters()<<std::endl;
+            std::cout<< "Trans MI F" << rigid_trans2->GetParameters()<<std::endl;
+            std::cout<< "Trans MI B" << rigid_trans2a->GetParameters()<<std::endl;
 
             std::string new_metric_type="MI";
             if(diff1< diff2)
@@ -1137,21 +1144,50 @@ void TORTOISE::AlignB0ToReorientation()
                 new_metric_type="CC";
             }
 
+            if(diff1<0.001)
+            {
+                b1[0]= (params1[0] - b1[0])/2.;
+                b1[1]= (params1[1] - b1[1])/2.;
+                b1[2]= (params1[2] - b1[2])/2.;
+                b1[3]= (params1[3] );
+                b1[4]= (params1[4] );
+                b1[5]= (params1[5] );
+                rigid_trans1->SetParameters(b1);
 
+                b0_to_str_trans= RigidRegisterImagesEuler( b0_img,  target_img, "CC",parser->getRigidLR(),true, rigid_trans1);
+            }
+            else
+            {
+                if(diff2<0.001)
+                {
+                    b2[0]= (params2[0] - b2[0])/2.;
+                    b2[1]= (params2[1] - b2[1])/2.;
+                    b2[2]= (params2[2] - b2[2])/2.;
+                    b2[3]= (params2[3] );
+                    b2[4]= (params2[4] );
+                    b2[5]= (params2[5] );
+                    rigid_trans2->SetParameters(b2);
 
-            std::vector<float> new_res; new_res.resize(3);
-            new_res[0]= b0_img->GetSpacing()[0] * 2;
-            new_res[1]= b0_img->GetSpacing()[1] * 2;
-            new_res[2]= b0_img->GetSpacing()[2] * 2;
-            std::vector<float> dummy;
-            ImageType3D::Pointer b02= resample_3D_image(b0_img,new_res,dummy,"Linear");
-            new_res[0]= target_img->GetSpacing()[0] * 2;
-            new_res[1]= target_img->GetSpacing()[1] * 2;
-            new_res[2]= target_img->GetSpacing()[2] * 2;
-            ImageType3D::Pointer str2= resample_3D_image(target_img,new_res,dummy,"Linear");
+                    b0_to_str_trans= RigidRegisterImagesEuler( b0_img,  target_img, "MI",parser->getRigidLR(),true,rigid_trans2);
+                }
+                else
+                {
 
-            rigid_trans1=MultiStartRigidSearch(str2,b02,new_metric_type);
-            b0_to_str_trans= RigidRegisterImagesEuler( target_img, b0_img, new_metric_type  ,parser->getRigidLR()/2.,rigid_trans1);
+                    std::vector<float> new_res; new_res.resize(3);
+                    new_res[0]= b0_img->GetSpacing()[0] * 2;
+                    new_res[1]= b0_img->GetSpacing()[1] * 2;
+                    new_res[2]= b0_img->GetSpacing()[2] * 2;
+                    std::vector<float> dummy;
+                    ImageType3D::Pointer b02= resample_3D_image(b0_img,new_res,dummy,"Linear");
+                    new_res[0]= target_img->GetSpacing()[0] * 2;
+                    new_res[1]= target_img->GetSpacing()[1] * 2;
+                    new_res[2]= target_img->GetSpacing()[2] * 2;
+                    ImageType3D::Pointer str2= resample_3D_image(target_img,new_res,dummy,"Linear");
+
+                    rigid_trans1=MultiStartRigidSearch(str2,b02,new_metric_type);
+                    b0_to_str_trans= RigidRegisterImagesEuler( target_img, b0_img, new_metric_type  ,parser->getRigidLR()/2.,rigid_trans1);
+                }
+            }
         }
         (*stream)<<"Final transformation: " << b0_to_str_trans->GetParameters()<<std::endl;
 

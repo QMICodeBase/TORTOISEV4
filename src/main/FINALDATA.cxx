@@ -2222,6 +2222,118 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
 
 
+    //eddy currents transformation jacobian
+    if(parser->getCorrectionMode()!="off" && parser->getCorrectionMode()!="motion" )
+    {
+        for(int PE=0;PE<2;PE++)
+        {
+            ImageType3D::Pointer ref_img =  read_3D_volume_from_4D(data_names[PE],0);
+            ImageType3D::Pointer ref_img_DP= ChangeImageHeaderToDP<ImageType3D>(ref_img);
+
+            #pragma omp parallel for
+            for(int v=0;v<all_final_data[PE].size();v++)
+            {
+                using DupType = itk::ImageDuplicator<ImageType3D>;
+                DupType::Pointer dup= DupType::New();
+                dup->SetInputImage(ref_img_DP);
+                dup->Update();
+                ImageType3D::Pointer jac_mult_img_native = dup->GetOutput();
+
+                itk::ImageRegionIteratorWithIndex<ImageType3D> it(jac_mult_img_native,jac_mult_img_native->GetLargestPossibleRegion());
+                for(it.GoToBegin();!it.IsAtEnd();++it)
+                {
+                    ImageType3D::IndexType ind3= it.GetIndex();
+                    ImageType3D::PointType p;
+                    ref_img_DP->TransformIndexToPhysicalPoint(ind3,p);
+                    double X= p[0];
+                    double Y= p[1];
+                    double Z= p[2];
+
+
+                    OkanQuadraticTransformType::ParametersType params= dwi_transforms[PE][v]->GetParameters();
+
+                    double mult=1;
+                    if(dwi_transforms[PE][v]->GetPhase()==0)
+                    {
+                        mult = params[6] + params[9]*Y + params[10]*Z + 2*params[12]*X -2*params[13]*X +
+                               params[14]*Y*Z +
+                               params[15]*Z*2*X +
+                               params[16]*((4*p[2]*p[2]-p[0]*p[0]-p[1]*p[1])+ -2*X*X ) +
+                               params[17]*-2*X*Y +
+                               params[18]*(3*X*X -3*Y*Y)+
+                               params[19]*Y*6*X+
+                               params[20]*Z*-6*X;
+                    }
+                    if(dwi_transforms[PE][v]->GetPhase()==1)
+                    {
+                        mult = params[7] + params[9]*X + params[11]*Z + params[12]*-2*Y + params[13]*-2*Y +
+                               params[14]*X*Z +
+                               params[15]*Z*-2*Y +
+                               params[16]* X* -2*Y +
+                               params[17]* ((4*p[2]*p[2]-p[0]*p[0]-p[1]*p[1]) + Y*-2*Y)+
+                               params[18]* X *-6*Y +
+                               params[19]*(3*X*X -3*Y*Y) +
+                               params[20]*Z*-6*Y;
+                    }
+                    if(dwi_transforms[PE][v]->GetPhase()==2)
+                    {
+                        mult = params[8] + params[10]*X + params[11]*Y +params[13]*4*Z+
+                               params[14]*X*Y +
+                               params[15]*(X*X-Y*Y)+
+                               params[16]*X*8*Z+
+                               params[17]*Y*8*Z+
+                               params[20]* ((2*p[2]*p[2]-3*p[0]*p[0]-3*p[1]*p[1]) + Z*4*Z);
+                    }
+
+                    it.Set(mult);
+                }
+                jac_mult_img_native->SetDirection(ref_img->GetDirection());
+                jac_mult_img_native->SetOrigin(ref_img->GetOrigin());
+
+                using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D,ImageType3D>;
+                if(PE==0 || this->b0down_t0_b0up_trans==nullptr)
+                {
+
+
+                    if(this->b0_t0_str_trans)
+                    {
+                        ResampleImageFilterType::Pointer resampler = ResampleImageFilterType::New();
+                        resampler->SetOutputParametersFromImage(this->template_structural);
+                        resampler->SetInput(jac_mult_img_native);
+                        resampler->SetTransform( b0_t0_str_trans);
+                        resampler->SetDefaultPixelValue(1);
+                        resampler->Update();
+                        jac_mult_img_native= resampler->GetOutput();
+                    }
+                }
+                else
+                {
+                    CompositeTransformType::Pointer comp_trans = CompositeTransformType::New();
+                    comp_trans->AddTransform(this->b0down_t0_b0up_trans);
+                    if(this->b0_t0_str_trans)
+                        comp_trans->AddTransform(b0_t0_str_trans);
+
+                    ResampleImageFilterType::Pointer resampler = ResampleImageFilterType::New();
+                    resampler->SetOutputParametersFromImage(this->template_structural);
+                    resampler->SetInput(jac_mult_img_native);
+                    resampler->SetTransform( comp_trans);
+                    resampler->SetDefaultPixelValue(1);
+                    resampler->Update();
+                    jac_mult_img_native= resampler->GetOutput();
+                }
+
+                itk::ImageRegionIteratorWithIndex<ImageType3D> it2(all_final_data[PE][v],all_final_data[PE][v]->GetLargestPossibleRegion());
+                for(it2.GoToBegin();!it2.IsAtEnd();++it2)
+                {
+                    ImageType3D::IndexType ind3= it2.GetIndex();
+                    it2.Set(it2.Get()*jac_mult_img_native->GetPixel(ind3));
+                }
+            } //vol
+        }//PE
+    } //if eddy currents
+
+
+
     for(int PE=0;PE<2;PE++)
     {
         std::string up_name = data_names[PE];

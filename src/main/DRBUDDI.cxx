@@ -764,15 +764,9 @@ void DRBUDDI::Step1_RigidRegistration()
             p1[1]= params1[1]+ b1[1];
             p1[2]= params1[2]+ b1[2];
 
-
-
             double diff1= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] ;
-
-
-
             RigidTransformType::Pointer rigid_trans2a= RigidRegisterImagesEuler( str_img, initial_corrected_b0,  "MI",parser->getRigidLR(),false);
             RigidTransformType::ParametersType b2= rigid_trans2a->GetParameters();
-
 
             std::cout<< "Trans CC F" << rigid_trans1->GetParameters()<<std::endl;
             std::cout<< "Trans CC B" << rigid_trans1a->GetParameters()<<std::endl;
