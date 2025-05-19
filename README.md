@@ -171,7 +171,7 @@ The sed commands are to fix a bug in MattesMutualInformationv4 metric that preve
 #### 5) VTK installation (Optional. only for the ComputeGlyphMaps executable)
 
 ```
-wget https://gitlab.kitware.com/vtk/vtk/-/archive/v8.0.1/vtk-v8.0.1.zip](https://www.vtk.org/files/release/9.4/VTK-9.4.2.tar.gz
+wget https://www.vtk.org/files/release/9.4/VTK-9.4.2.tar.gz
 tar -xvf  VTK-9.4.2.tar.gz
 mkdir VTK-9.4.2_build
 cd VTK-9.4.2_build
