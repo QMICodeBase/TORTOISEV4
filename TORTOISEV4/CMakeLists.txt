@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.20)
 PROJECT(TORTOISEV4  )
 
 SET(USEOPENMP 1)
- #  SET(CMAKE_BUILD_TYPE Debug)
- #  SET(ISDEBUG 1)
+#   SET(CMAKE_BUILD_TYPE Debug)
+#   SET(ISDEBUG 1)
 
 
 
@@ -12,7 +12,7 @@ if ( NOT DEFINED USECUDA)
     SET(USECUDA  0)
 endif()
 if ( NOT DEFINED USE_VTK)
-    SET(USE_VTK 1)
+    SET(USE_VTK 0)
 endif()
 
 if ( NOT DEFINED QSIPREP)
@@ -525,7 +525,7 @@ target_link_libraries(ImportBruker  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 IF(USE_VTK)
     add_definitions(-DUSE_VTK)
     if ( NOT DEFINED VTK_DIR)
-        SET(VTK_DIR /qmi_home/irfanogo/Desktop/codes/other_codes/ANTs_09_05_2013/Release/VTK_801_Linux_static)
+        SET(VTK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/VTK-9.4.2_build)
     endif()
 
     FIND_PACKAGE(VTK)
@@ -539,6 +539,12 @@ IF(USE_VTK)
 
     add_executable(ComputeGlyphMaps ../src/tools/ComputeGlyphMaps/compute_glyph_maps.cxx  ../src/main/defines.cxx ../src/tools/ComputeGlyphMaps/vtkTensorGlyphOkan.cxx)
     target_link_libraries(ComputeGlyphMaps ${ITK_LIBRARIES} ${VTK_LIBRARIES} -lboost_system  )
+
+    # vtk_module_autoinit is needed
+    vtk_module_autoinit(
+      TARGETS ComputeGlyphMaps
+      MODULES ${VTK_LIBRARIES}
+    )
 
    # add_executable(WarpMesh ../src/utilities/read_3Dvolume_from_4D.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/WarpMesh/WarpMesh.cxx  ../src/main/defines.cxx )
    # target_link_libraries(WarpMesh ${ITK_LIBRARIES} ${VTK_LIBRARIES} -lboost_system  )

@@ -439,7 +439,8 @@ int vtkTensorGlyphOkan::RequestData(
 
         for (i=0; i < numSourcePts; i++)
           {
-          newScalars->InsertTupleValue(ptIncr+i, sok);
+            newScalars->InsertTypedTuple(ptIncr+i, sok);
+          //newScalars->InsertTupleValue(ptIncr+i, sok);
           }
         }
       else if (this->ColorGlyphs &&

@@ -28,6 +28,7 @@
 #include <vtkInteractorStyleTrackballCamera.h>
 
 
+
 typedef double RealType;
 typedef itk::DiffusionTensor3D<RealType> TensorPixelType;
 typedef itk::Vector<RealType,6> VectorPixelType;
@@ -117,6 +118,13 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
 
                 vnl_symmetric_eigensystem<RealType>  eigf(mat);
 
+                if(eigf.D(0,0) < 0)
+                    eigf.D(0,0)=0;
+                if(eigf.D(1,1) < 0)
+                    eigf.D(1,1)=0;
+                if(eigf.D(2,2) < 0)
+                    eigf.D(2,2)=0;
+
                 double MDf= (eigf.D(0,0)+eigf.D(1,1)+eigf.D(2,2))/3.;
                 double nom= (eigf.D(0,0)-MDf)*(eigf.D(0,0)-MDf) + (eigf.D(1,1)-MDf)*(eigf.D(1,1)-MDf) + (eigf.D(2,2)-MDf)*(eigf.D(2,2)-MDf);
                 double denom = eigf.D(0,0)*eigf.D(0,0) + eigf.D(1,1)*eigf.D(1,1) + eigf.D(2,2)*eigf.D(2,2) ;
@@ -129,11 +137,12 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
                 if(FAf>max_FA)
                     max_FA=FAf;
 
-                if(FAf>FA_thr)
+                double maxval= std::max(eigf.D(0,0),std::max(eigf.D(1,1),eigf.D(2,2)));
+                if(FAf>FA_thr  )
                 {
                     points->InsertNextPoint(i, sz[1]-j-1, sl_numbers[2]);
 
-                    double maxval= std::max(eigf.D(0,0),std::max(eigf.D(1,1),eigf.D(2,2)));
+
                     eigf.D(0,0)=eigf.D(0,0)/maxval*FAf;
                     eigf.D(1,1)=eigf.D(1,1)/maxval*FAf;
                     eigf.D(2,2)=eigf.D(2,2)/maxval*FAf;
@@ -147,7 +156,8 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
                     s[1]=(unsigned char)floor(255*fabs(evec[1]));
                     s[2]=(unsigned char)floor(255*fabs(evec[2]));
 
-                    colors->InsertNextTupleValue( s);
+
+                    colors->InsertNextTypedTuple( s);
                     tensors->InsertTuple9(counter,vmat(0,0),-vmat(0,1),vmat(0,2),-vmat(1,0),vmat(1,1),-vmat(1,2),vmat(2,0),-vmat(2,1),vmat(2,2));
                     counter++;
 
@@ -229,6 +239,13 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
 
                  vnl_symmetric_eigensystem<RealType>  eigf(mat);
 
+                 if(eigf.D(0,0) < 0)
+                     eigf.D(0,0)=0;
+                 if(eigf.D(1,1) < 0)
+                     eigf.D(1,1)=0;
+                 if(eigf.D(2,2) < 0)
+                     eigf.D(2,2)=0;
+
                  double MDf= (eigf.D(0,0)+eigf.D(1,1)+eigf.D(2,2))/3.;
                  double nom= (eigf.D(0,0)-MDf)*(eigf.D(0,0)-MDf) + (eigf.D(1,1)-MDf)*(eigf.D(1,1)-MDf) + (eigf.D(2,2)-MDf)*(eigf.D(2,2)-MDf);
                  double denom = eigf.D(0,0)*eigf.D(0,0) + eigf.D(1,1)*eigf.D(1,1) + eigf.D(2,2)*eigf.D(2,2) ;
@@ -241,11 +258,12 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
                  if(FAf>max_FA)
                      max_FA=FAf;
 
-                 if(FAf>FA_thr)
+                 double maxval= std::max(eigf.D(0,0),std::max(eigf.D(1,1),eigf.D(2,2)));
+                 if(FAf>FA_thr  )
                  {
                      points->InsertNextPoint(sl_numbers[0], sz[1]-j-1, k);
 
-                     double maxval= std::max(eigf.D(0,0),std::max(eigf.D(1,1),eigf.D(2,2)));
+
                      eigf.D(0,0)=eigf.D(0,0)/maxval*FAf;
                      eigf.D(1,1)=eigf.D(1,1)/maxval*FAf;
                      eigf.D(2,2)=eigf.D(2,2)/maxval*FAf;
@@ -259,7 +277,7 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
                      s[1]=(unsigned char)floor(255*fabs(evec[1]));
                      s[2]=(unsigned char)floor(255*fabs(evec[2]));
 
-                     colors->InsertNextTupleValue( s);
+                     colors->InsertNextTypedTuple( s);
                      tensors->InsertTuple9(counter,vmat(0,0),-vmat(0,1),vmat(0,2),-vmat(1,0),vmat(1,1),-vmat(1,2),vmat(2,0),-vmat(2,1),vmat(2,2));
                      counter++;
 
@@ -342,6 +360,13 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
 
                  vnl_symmetric_eigensystem<RealType>  eigf(mat);
 
+                 if(eigf.D(0,0) < 0)
+                     eigf.D(0,0)=0;
+                 if(eigf.D(1,1) < 0)
+                     eigf.D(1,1)=0;
+                 if(eigf.D(2,2) < 0)
+                     eigf.D(2,2)=0;
+
                  double MDf= (eigf.D(0,0)+eigf.D(1,1)+eigf.D(2,2))/3.;
                  double nom= (eigf.D(0,0)-MDf)*(eigf.D(0,0)-MDf) + (eigf.D(1,1)-MDf)*(eigf.D(1,1)-MDf) + (eigf.D(2,2)-MDf)*(eigf.D(2,2)-MDf);
                  double denom = eigf.D(0,0)*eigf.D(0,0) + eigf.D(1,1)*eigf.D(1,1) + eigf.D(2,2)*eigf.D(2,2) ;
@@ -354,11 +379,12 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
                  if(FAf>max_FA)
                      max_FA=FAf;
 
-                 if(FAf>FA_thr)
+                 double maxval= std::max(eigf.D(0,0),std::max(eigf.D(1,1),eigf.D(2,2)));
+                 if(FAf>FA_thr  )
                  {
                      points->InsertNextPoint(i, sz[1]-1-sl_numbers[1], k);
 
-                     double maxval= std::max(eigf.D(0,0),std::max(eigf.D(1,1),eigf.D(2,2)));
+
                      eigf.D(0,0)=eigf.D(0,0)/maxval*FAf;
                      eigf.D(1,1)=eigf.D(1,1)/maxval*FAf;
                      eigf.D(2,2)=eigf.D(2,2)/maxval*FAf;
@@ -372,7 +398,7 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
                      s[1]=(unsigned char)floor(255*fabs(evec[1]));
                      s[2]=(unsigned char)floor(255*fabs(evec[2]));
 
-                     colors->InsertNextTupleValue( s);
+                     colors->InsertNextTypedTuple( s);
                      tensors->InsertTuple9(counter,vmat(0,0),-vmat(0,1),vmat(0,2),-vmat(1,0),vmat(1,1),-vmat(1,2),vmat(2,0),-vmat(2,1),vmat(2,2));
                      counter++;
 
@@ -392,7 +418,7 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
          tensorGlyph->SetColorModeToScalars();
          tensorGlyph->ThreeGlyphsOff();
          tensorGlyph->ExtractEigenvaluesOn();
-         tensorGlyph->ClampScalingOff();
+         tensorGlyph->ClampScalingOn();
          tensorGlyph->SetScaleFactor(1./max_FA);
          tensorGlyph->Update();
 
@@ -616,7 +642,8 @@ int main(int argc, char *argv[])
 
     vtkSmartPointer<vtkWindowToImageFilter> windowToImageFilter =     vtkSmartPointer<vtkWindowToImageFilter>::New();
     windowToImageFilter->SetInput(renderWindow);
-    windowToImageFilter->SetMagnification(2);
+   // windowToImageFilter->SetMagnification(2);
+    windowToImageFilter->SetScale(2);
     windowToImageFilter->SetInputBufferTypeToRGB();
     windowToImageFilter->Update();
 
