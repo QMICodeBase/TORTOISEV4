@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.20)
 PROJECT(TORTOISEV4  )
 
 SET(USEOPENMP 1)
-#   SET(CMAKE_BUILD_TYPE Debug)
-#   SET(ISDEBUG 1)
+ #  SET(CMAKE_BUILD_TYPE Debug)
+ #  SET(ISDEBUG 1)
 
 
 
@@ -521,6 +521,9 @@ target_link_libraries(ImportBruker  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 #add_executable(OrthoSuperRes   ../src/tools/OrthoSuperRes/OrthoSuperRes.cxx  ${SOURCES})
 #target_link_libraries(OrthoSuperRes Eigen3::Eigen ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
+
+add_executable(ComputeLineField   ../src/tools/ComputeLineField/ComputeLineField.cxx  ${SOURCES})
+target_link_libraries(ComputeLineField Eigen3::Eigen ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
 IF(USE_VTK)
     add_definitions(-DUSE_VTK)
