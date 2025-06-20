@@ -111,6 +111,17 @@ Usage:FSLBVecsToTORTOISEBmatrix bvals_file bvecs_file
 
 Converts a bvecs and bvals to a TORTOISE format Bmatrix. Normally not necessary for data processing.
 
+##  TORTOISEBMatrixToBT
+Usage: TORTOISEBMatrixToBT bmatrix_file
+
+Converts TORTOISE Bmatrix to a BTensor for multi-dimensional analysis.
+
+
+##  TORTOISEBmatrixToFSLBVecs
+Usage: TORTOISEBmatrixToFSLBVecs bmatrix_file
+
+Converts TORTOISE Bmatrix to bvecs and bvals files by doing an eigendecomposition on the Bmatrix.
+
 
 # DRTAMAS Tools
 
