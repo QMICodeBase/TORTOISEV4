@@ -1,4 +1,7 @@
-TORTOISEV4 has many tools for specific purposes.  Each module in the TORTOISEProcess pipeline has also a corresponding executable in case users prefer to use them independently. Here is the list and their descriptions (in alphabetical order).
+TORTOISEV4 has many tools for specific purposes.  Each module in the TORTOISEProcess pipeline has also a corresponding executable in case users prefer to use them independently. Here is the list and their descriptions.
+
+# Input Related Tools
+
 
 
 ## ApplyTransformationToScalar2
