@@ -9,7 +9,7 @@ SET(USEOPENMP 1)
 
 
 if ( NOT DEFINED USECUDA)
-    SET(USECUDA  1)
+    SET(USECUDA  0)
 endif()
 if ( NOT DEFINED USE_VTK)
     SET(USE_VTK 0)
@@ -187,6 +187,10 @@ ELSE(USECUDA)
      target_link_libraries(DRBUDDI  ${ITK_LIBRARIES}  ${Boost_LIBRARIES} ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a -lz fftw3 )
      target_compile_definitions(DRBUDDI PUBLIC -DDRBUDDIALONE)
 
+     add_executable(Vol2SlRegistration   ../src/tools/Vol2SlRegistration/vol2sl_registration_main.cxx ../src/tools/ResampleDWIs/resample_dwis.cxx ${SOURCES})
+     target_include_directories(Vol2SlRegistration   PRIVATE   )
+     target_link_libraries(Vol2SlRegistration ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+
 
 ENDIF(USECUDA)
 
@@ -196,9 +200,7 @@ ENDIF(USECUDA)
 #target_link_libraries(AffineTransformationDeterminant ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
 
 
-add_executable(Vol2SlRegistration   ../src/tools/Vol2SlRegistration/vol2sl_registration_main.cxx ../src/tools/ResampleDWIs/resample_dwis.cxx ${SOURCES})
-target_include_directories(Vol2SlRegistration   PRIVATE   )
-target_link_libraries(Vol2SlRegistration ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
+
 
 add_executable(ApplyTransformationToTensor   ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/DRTAMAS/ApplyTransformationToTensorDRT.cxx    ${SOURCES} )
 target_link_libraries(ApplyTransformationToTensor   ${ITK_LIBRARIES} ${Boost_LIBRARIES}    -static-libgcc -static-libstdc++)
@@ -508,8 +510,8 @@ target_link_libraries(ImportBruker  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 
-#add_executable(BrukerBmatToTORTOISEBMTXT   ../src/tools/BrukerBmatToTORTOISEBMTXT/BrukerBmatToTORTOISEBMTXT.cxx ${SOURCES})
-#target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
+add_executable(BrukerBmatToTORTOISEBMTXT   ../src/tools/BrukerBmatToTORTOISEBMTXT/BrukerBmatToTORTOISEBMTXT.cxx ${SOURCES})
+target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
 
 #add_executable(Affine2Rigid   ../src/tools/AffineToRigid/affine_to_rigid.cxx ${SOURCES})
 #target_link_libraries(Affine2Rigid ${ITK_LIBRARIES} ${Boost_LIBRARIES})

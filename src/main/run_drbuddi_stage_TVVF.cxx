@@ -239,7 +239,7 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
     Goper.SetMaximumKernelWidth(31);
     Goper.CreateDirectional();
 
-    std::vector<CurrentFieldType::Pointer> update_velocity_field; update_velocity_field.resize(NTimePoints);
+    CurrentFieldType::Pointer update_velocity_field;
 
     for(int m=0;m<this->settings->metrics.size();m++)
     {
@@ -298,26 +298,28 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
                 field_down= ComposeFields(settings->init_minv_const,field_down);
             }
 
+            if(this->settings->constrain )
+            {
+                if(t!=0 && t!=1)
+                {
+                //    field_up=MultiplyImage(AddImages(field_up,MultiplyImage(field_down,-t/(1-t))),0.5);
+                //    field_down= MultiplyImage(field_up,(t-1)/t);
+
+
+                }
+                if(t==0.5)
+                {
+                    field_up= MultiplyImage(AddImages(field_up,MultiplyImage(field_down,-1)),0.5);
+                    field_down= MultiplyImage(field_up,-1);
+                }
+            }
 
             for(int met=0; met< Nmetrics;met++)
             {
                 CurrentImageType::Pointer warped_up_img = WarpImage(this->resampled_smoothed_up_images[met],field_up);
                 CurrentImageType::Pointer  warped_down_img = WarpImage(this->resampled_smoothed_down_images[met],field_down);
                 CurrentImageType::Pointer warped_str_img=nullptr, warped_str_img_jac=nullptr;
-/*
-                if(iter==1 && t==0.5 && met==0)
-                {
-                    ImageType3D::Pointer aaa = warped_up_img->CudaImageToITKImage();
-                    ImageType3D::Pointer bbb = warped_down_img->CudaImageToITKImage();
-                    char nm[1000];
-                    static int mama=0;
-                    sprintf(nm,"/qmi13_raid/okan/ABCD_Don_100_subjects/dMRIv3/data/proc_dti/DTIPROC_G010_INV18YX7994_2year_20181117.124339_1/tmp_DTI_corr_regT1_orig3/test/DTI2_temp_proc/aaa_%d.nii",mama);
-                    writeImageD<ImageType3D>(aaa,nm);
-                    sprintf(nm,"/qmi13_raid/okan/ABCD_Don_100_subjects/dMRIv3/data/proc_dti/DTIPROC_G010_INV18YX7994_2year_20181117.124339_1/tmp_DTI_corr_regT1_orig3/test/DTI2_temp_proc/bbb_%d.nii",mama);
-                    writeImageD<ImageType3D>(bbb,nm);
-                    mama++;
-                }
-*/
+
 
                 if( this->resampled_smoothed_str_images[met])
                 {
@@ -325,8 +327,9 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
                     str_img_texture->DuplicateFromCUDAImage(this->resampled_smoothed_str_images[met]);
                     str_img_texture->CreateTexture();
                     warped_str_img = WarpImage(str_img_texture,field_str);
-                    warped_str_img_jac= ComputeDetImgMain(warped_str_img,field_str,this->up_phase_vector);
+                  // warped_str_img_jac= ComputeDetImgMain(warped_str_img,field_str,this->up_phase_vector);
                     //warped_str_img_jac= warped_str_img;
+
                 }
 
                 float metric_value=0;
@@ -343,7 +346,7 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
                 }
                 if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCSK)
                 {
-                    metric_value = ComputeMetric_CCSK(warped_up_img,warped_down_img, warped_str_img_jac,updateFieldF_temp,updateFieldM_temp,t );
+                    metric_value = ComputeMetric_CCSK(warped_up_img,warped_down_img, warped_str_img,updateFieldF_temp,updateFieldM_temp,0.5 );
                 }
                 if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CC)
                 {
@@ -376,8 +379,8 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
 
 
             //TVVF needs more smoothing
-            updateFieldF=GaussianSmoothImage(updateFieldF,this->settings->update_gaussian_sigma);
-            updateFieldM=GaussianSmoothImage(updateFieldM,this->settings->update_gaussian_sigma);
+         //   updateFieldF=GaussianSmoothImage(updateFieldF,this->settings->update_gaussian_sigma);
+           // updateFieldM=GaussianSmoothImage(updateFieldM,this->settings->update_gaussian_sigma);
 
 
             if(this->settings->restrct)
@@ -397,65 +400,18 @@ void DRBUDDIStage_TVVF::RunDRBUDDIStage()
             updateFieldM=InvertField(updateFieldM_inv );
 
 
+
             auto aa=MultiplyImage(AddImages(updateFieldF_inv,MultiplyImage(updateFieldM_inv,-1)),-1);
             ScaleUpdateField(aa,1);
 
-            update_velocity_field[T]=aa;
+            update_velocity_field = GaussianSmoothImage(aa,this->settings->update_gaussian_sigma);
+            update_velocity_field= MultiplyImage(update_velocity_field,this->settings->learning_rate*2);
+            this->velocity_field[T]= AddImages(this->velocity_field[T],update_velocity_field);
 
 
 
         } //T loop
 
-
-        //update field time domain gaussian smoothing
-        for(int T=0;T<NTimePoints;T++)
-        {            
-            CUDAIMAGE::Pointer toadd= MultiplyImage(update_velocity_field[T],this->settings->learning_rate);
-            this->velocity_field[T]= AddImages(this->velocity_field[T],toadd);
-        }
-
-/*
-        if(this->settings->constrain)
-        {
-            for(int T=0; T<NTimePoints/2; T++)
-            {
-                this->velocity_field[T] = AddImages(this->velocity_field[T],this->velocity_field[T+1+NTimePoints/2]);
-                this->velocity_field[T] = MultiplyImage(this->velocity_field[T],0.5);
-                this->velocity_field[T+1+ NTimePoints/2] = this->velocity_field[T] ;
-            }
-        }
-        */
-
-        if(this->settings->constrain)
-        {
-            for(int TT=-1; TT+NTimePoints/2>=0; TT--)
-            {
-                int T1= TT+NTimePoints/2;
-                int T2= NTimePoints/2 -TT;
-
-                float t1= 1.*T1/(NTimePoints-1);
-                float t2= 1.*T2/(NTimePoints-1);
-
-                CurrentFieldType::Pointer fu=IntegrateVelocityField(0.5,t1);
-                CurrentFieldType::Pointer fd=IntegrateVelocityField(0.5,t2);
-
-                auto fum = MultiplyImage(fu,-1);
-                auto ff = AddImages(fum,fd);
-                ff= MultiplyImage(ff,0.5);
-             //   ff= MultiplyImage(ff, (0.5-t1));
-
-                this->velocity_field[T1]= ff;
-                this->velocity_field[T2]= ff;
-
-
-
-
-
-
-
-            }
-
-        }
 
 
         for(int met=0; met< Nmetrics;met++)

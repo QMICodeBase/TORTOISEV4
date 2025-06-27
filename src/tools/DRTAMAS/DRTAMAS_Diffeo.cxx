@@ -103,6 +103,7 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         DRTAMASMetric metric1;
         metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
         metric1.weight=1;
+        metric1.to=1;
         curr_stage.metrics.push_back(metric1);
 
         for(int s=0;s<Nstr;s++)
@@ -131,6 +132,7 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         DRTAMASMetric metric1;
         metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
         metric1.weight=1;
+        metric1.to=1;
         curr_stage.metrics.push_back(metric1);
 
         for(int s=0;s<Nstr;s++)
@@ -159,6 +161,7 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         DRTAMASMetric metric1;
         metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
         metric1.weight=2;
+        metric1.to=1;
         curr_stage.metrics.push_back(metric1);
 
         for(int s=0;s<Nstr;s++)
@@ -187,6 +190,7 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         DRTAMASMetric metric1;
         metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
         metric1.weight=2;
+        metric1.to=1;
         curr_stage.metrics.push_back(metric1);
 
         for(int s=0;s<Nstr;s++)
@@ -224,6 +228,7 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         DRTAMASMetric metric1;
         metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
         metric1.weight=2;
+        metric1.to=1;
         curr_stage.metrics.push_back(metric1);
 
         for(int s=0;s<Nstr;s++)

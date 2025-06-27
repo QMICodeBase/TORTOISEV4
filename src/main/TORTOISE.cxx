@@ -782,7 +782,7 @@ void TORTOISE::Process()
         EPICorrectData();
 
         std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
-        std::cout << "TOTAL EPI time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
+        (*stream) << "TOTAL EPI time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
     }
 /*
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::ExtraOutlier)
@@ -809,7 +809,7 @@ void TORTOISE::Process()
         AlignB0ToReorientation();
 
         std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
-        std::cout << "TOTAL Rigid to Str time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
+        (*stream) << "TOTAL Rigid to Str time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
     }
 
 
@@ -1051,6 +1051,8 @@ void TORTOISE::AlignB0ToReorientation()
 {
     std::vector<std::string>  structural_names = RegistrationSettings::get().getVectorValue<std::string>("structural");
     std::string reorientation_name= RegistrationSettings::get().getValue<std::string>("reorientation");
+    bool is_human_brain= RegistrationSettings::get().getValue<bool>("is_human_brain");
+
 
 
     RigidTransformType::Pointer b0_to_str_trans=nullptr;
@@ -1070,14 +1072,17 @@ void TORTOISE::AlignB0ToReorientation()
         ImageType3D::Pointer b0_img=nullptr;
 
         {
-            ImageType3D::Pointer target_mask= create_mask(target_img);
+            if(is_human_brain)
             {
-                itk::ImageRegionIteratorWithIndex<ImageType3D> it(target_img,target_img->GetLargestPossibleRegion());
-                for(it.GoToBegin();!it.IsAtEnd();++it)
+                ImageType3D::Pointer target_mask= create_mask(target_img);
                 {
-                    ImageType3D::IndexType ind3= it.GetIndex();
-                    if(target_mask->GetPixel(ind3))
-                        it.Set(it.Get()*5);
+                    itk::ImageRegionIteratorWithIndex<ImageType3D> it(target_img,target_img->GetLargestPossibleRegion());
+                    for(it.GoToBegin();!it.IsAtEnd();++it)
+                    {
+                        ImageType3D::IndexType ind3= it.GetIndex();
+                        if(target_mask->GetPixel(ind3))
+                            it.Set(it.Get()*5);
+                    }
                 }
             }
         }
@@ -1102,17 +1107,17 @@ void TORTOISE::AlignB0ToReorientation()
                p1[3]*p1[3]/400. + p1[4]*p1[4]/400. + p1[5]*p1[5]/400. ;
 
         RigidTransformType::Pointer rigid_trans=nullptr;
-        std::cout<<"R1: "<< params1<<std::endl;
-        std::cout<<"R2: "<< params2<<std::endl;
-        std::cout<<"MI vs CC diff: "<< diff<<std::endl;
+        (*stream)<<"R1: "<< params1<<std::endl;
+        (*stream)<<"R2: "<< params2<<std::endl;
+        (*stream)<<"MI vs CC diff: "<< diff<<std::endl;
 
 
         if(diff<0.005)
             b0_to_str_trans=rigid_trans2;
         else
         {
-            std::cout<<"Could not compute the rigid transformation from the structural imageto b=0 image... Starting multistart.... This could take a while"<<std::endl;
-            std::cout<<"Better be safe than sorry, right?"<<std::endl;
+            (*stream)<<"Could not compute the rigid transformation from the structural imageto b=0 image... Starting multistart.... This could take a while"<<std::endl;
+            (*stream)<<"Better be safe than sorry, right?"<<std::endl;
 
             RigidTransformType::Pointer rigid_trans1a= RigidRegisterImagesEuler( b0_img, target_img,  "CC",parser->getRigidLR());
             RigidTransformType::ParametersType b1= rigid_trans1a->GetParameters();
@@ -1130,12 +1135,12 @@ void TORTOISE::AlignB0ToReorientation()
             p1[1]= params2[1]+ b2[1];
             p1[2]= params2[2]+ b2[2];            
             double diff2= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] ;
-            std::cout<< "diff1 "<<diff1 << " diff2 " <<diff2 <<std::endl;
+            (*stream)<< "diff1 "<<diff1 << " diff2 " <<diff2 <<std::endl;
 
-            std::cout<< "Trans CC F" << rigid_trans1->GetParameters()<<std::endl;
-            std::cout<< "Trans CC B" << rigid_trans1a->GetParameters()<<std::endl;
-            std::cout<< "Trans MI F" << rigid_trans2->GetParameters()<<std::endl;
-            std::cout<< "Trans MI B" << rigid_trans2a->GetParameters()<<std::endl;
+            (*stream)<< "Trans CC F" << rigid_trans1->GetParameters()<<std::endl;
+            (*stream)<< "Trans CC B" << rigid_trans1a->GetParameters()<<std::endl;
+            (*stream)<< "Trans MI F" << rigid_trans2->GetParameters()<<std::endl;
+            (*stream)<< "Trans MI B" << rigid_trans2a->GetParameters()<<std::endl;
 
             std::string new_metric_type="MI";
             if(diff1< diff2)
@@ -1154,7 +1159,7 @@ void TORTOISE::AlignB0ToReorientation()
                 b1[5]= (params1[5] );
                 rigid_trans1->SetParameters(b1);
 
-                b0_to_str_trans= RigidRegisterImagesEuler( b0_img,  target_img, "CC",parser->getRigidLR(),true, rigid_trans1);
+                b0_to_str_trans= RigidRegisterImagesEuler( target_img,  b0_img, "CC",parser->getRigidLR(),true, rigid_trans1);
             }
             else
             {
@@ -1168,7 +1173,7 @@ void TORTOISE::AlignB0ToReorientation()
                     b2[5]= (params2[5] );
                     rigid_trans2->SetParameters(b2);
 
-                    b0_to_str_trans= RigidRegisterImagesEuler( b0_img,  target_img, "MI",parser->getRigidLR(),true,rigid_trans2);
+                    b0_to_str_trans= RigidRegisterImagesEuler( target_img,  b0_img, "MI",parser->getRigidLR(),true,rigid_trans2);
                 }
                 else
                 {

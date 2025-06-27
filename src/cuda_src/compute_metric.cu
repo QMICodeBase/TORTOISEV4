@@ -11,8 +11,8 @@
 #define LIMCC (1E-10)
 #define LIMCCJAC (1E-5)
 
-#define WIN_RAD 7
-#define WIN_RAD_Z 5
+#define WIN_RAD 5
+#define WIN_RAD_Z 3
 
 #define WIN_RAD_JAC 9
 #define WIN_RAD_JAC_Z 4
@@ -52,26 +52,26 @@ ComputeMetric_CC_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                            cudaPitchedPtr metric_img);
 
 __device__ inline float mf(float det)
-{    
-    return det;
+{
+  //  return det;
 
-//    float logd = log(det);
-//    float ly = logd / (sqrt(1+0.25*logd*logd));
-//    float y= exp(ly);
- //   return y;
+    float logd = log(det);
+    float ly = logd / (sqrt(1+0.25*logd*logd));
+    float y= exp(ly);
+    return y;
 }
 
 
 __device__ inline float dmf(float x)
 {    
     return 1;
-//    float y= mf(x);
-//    float lx= log(x);
+    float y= mf(x);
+    float lx= log(x);
 
- //   float nom = 1./x * sqrt(1+0.25* lx*lx) - lx *  1./sqrt(1+0.25*lx*lx) *0.25* lx *1./x;
- //   float denom = 1+0.25* lx*lx;
+    float nom = 1./x * sqrt(1+0.25* lx*lx) - lx *  1./sqrt(1+0.25*lx*lx) *0.25* lx *1./x;
+    float denom = 1+0.25* lx*lx;
 
- //   return y*nom/denom;
+    return y*nom/denom;
 
 
 }
@@ -470,6 +470,7 @@ ComputeMetric_CCJacSSingle_kernel( cudaPitchedPtr b0_img,  cudaPitchedPtr str_im
 
                     float sSS_sKK = sSS_val * sKK_val;
 
+                    row_M[i]=-1;
                     if(fabs(sSS_sKK) > LIMCCJAC && fabs(sKK_val) > LIMCCJAC )
                     {
                         row_M[i]+= -sKS_val*sKS_val/ sSS_sKK;
@@ -830,7 +831,7 @@ void ComputeMetric_CCJacSSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_
     cudaPitchedPtr metric_image={0};
     cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
-    cudaMemset3D(metric_image,0,extent);
+    cudaMemset3D(metric_image,1,extent);
 
 
     float new_phase[3];
@@ -1070,6 +1071,7 @@ ComputeMetric_CCJacS_kernel( cudaPitchedPtr b0_img,  cudaPitchedPtr str_img,
 
                     float sSS_sKK = sSS_val * sKK_val;
 
+                    row_M[i]=-1;
                     if(fabs(sSS_sKK) > LIMCCJAC && fabs(sKK_val) > LIMCCJAC )
                     {
                        row_M[i]+= -sKS_val*sKS_val/ sSS_sKK;
@@ -1319,7 +1321,7 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
     cudaPitchedPtr metric_image={0};
     cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
-    cudaMemset3D(metric_image,0,extent);
+    cudaMemset3D(metric_image,1,extent);
 
 
     float new_phase[3];
@@ -1712,7 +1714,7 @@ void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     cudaPitchedPtr metric_image={0};
     cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
-    cudaMemset3D(metric_image,0,extent);
+    cudaMemset3D(metric_image,1,extent);
 
 
     float new_phase[3];
@@ -2126,7 +2128,7 @@ void ComputeMetric_MSJacSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_i
     cudaPitchedPtr metric_image={0};
     cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
-    cudaMemset3D(metric_image,0,extent);
+    cudaMemset3D(metric_image,1,extent);
 
 
     float new_phase[3];
@@ -2349,6 +2351,7 @@ ComputeMetric_CCSK_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
             float sKS = sumac - Kmean*sumc;
 
 
+            row_M[i]=-1;
             float sSS_sKK = sSS * sKK;
             if(fabs(sSS_sKK) > LIMCCSK && fabs(sKK) > LIMCCSK )
             {
@@ -2432,7 +2435,7 @@ void ComputeMetric_CCSK_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cud
     //cudaExtent extent =  make_cudaExtent(1*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
     cudaExtent extent =  make_cudaExtent(1*up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
-    cudaMemset3D(metric_image,0,extent);
+    cudaMemset3D(metric_image,1,extent);
 
     cudaPitchedPtr K_image={0};
     cudaMalloc3D(&K_image, extent);
@@ -2596,10 +2599,11 @@ ComputeMetric_CC_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
             float sMM = sumc2 - Mmean*sumc;
             float sFM = sumac - Fmean*sumc;
 
+            row_M[i]=-1;
             float sFF_sMM = sFF * sMM;
             if(fabs(sFF_sMM) >LIMCC && fabs(sMM) > LIMCC)
             {
-                row_M[i]+= -sFM*sFM/ sFF_sMM;
+                row_M[i]= -sFM*sFM/ sFF_sMM;
 
                 float first_termF= -2* sFM/sFF_sMM *    (valM - sFM/sFF * valF) ;
                 float first_termM= -2* sFM/sFF_sMM *    (valF - sFM/sMM * valM) ;

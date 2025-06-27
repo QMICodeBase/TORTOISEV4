@@ -78,7 +78,8 @@ vnl_matrix<int> ParseJSONForSliceTiming(json cjson)
     {
         int r = s/MB;
         int c = s%MB;
-        slspec(r,c)= idx[s];
+        if(r<slspec.rows())
+            slspec(r,c)= idx[s];
     }
     return slspec;
 }

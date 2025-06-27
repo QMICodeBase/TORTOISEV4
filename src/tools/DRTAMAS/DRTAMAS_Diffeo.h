@@ -39,6 +39,7 @@ class DRTAMAS_Diffeo
         return disp;
     }
 
+
     void SetFixedStructurals(std::vector<ImageType3D::Pointer> si)
     {
         for(int i=0;i<si.size();i++)

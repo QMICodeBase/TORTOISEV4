@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
     }
 
     fs::path output_path(output_name);
-    if(!fs::exists(output_path.parent_path()))
+    if(!fs::exists(output_path.parent_path()) && output_path.parent_path().string()!="")
             fs::create_directories(output_path.parent_path());
 
 

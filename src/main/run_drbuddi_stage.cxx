@@ -604,8 +604,11 @@ void DRBUDDIStage::RunDRBUDDIStage()
 
             if(Nmetrics>1)
             {
-                AddToUpdateField(updateFieldF,updateFieldF_temp,this->settings->metrics[met].weight);
-                AddToUpdateField(updateFieldM,updateFieldM_temp,this->settings->metrics[met].weight);
+                float mlt=1;
+              //  if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCSK || this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCJacS)
+                //    mlt*=100;
+                AddToUpdateField(updateFieldF,updateFieldF_temp,this->settings->metrics[met].weight*mlt);
+                AddToUpdateField(updateFieldM,updateFieldM_temp,this->settings->metrics[met].weight*mlt);
             }
             else
             {

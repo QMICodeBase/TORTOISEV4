@@ -79,6 +79,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
 
     float str_weight=parser->getStructuralWeight();
 
+
     {
         DRBUDDIStageSettings curr_stage;                                //1
         curr_stage.niter=300;
@@ -92,7 +93,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         DRBUDDIMetric metric;
         metric.SetMetricType(DRBUDDIMetricEnumeration::MSJac);
         metric.weight=1;
-        curr_stage.metrics.push_back(metric);     
+        curr_stage.metrics.push_back(metric);
         this->stages.push_back(curr_stage);
     }
     {
@@ -167,7 +168,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         curr_stage.downsample_factor=8;
         curr_stage.learning_rate=0.2;
         curr_stage.update_gaussian_sigma=4.5;
-        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.total_gaussian_sigma=0.0;
         curr_stage.restrct=1;
         curr_stage.constrain=1;
         DRBUDDIMetric metric1;
@@ -190,7 +191,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
         curr_stage.downsample_factor=8;
         curr_stage.learning_rate=0.5;
         curr_stage.update_gaussian_sigma=5.;
-        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.total_gaussian_sigma=0.0;
         curr_stage.restrct=1;
         curr_stage.constrain=1;
         DRBUDDIMetric metric1;
@@ -996,7 +997,7 @@ void DRBUDDI_Diffeo::Process()
 
 
     CurrentFieldType::Pointer prev_finv=nullptr;
-    CurrentFieldType::Pointer prev_minv=nullptr;    
+    CurrentFieldType::Pointer prev_minv=nullptr;
     std::vector<CurrentFieldType::Pointer> init_vfield;
 
     if(parser->GetInitialFINV()!="")
