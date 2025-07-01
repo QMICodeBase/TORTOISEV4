@@ -9,7 +9,7 @@ SET(USEOPENMP 1)
 
 
 if ( NOT DEFINED USECUDA)
-    SET(USECUDA  0)
+    SET(USECUDA  )
 endif()
 if ( NOT DEFINED USE_VTK)
     SET(USE_VTK 0)
@@ -526,6 +526,17 @@ target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARI
 
 add_executable(ComputeLineField   ../src/tools/ComputeLineField/ComputeLineField.cxx  ${SOURCES})
 target_link_libraries(ComputeLineField Eigen3::Eigen ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+
+add_executable(CombineTransformations   ../src/tools/CombineTransformations/combine_transformations.cxx  ${SOURCES})
+target_link_libraries(CombineTransformations  ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+
+add_executable(CombineTransformationsWithOutputName   ../src/tools/CombineTransformations/combine_transformations_with_output_name.cxx ${SOURCES})
+target_link_libraries(CombineTransformationsWithOutputName  ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+
+add_executable(CombineTransformationsWithReference   ../src/tools/CombineTransformations/combine_transformations_with_reference.cxx ${SOURCES})
+target_link_libraries(CombineTransformationsWithReference  ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+
+
 
 IF(USE_VTK)
     add_definitions(-DUSE_VTK)
