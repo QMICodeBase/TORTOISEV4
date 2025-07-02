@@ -510,8 +510,8 @@ target_link_libraries(ImportBruker  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 
 
 
-add_executable(BrukerBmatToTORTOISEBMTXT   ../src/tools/BrukerBmatToTORTOISEBMTXT/BrukerBmatToTORTOISEBMTXT.cxx ${SOURCES})
-target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
+#add_executable(BrukerBmatToTORTOISEBMTXT   ../src/tools/BrukerBmatToTORTOISEBMTXT/BrukerBmatToTORTOISEBMTXT.cxx ${SOURCES})
+#target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
 
 #add_executable(Affine2Rigid   ../src/tools/AffineToRigid/affine_to_rigid.cxx ${SOURCES})
 #target_link_libraries(Affine2Rigid ${ITK_LIBRARIES} ${Boost_LIBRARIES})
