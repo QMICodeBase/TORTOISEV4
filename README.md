@@ -147,6 +147,11 @@ cd boost_1_86_0
 ./bootstrap.sh --with-libraries=iostreams,filesystem,system,regex --prefix=/usr/local/boost186
 sudo ./b2 install
 cd ..
+tar -xvf boost_1_86_0.tar.gz
+cd boost_1_86_0
+./bootstrap.sh --with-libraries=iostreams,filesystem,system,regex --prefix=/usr/local/boost186
+sudo ./b2 install
+cd ..
 ```
 
 
