@@ -246,6 +246,12 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
 
             ImageType3D::SpacingType spc= slice_img->GetSpacing();
             spc[2]=(slspec(e,1)-slspec(e,0))*spc[2];
+            if(spc[2]<0)
+            {
+                std::cout<<std::endl<<"ERROR............... JSON timings could not be read properly..."<<std::endl;
+                std::cout<<slspec<<std::endl;
+                exit(EXIT_FAILURE);
+            }
             temp_slice_img_itk->SetSpacing(spc);
 
             ImageType3D::IndexType orig_ind;
@@ -329,7 +335,15 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
             {
                   registration->Update();
                   for(int kk=0;kk<MB;kk++)
-                      s2v_transformations[ slspec(e,kk)]=initialTransform;
+                  {
+                      auto op = s2v_transformations[slspec(e,kk) ]->GetParameters();
+                      double sm=0;
+                      for(int pp=0;pp<6;pp++ )
+                          sm+=fabs(op[pp]);
+
+                      if(sm<1E-6)
+                          s2v_transformations[ slspec(e,kk)]=initialTransform;
+                  }
             }
             catch( itk::ExceptionObject & err )
             {

@@ -109,7 +109,8 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
         initializer->SetTransform( initial_transform );
         initializer->SetFixedImage( fixed_img );
         initializer->SetMovingImage( moving_img );
-        initializer->GeometryOn();
+        //initializer->GeometryOn();
+        initializer->MomentsOn();
         initializer->InitializeTransform();
     }
     else
@@ -285,8 +286,10 @@ RigidTransformType::Pointer RigidRegisterImagesEulerSmall(ImageType3D::Pointer f
     initializer->SetTransform( initial_transform );
     initializer->SetFixedImage( fixed_img );
     initializer->SetMovingImage( moving_img );
-    initializer->GeometryOn();
+    //initializer->GeometryOn();
+    initializer->MomentsOn();
     initializer->InitializeTransform();
+
 
 
 
@@ -326,6 +329,8 @@ RigidTransformType::Pointer RigidRegisterImagesEulerSmall(ImageType3D::Pointer f
     rigidRegistration->SetMetricSamplingStrategy(RigidRegistrationType::MetricSamplingStrategyEnum::NONE);
     rigidRegistration->SetInitialTransform(initial_transform);
     rigidRegistration->SetInPlace(true);
+
+  //  std::cout<< initial_transform->GetParameters()<<std::endl;
 
 
     float learningRate = 0.01;

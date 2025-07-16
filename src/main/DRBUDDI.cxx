@@ -471,8 +471,7 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
     std::vector<DisplacementFieldType::Pointer> epi_fields= DRBUDDI_Initial_Register_Up_Down(b0_up_image, curr_down_quad_image, this->PE_string,false);
 
     ImageType3D::Pointer new_up_img=   JacobianTransformImage(b0_up_image,epi_fields[0],b0_up_image);
-    ImageType3D::Pointer new_down_img=   JacobianTransformImage(b0_down_image,epi_fields[1],b0_up_image);
-
+    ImageType3D::Pointer new_down_img=   JacobianTransformImage(curr_down_quad_image,epi_fields[1],b0_up_image);
 
     typedef itk::AddImageFilter<ImageType3D,ImageType3D,ImageType3D> AdderType;
     AdderType::Pointer adder= AdderType::New();
@@ -632,7 +631,8 @@ void DRBUDDI::Step1_RigidRegistration()
     }
     else
     {
-        down_to_up_rigid_trans = RigidDiffeoRigidRegisterB0DownToB0Up(this->b0_up_quad,this->b0_down,"CC",initial_corrected_b0);
+        //down_to_up_rigid_trans = RigidDiffeoRigidRegisterB0DownToB0Up(this->b0_up_quad,this->b0_down,"CC",initial_corrected_b0);
+        down_to_up_rigid_trans = RigidDiffeoRigidRegisterB0DownToB0Up(this->b0_up_quad,this->b0_down,"MI",initial_corrected_b0);
     }
 
     writeImageD<ImageType3D>(initial_corrected_b0,proc_folder+"/b0_str_registration_target.nii");

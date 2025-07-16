@@ -223,7 +223,7 @@ ComputeDeviatoric_kernel( cudaPitchedPtr img)
 }
 
 
-__device__ Matrix3f ComputeRotationMatrix(Matrix3f A)
+__device__ Matrix3f ComputeRotationMatrix(Matrix3f &A)
 {
     Matrix3f R=Matrix3f::Identity();
 
@@ -821,6 +821,8 @@ void ComputeMetric_DEV_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
     const dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
 
+    std::cout<<blockSize.x<<" " <<blockSize.y<<" " <<blockSize.z<<" "  <<std::endl;
+    std::cout<<gridSize.x<<" " <<gridSize.y<<" " <<gridSize.z<<" "  <<std::endl;
 
     if(!tensonly_h)
     {
