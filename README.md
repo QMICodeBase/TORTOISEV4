@@ -141,7 +141,7 @@ sudo apt install libeigen3-dev
 #### 4) Boost installation 
 
 ```
-wget https://boostorg.jfrog.io/artifactory/main/release/1.86.0/source/boost_1_86_0.tar.gz
+wget https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.gz
 tar -xvf boost_1_86_0.tar.gz
 cd boost_1_86_0
 ./bootstrap.sh --with-libraries=iostreams,filesystem,system,regex --prefix=/usr/local/boost186
