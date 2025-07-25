@@ -155,13 +155,14 @@ void Fit_NIFTI_iso_parser::InitializeCommandLineOptions()
     }
 
     {
-        std::string description = std::string( "Gradient Normalization. (Optional). For debugging purposes." );
+        std::string description = std::string( "Gradient Normalization. (Optional)." );
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "grad_normalization");
-        option->SetUsageOption(0, "off: no normalization.(default)" );
+        option->SetUsageOption(0, "off: no normalization." );
         option->SetUsageOption(1, "x: x gradient normalization." );
         option->SetUsageOption(2, "y: y gradient normalization." );
         option->SetUsageOption(3, "z: z gradient normalization." );
+        option->SetUsageOption(4, "avg: Average scalings will be 1." );
 
 
         option->SetDescription( description );
@@ -318,7 +319,7 @@ std::string Fit_NIFTI_iso_parser::getGradient_normalization(){
         return option->GetFunction(0)->GetName().c_str();
     }
     else
-       return "z";
+       return "avg";
 }
 
 

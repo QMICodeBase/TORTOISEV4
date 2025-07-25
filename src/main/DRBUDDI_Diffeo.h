@@ -43,7 +43,10 @@ class DRBUDDI_Diffeo
     }
     ~DRBUDDI_Diffeo(){};
 
+    DisplacementFieldType::Pointer getUp2DownINV();
+
 #ifdef USECUDA
+
     DisplacementFieldType::Pointer getDefFINV()
     {
         DisplacementFieldType::Pointer disp=def_FINV->CudaImageToITKField();
@@ -59,7 +62,6 @@ class DRBUDDI_Diffeo
             it.Set(pix);
         }
         return disp;
-
     }
 
     DisplacementFieldType::Pointer getDefMINV()
@@ -295,6 +297,7 @@ private:          //class member variables
 
     CUDAIMAGE::Pointer def_FINV{nullptr};
     CUDAIMAGE::Pointer def_MINV{nullptr};
+    CUDAIMAGE::Pointer up2down_INV{nullptr};
 
 #else
     ImageType3D::Pointer b0_up_img{nullptr},b0_down_img{nullptr};
@@ -303,6 +306,7 @@ private:          //class member variables
 
     DisplacementFieldType::Pointer def_FINV{nullptr};
     DisplacementFieldType::Pointer def_MINV{nullptr};
+    DisplacementFieldType::Pointer up2down_INV{nullptr};
 
 #endif
 

@@ -61,6 +61,10 @@ FITNIFTIISO::FITNIFTIISO(int argc, char *argv[]){
     std::string bmtxt_name = image_name.substr(0,image_name.rfind(".nii"))+".bmtxt";
     this->Bmatrix = read_bmatrix_file(bmtxt_name);
 
+
+
+
+
     this->setb0Image(0);
 
     /*Set mask image, or create mask image */
@@ -136,54 +140,73 @@ void FITNIFTIISO::process(){
         iso_ind3[1] =std::roundf(iso_index[1]);
         iso_ind3[2] =std::roundf(iso_index[2]);
 
+
+        int rdfits[3]={0};
+
         /*if rdfit is not specfied, compute indices of magnet isocenter (get from smat) */
         if (this->rdfit == 0)        {
-            std::cout << "Perform regression to compute indices of magnet isocenter, rdfit = 0" << std::endl;
-            this->phantomD = this->regression_at_point(iso_ind3);
+            std::cout << "Perform regression to compute indices of magnet isocenter, rdfit = 5x5x3" << std::endl;
+           // this->phantomD = this->regression_at_point(iso_ind3);
+            rdfits[0]=2;
+            rdfits[1]=2;
+            rdfits[2]=1;
         }
         else
         {
-            /*compute dd in roi sphere of radius rdfit about iscenter */
             std::cout << "Perform regression to compute diffusitivity inside rdfit" << std::endl;
-            int start_x_index= std::max(0,(int)iso_ind3[0]-this->rdfit);
-            int end_x_index= std::max((int)sizes[0]-1,(int)iso_ind3[0]+this->rdfit);
-            int start_y_index= std::max(0,(int)iso_ind3[1]-this->rdfit);
-            int end_y_index= std::max((int)sizes[1]-1,(int)iso_ind3[1]+this->rdfit);
-            int start_z_index= std::max(0,(int)iso_ind3[2]-this->rdfit);
-            int end_z_index= std::max((int)sizes[2]-1,(int)iso_ind3[2]+this->rdfit);
+            rdfits[0]=this->rdfit;
+            rdfits[1]=this->rdfit;
+            rdfits[2]=this->rdfit;
+        }
 
-            int Nvoxels=0;
-            double DD=0;
-            for(int kk=start_z_index;kk<=end_z_index;kk++)
+        /*compute dd in roi sphere of radius rdfit about iscenter */
+
+        int start_x_index= std::max(0,(int)iso_ind3[0]-rdfits[0]);
+        int end_x_index= std::max((int)sizes[0]-1,(int)iso_ind3[0]+rdfits[0]);
+        int start_y_index= std::max(0,(int)iso_ind3[1]-rdfits[1]);
+        int end_y_index= std::max((int)sizes[1]-1,(int)iso_ind3[1]+rdfits[1]);
+        int start_z_index= std::max(0,(int)iso_ind3[2]-rdfits[2]);
+        int end_z_index= std::max((int)sizes[2]-1,(int)iso_ind3[2]+rdfits[2]);
+
+        int Nvoxels=0;
+        double DD=0;
+        for(int kk=start_z_index;kk<=end_z_index;kk++)
+        {
+            ImageType3D::IndexType curr_ind3;
+            curr_ind3[2]=kk;
+
+            for(int jj=start_y_index;jj<=end_y_index;jj++)
             {
-                ImageType3D::IndexType curr_ind3;
-                curr_ind3[2]=kk;
+                curr_ind3[1]=jj;
 
-                for(int jj=start_y_index;jj<=end_y_index;jj++)
+                for(int ii=start_x_index;ii<=end_x_index;ii++)
                 {
-                    curr_ind3[1]=jj;
+                    curr_ind3[0]=ii;
 
-                    for(int ii=start_x_index;ii<=end_x_index;ii++)
+                    if(this->maskImage->GetPixel(curr_ind3)!=0)
                     {
-                        curr_ind3[0]=ii;
-
-                        if(this->maskImage->GetPixel(curr_ind3)!=0)
+                        int a =(kk- iso_ind3[2]);
+                        int b =(jj- iso_ind3[1]);
+                        int c =(ii- iso_ind3[0]);
+                        double rr = std::sqrt(a*a+b*b+c*c);
+                        if(this->rdfit)
                         {
-                            int a =(kk- iso_ind3[2]);
-                            int b =(jj- iso_ind3[1]);
-                            int c =(ii- iso_ind3[0]);                            
-                            double rr = std::sqrt(a*a+b*b+c*c);
                             if(rr <= this->rdfit)
                             {
                                 DD+=this->regression_at_point(curr_ind3);
                                 Nvoxels++;
                             }
                         }
+                        else
+                        {
+                            DD+=this->regression_at_point(curr_ind3);
+                            Nvoxels++;
+                        }
                     }
                 }
             }
-            this->phantomD=DD/Nvoxels;
         }
+        this->phantomD=DD/Nvoxels;
     }
     /* tp and normalization are moved up to the constructor */
     this->aa(this->na-1) = this->phantomD;
@@ -205,12 +228,16 @@ void FITNIFTIISO::process(){
 void FITNIFTIISO::normalize_gradient(){
     /* ;default is normalize to z-gradient */
     double initCoef =1;
-    if (this->grad_normalization == "x"){
-        initCoef = this->gradCoefOutput.gradX_coef[0];}
-    if (this->grad_normalization == "y"){
-        initCoef = this->gradCoefOutput.gradY_coef[0];}
-    if (this->grad_normalization == "z"){
-        initCoef = this->gradCoefOutput.gradZ_coef[0];}
+    if (this->grad_normalization == "x")
+        initCoef = this->gradCoefOutput.gradX_coef[0];
+    if (this->grad_normalization == "y")
+        initCoef = this->gradCoefOutput.gradY_coef[0];
+    if (this->grad_normalization == "z")
+        initCoef = this->gradCoefOutput.gradZ_coef[0];
+    if (this->grad_normalization == "avg")
+    {
+        initCoef = (this->gradCoefOutput.gradX_coef[0] + this->gradCoefOutput.gradY_coef[0] +this->gradCoefOutput.gradZ_coef[0])/3.;
+    }
 
     for (int kk =0; kk < this->gradCoefOutput.gradX_coef.size(); kk ++){
         this->gradCoefOutput.gradX_coef[kk] /=initCoef;
@@ -259,6 +286,7 @@ void FITNIFTIISO::setb0Image(int volId = 0){
    ImageType3D::DirectionType dir = b0_image->GetDirection();
    ImageType3D::SpacingType spc = b0_image->GetSpacing();
    ImageType3D::PointType origin = b0_image->GetOrigin();
+   ImageType3D::SizeType sz= b0_image->GetLargestPossibleRegion().GetSize();
 
    vnl_vector<double> orig_vec(3,0);
    orig_vec[0]=origin[0];
@@ -278,7 +306,7 @@ void FITNIFTIISO::setb0Image(int volId = 0){
    spc_mat(0,0)= spc[0];
    spc_mat(1,1)= spc[1];
    spc_mat(2,2)= spc[2];
-   vnl_matrix<double> nmat= new_direction *spc_mat;
+   vnl_matrix_fixed<double,3,3> nmat= new_direction *spc_mat;
    this->smat.set_identity();
    this->smat(0,0) = nmat(0,0);    this->smat(0,1) = nmat(0,1);     this->smat(0,2) = nmat(0,2);     this->smat(0,3) = new_orig_vec[0];
    this->smat(1,0) = nmat(1,0);    this->smat(1,1) = nmat(1,1);     this->smat(1,2) = nmat(1,2);     this->smat(1,3) = new_orig_vec[1];
@@ -286,7 +314,15 @@ void FITNIFTIISO::setb0Image(int volId = 0){
    /* If this is GE scanner */
    if(this->GE_type)
    {
-       this->smat(2,3) =  -((b0_image->GetLargestPossibleRegion().GetSize()[2] -1) * spc[2])/2.;
+       vnl_matrix<double> mmat = this->smat.extract(3,3,0,0);
+       vnl_vector<double> mijk(3);
+       mijk[0]= (sz[0]-1)/2.;
+       mijk[1]= (sz[1]-1)/2.;
+       mijk[2]= (sz[2]-1)/2.;
+
+       auto oktemp = mmat * mijk;
+       this->smat(2,3) = - oktemp[2];
+       //this->smat(2,3) =  -((b0_image->GetLargestPossibleRegion().GetSize()[2] -1) * spc[2])/2.;
    }
    /* inverse physCoor */
    this->inv_smat= vnl_matrix_inverse<double>(this->smat);
@@ -436,7 +472,8 @@ void FITNIFTIISO::normalize_image_nodif(std::vector<int> nodif, int nnodif){
 
     DTImageType4D::IndexType ind4;
     /* Note: Only Normalize index in the mask */
-    while(!imageIterator.IsAtEnd()){
+    while(!imageIterator.IsAtEnd())
+    {
         if (imageIterator.Get() == 0){
             ++imageIterator;
            continue;
@@ -453,13 +490,20 @@ void FITNIFTIISO::normalize_image_nodif(std::vector<int> nodif, int nnodif){
             norm += val;
         }
         norm = norm/nnodif;
-
-        for (int v = 0; v<this->nVols; v ++){
-            ind4[3] = v;
-            double val = this->my_image->GetPixel(ind4);
-            val = val/norm;
-            this->my_image->SetPixel(ind4, val);
+        if(norm <=0)
+        {
+            imageIterator.Set(0);
         }
+        else
+        {
+            for (int v = 0; v<this->nVols; v ++){
+                ind4[3] = v;
+                double val = this->my_image->GetPixel(ind4);
+                val = val/norm;
+                this->my_image->SetPixel(ind4, val);
+            }
+        }
+
         ++imageIterator;
     }
 }
@@ -474,7 +518,8 @@ void FITNIFTIISO::normalize_image_b0(){
     DTImageType4D::IndexType ind4;
     /* Note: Only Normalize index in the mask */
 
-    while(!imageIterator.IsAtEnd()){
+    while(!imageIterator.IsAtEnd())
+    {
         if (imageIterator.Get() == 0){
             ++imageIterator;
            continue;
@@ -485,13 +530,22 @@ void FITNIFTIISO::normalize_image_b0(){
         ind4[2] = index[2];
         ind4[3] = 0;
         double norm = this->my_image->GetPixel(ind4);
-        for (int v = 0; v< this->nVols; v ++){
-            ind4[3] = v;
-            double val = this->my_image->GetPixel(ind4);
-
-            val = val/norm;
-            this->my_image->SetPixel(ind4, val);
+        if(norm<=0)
+        {
+            imageIterator.Set(0);
         }
+        else
+        {
+            for (int v = 0; v< this->nVols; v ++)
+            {
+                ind4[3] = v;
+                double val = this->my_image->GetPixel(ind4);
+
+                val = val/norm;
+                this->my_image->SetPixel(ind4, val);
+            }
+        }
+
         ++imageIterator;
     }
 
@@ -953,15 +1007,6 @@ int OkanCurveFit(int m, int n, vnl_vector<double> &p, void *vars)
 
         vnl_vector<double> beta = pder_param * resids;
 
-/*
-        FILE *fp=fopen("pder.bin","wb");
-        for(int caca=0;caca<pder.cols();caca++)
-        {
-            double ma=pder(1,caca);
-            fwrite(&ma,sizeof(double),1,fp);
-        }
-        fclose(fp);
-*/
 
         vnl_matrix<double> alpha(nparam,nparam);
 #pragma omp parallel for
@@ -995,7 +1040,7 @@ int OkanCurveFit(int m, int n, vnl_vector<double> &p, void *vars)
         vnl_vector<double> yfit1= yFit;
 
 
-        if(chisq1 < (*Y).one_norm()/1E7/nfree   )
+        if(chisq1 < 1.* (*Y).one_norm()/1E10/nfree   )
         {
             done=true;
             break;
@@ -1084,7 +1129,7 @@ int OkanCurveFit(int m, int n, vnl_vector<double> &p, void *vars)
         for(int m=0;m<nparam;m++)
             p[iparam[m]]=b[iparam[m]];
 
-        if( (chisq1-chisq)/chisq1   <= TOL  )
+        if( (chisq1-chisq)/chisq1   <= TOL /1E5 )
         {
             done=true;
             break;
@@ -1665,11 +1710,11 @@ void FITNIFTIISO::PerformNonlinearityMisCalibrationFitting()
     my_results_struct.xerror=nullptr;
     my_results_struct.covar=nullptr;
 
-    vnl_matrix <double> Bmatrix = this->Bmatrix /1000;
+    vnl_matrix <double> Bmatrx = this->Bmatrix /1000;
     vars_struct my_struct;
     GradCoef gradA = this->gradCoefOutput;
     my_struct.weights=NULL;
-    my_struct.Bmat= &(Bmatrix);
+    my_struct.Bmat= &(Bmatrx);
     my_struct.Image1Darray = &(Image1DArray);
     my_struct.Basis= &(this->basis);
     my_struct.nmaskpts = pts;

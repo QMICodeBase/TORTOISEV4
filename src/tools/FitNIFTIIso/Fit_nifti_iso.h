@@ -63,7 +63,7 @@ private:
 
     vnl_matrix <double> Bmatrix;
     vnl_matrix_fixed <double,4,4> smat;
-    vnl_matrix<double> inv_smat;
+    vnl_matrix_fixed<double,4,4> inv_smat;
     vnl_vector<double> aa;
     vnl_vector<int>fita;
     std::vector<int>nodif;

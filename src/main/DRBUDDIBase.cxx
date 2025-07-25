@@ -50,8 +50,12 @@ void DRBUDDIBase::CreateBlipUpQuadImage()
     {
         new_spacing= b0_up->GetSpacing();
     }
-    while(new_spacing[0]>=1)
+    float avg_spacing = (new_spacing[0] + new_spacing[1] + new_spacing[2])/3.;
+    while(avg_spacing>1)
+    {
         new_spacing=new_spacing/1.3;
+        avg_spacing = (new_spacing[0] + new_spacing[1] + new_spacing[2])/3.;
+    }
 
     ImageType3D::SizeType new_size;
     new_size[0] = (int)ceil(1.0*b0_up->GetLargestPossibleRegion().GetSize()[0] * b0_up->GetSpacing()[0]/new_spacing[0]);

@@ -3,7 +3,7 @@
 
 #include <omp.h>
 
-//#include "TORTOISE.h"
+#include "TORTOISE.h"
 
 #include "registration_settings.h"
 #include "../utilities/read_3Dvolume_from_4D.h"
@@ -504,11 +504,9 @@ void TORTOISE::Process()
     if(ConvertStringToStep(parser->getStartStep())== STEPS::Import)  //these are self explanatory :)
     {
         (*stream)<<"Importing and copying data..."<<std::endl;
+        this->curr_step=STEPS::Import;
         CheckAndCopyInputData();
     }
-
-
-
 
 
 
@@ -625,10 +623,6 @@ void TORTOISE::Process()
         }
     }
 
-
-
-
-
     if(parser->getGradNonlinInput()!="")    //update the gradient nonlinearity file to the adjusted one.
     {
 
@@ -641,19 +635,13 @@ void TORTOISE::Process()
         {
             RegistrationSettings::get().setValue<std::string>("grad_nonlin_coeffs", "");
         }
-
-        std::string up_name = this->parser->getUpInputName();
-        fs::path up_path(up_name);
-        std::string basename= fs::path(up_path).filename().string();
-        basename=basename.substr(0,basename.rfind(".nii"));
-        std::string gradnonlin_name= this->temp_proc_folder + std::string("/") + basename + std::string("_proc_gradnonlin_field.nii");
-        parser->setGradNonlinInput(gradnonlin_name);
-        RegistrationSettings::get().setValue<std::string>("grad_nonlin", parser->getGradNonlinInput());
     }
 
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::Denoising) //these are self explanatory :))))
     {
+
+        this->curr_step=STEPS::Denoising;
 
         std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
 
@@ -676,6 +664,7 @@ void TORTOISE::Process()
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::Gibbs)
     {
+        this->curr_step=STEPS::Gibbs;
         std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
         for(int PE=0;PE<2;PE++)
         {
@@ -688,6 +677,7 @@ void TORTOISE::Process()
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::MotionEddy)
     {
+        this->curr_step=STEPS::MotionEddy;
         std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
         for(int PE=0;PE<2;PE++)
         {
@@ -703,6 +693,7 @@ void TORTOISE::Process()
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::Drift)
     {
+        this->curr_step=STEPS::Drift;
         std::string drift_option= RegistrationSettings::get().getValue<std::string>("drift");
 
         if(drift_option!="off")
@@ -777,6 +768,7 @@ void TORTOISE::Process()
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::EPI)
     {
+        this->curr_step=STEPS::EPI;
         std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
         (*stream)<<"Starting EPI distortion correction..."<<std::endl;
         EPICorrectData();
@@ -804,6 +796,7 @@ void TORTOISE::Process()
 */
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::StructuralAlignment)
     {
+        this->curr_step=STEPS::StructuralAlignment;
         std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
         (*stream)<<"Starting b=0 to structural registration..."<<std::endl;
         AlignB0ToReorientation();
@@ -815,6 +808,7 @@ void TORTOISE::Process()
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::FinalData)
     {
+        this->curr_step=STEPS::FinalData;
         std::string denoising_option= RegistrationSettings::get().getValue<std::string>("denoising");
         bool gibbs_option= RegistrationSettings::get().getValue<bool>("gibbs");
 
@@ -1758,7 +1752,7 @@ void TORTOISE::CheckAndCopyInputData()
 
 
     // Copy the gradient nonlinearity file in ITK displacement field format and make necessary changes.
-    if(parser->getGradNonlinInput()!="")
+    if(parser->getGradNonlinInput()!="" && this->curr_step==STEPS::Import)
     {
         //Gradpwarp field is already in ITK displacement field format
         // so just copy it into the temp folder
@@ -1780,7 +1774,7 @@ void TORTOISE::CheckAndCopyInputData()
         }
         else
         {
-            RegistrationSettings::get().setValue<std::string>("grad_nonlin_coeffs", parser->getGradNonlinInput());
+            //RegistrationSettings::get().setValue<std::string>("grad_nonlin_coeffs", parser->getGradNonlinInput());
 
             //Gradpwarp field is in coefficients format. convert it to a gradwarp_field.
             ImageType3D::Pointer ref_img = read_3D_volume_from_4D(this->proc_infos[0].nii_name,0);
@@ -2005,7 +1999,7 @@ bool TORTOISE::CheckIfInputsOkay()
     if(!parser->getIsHuman())
     {
         if(parser->getDTIBval()==1000 && parser->getHARDIBval()==2000)
-            std::cout<<"Data is NON-human but DTI-bval and HARDI-bval not entered. Default values of DTI=1000s/mm2 and high_b=2000s/mm2 will be used";
+            std::cout<<"Data is NON-human but DTI-bval and HARDI-bval not entered. Default values of DTI=1000s/mm2 and high_b=2000s/mm2 will be used"<<std::endl;
     }
 
     {

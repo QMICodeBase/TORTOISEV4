@@ -480,14 +480,25 @@ void FINALDATA::ReadOrigTransforms()
         this->epi_trans[1]=readImageD<DisplacementFieldType>(this->temp_folder +"/deformation_MINV.nii.gz");
     }
 
-    std::string gradnonlin_field_name= RegistrationSettings::get().getValue<std::string>("grad_nonlin");
-    std::string gradnonlin_name_inv = gradnonlin_field_name.substr(0,gradnonlin_field_name.rfind(".nii"))+ "_inv.nii";
-    if(fs::exists(gradnonlin_name_inv) && parser->getNOGradWarp()==false)
-    {
-        this->gradwarp_field= readImageD<DisplacementFieldType>(gradnonlin_name_inv);
-        this->gradwarp_field_forward= readImageD<DisplacementFieldType>(gradnonlin_field_name);
-    }
 
+
+    std::string coeffs_file = RegistrationSettings::get().getValue<std::string>("grad_nonlin_coeffs");
+    if(coeffs_file!="" && parser->getNOGradWarp()==false)
+    {
+        std::string up_name = this->parser->getUpInputName();
+        fs::path up_path(up_name);
+        std::string basename= fs::path(up_path).filename().string();
+        basename=basename.substr(0,basename.rfind(".nii"));
+        std::string gradnonlin_name_inv= this->temp_folder  + std::string("/") + basename + std::string("_proc_gradnonlin_field_inv.nii");
+
+
+        if(fs::exists(gradnonlin_name_inv))
+        {
+            std::string gradnonlin_name= this->temp_folder  + std::string("/") + basename + std::string("_proc_gradnonlin_field.nii");
+            this->gradwarp_field= readImageD<DisplacementFieldType>(gradnonlin_name_inv);
+            this->gradwarp_field_forward= readImageD<DisplacementFieldType>(gradnonlin_name);
+        }
+    }
 
     for(int d=0;d<2;d++)
     {
@@ -905,9 +916,14 @@ ImageType3D::Pointer FINALDATA::ComputeDetImgFromAllTransExceptStr(ImageType3D::
     }
     if(this->epi_trans[PE])
     {
-        DisplacementFieldTransformType::Pointer mepi_trans= DisplacementFieldTransformType::New();
-        mepi_trans->SetDisplacementField(this->epi_trans[PE]);
-        all_trans->AddTransform(mepi_trans);
+        std::string epi_option= RegistrationSettings::get().getValue<std::string>("epi");
+
+        if(epi_option=="DRBUDDI")
+        {
+            DisplacementFieldTransformType::Pointer mepi_trans= DisplacementFieldTransformType::New();
+            mepi_trans->SetDisplacementField(this->epi_trans[PE]);
+            all_trans->AddTransform(mepi_trans);
+        }
     }
 
     ImageType3D::Pointer det_img = ImageType3D::New();
@@ -1034,6 +1050,9 @@ void FINALDATA::GenerateFinalData(std::vector< std::vector<ImageType3D::Pointer>
     {    
         for(int PE=0;PE<2;PE++)
         {
+            if(data_names[PE]=="")
+                continue;
+
             int nvols= final_DWIs[PE].size();
             for(int v=0;v<nvols;v++)
             {
@@ -1164,11 +1183,12 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
     for(int PE=0;PE<2;PE++)
     {
+        if(data_names[PE]=="")
+            continue;
+
         int nvols= Nvols[PE];
 
         std::string up_name = data_names[PE];
-        if(up_name=="")
-            continue;
 
         std::string bmtxt_name = up_name.substr(0,up_name.rfind(".nii"))+".bmtxt";
         vnl_matrix<double> Bmatrix = read_bmatrix_file(bmtxt_name);
@@ -1720,6 +1740,9 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
         //Jac mipulation for fitting. We will have to undo this because it will be redone later.
         for(int PE=0;PE<2; PE++)
         {
+            if(data_names[PE]=="")
+                continue;
+
             int nvols = Nvols[PE];
             for(int v=0;v<nvols;v++)
             {
@@ -1870,6 +1893,9 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
         // revert back the JAC
         for(int PE=0;PE<2; PE++)
         {
+            if(data_names[PE]=="")
+                continue;
+
             int nvols = Nvols[PE];
             for(int v=0;v<nvols;v++)
             {
@@ -1888,6 +1914,9 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
         for(int PE=0;PE<2;PE++)
         {
+            if(data_names[PE]=="")
+                continue;
+
             std::vector<ImageType3D::Pointer> synth_imgs;
             synth_imgs.resize(Nvols[PE]);
 
@@ -2227,6 +2256,9 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
     {
         for(int PE=0;PE<2;PE++)
         {
+            if(data_names[PE]=="")
+                continue;
+
             ImageType3D::Pointer ref_img =  read_3D_volume_from_4D(data_names[PE],0);
             ImageType3D::Pointer ref_img_DP= ChangeImageHeaderToDP<ImageType3D>(ref_img);
 
@@ -3423,7 +3455,7 @@ void FINALDATA::GenerateGradNonlinOutput()
             graddev_vbmat_img_up= ComputeVBMatImgFromField(0);
             if(data_combination_method!="Merge" && data_names[1]!="")
             {
-                graddev_vbmat_img_down= ComputeVBMatImgFromCoeffs(1);
+                graddev_vbmat_img_down= ComputeVBMatImgFromField(1);
             }
         }
         else
@@ -3501,6 +3533,9 @@ void FINALDATA::ComputeJacImgs()
 
     for(int PE=0;PE<2;PE++)
     {
+        if(data_names[PE]=="")
+            continue;
+
         jac_imgs[PE]=ImageType3D::New();
         jac_imgs[PE]->SetRegions(template_structural->GetLargestPossibleRegion());
         jac_imgs[PE]->Allocate();
@@ -3553,6 +3588,9 @@ void FINALDATA::ComputeJacImgs()
         ImageType3D::Pointer b0_imgs[2]={blip_up_b0_corrected,blip_down_b0_corrected};
         for(int PE=0;PE<2;PE++)
         {
+            if(data_names[PE]=="")
+                continue;
+
             itk::ImageRegionIteratorWithIndex<ImageType3D> it(jac_imgs[PE],jac_imgs[PE]->GetLargestPossibleRegion());
             for(it.GoToBegin();!it.IsAtEnd();++it)
             {
@@ -3596,11 +3634,15 @@ void FINALDATA::Generate()
 
     ComputeJacImgs();
 
-    if(this->gradwarp_field || this->s2v_transformations[0].size())
+    std::string coeffs_file = RegistrationSettings::get().getValue<std::string>("grad_nonlin_coeffs");
+    std::string output_gradnonlin_type = RegistrationSettings::get().getValue<std::string>("output_gradnonlin_Bmtxt_type");
+
+
+    if(coeffs_file !="" || (this->s2v_transformations[0].size()) && output_gradnonlin_type =="vbmat")
     {
-        std::cout<<"Generating gradient nonlinearity information..."<<std::endl;
+        (*stream)<<"Generating gradient nonlinearity information..."<<std::endl;
         GenerateGradNonlinOutput();
-        std::cout<<"Done..."<<std::endl;
+        (*stream)<<"Done..."<<std::endl;
     }
 
 

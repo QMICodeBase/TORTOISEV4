@@ -1133,19 +1133,6 @@ void DRBUDDI_Diffeo::Process()
                 this->def_FINV=ComposeFields(prev_finv,this->def_FINV);
             if(prev_minv)
                 this->def_MINV=ComposeFields(prev_minv,this->def_MINV);
-/*
-            auto aa=final_stage.GetVelocityfield();
-            for(int T=0;T<aa.size();T++)
-            {
-                char nm[1000]={0};
-                sprintf(nm,"/qmi14_raid/okan/HCP_BIOWULF_T4/processed_data_200_T4_062623/data/100610/100610_LR_temp_proc/vf_%d.nii",T);
-                auto bb=aa[T]->CudaImageToITKField();
-                writeImageD<DisplacementFieldType>(bb,nm);
-            }
-*/
-
-
-
         }
         else
         {
@@ -1161,6 +1148,32 @@ void DRBUDDI_Diffeo::Process()
 
 }
 
+
+DisplacementFieldType::Pointer DRBUDDI_Diffeo::getUp2DownINV()
+{
+    auto disp_f = InvertField(def_FINV);
+    auto disp2a = ComposeFields(disp_f, def_MINV);
+    auto disp2= InvertField(disp2a);
+
+
+#ifdef USECUDA
+    DisplacementFieldType::Pointer disp=disp2->CudaImageToITKField();
+#else
+    DisplacementFieldType::Pointer disp=disp2;
+#endif
+    disp->SetDirection(orig_dir);
+    itk::ImageRegionIterator<DisplacementFieldType> it(disp,disp->GetLargestPossibleRegion());
+    for(it.GoToBegin();!it.IsAtEnd();++it)
+    {
+        DisplacementFieldType::PixelType pix= it.Get();
+        vnl_vector<double> vec=orig_dir.GetVnlMatrix()*new_dir.GetTranspose()* pix.GetVnlVector();
+        pix[0]=vec[0];
+        pix[1]=vec[1];
+        pix[2]=vec[2];
+        it.Set(pix);
+    }
+    return disp;
+}
 
 #endif
 

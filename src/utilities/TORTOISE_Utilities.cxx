@@ -57,11 +57,12 @@ int getNCores() {
 #endif
 }
 
+/*
 std::string GetTORTOISEVersion()
 {
     return std::string("TORTOISE V4.0.0");
 }
-
+*/
 
 
 

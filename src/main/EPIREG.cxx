@@ -173,72 +173,72 @@ void EPIREG::Step2_DiffeoRegistration()
     std::vector<DRBUDDIStageSettings> stages;
     stages.resize(6);
     {
-        stages[0].niter=100;
+        stages[0].niter=200;
         stages[0].img_smoothing_std=3.;
         stages[0].downsample_factor=8;
-        stages[0].learning_rate=0.05;
-        stages[0].update_gaussian_sigma=5.;
-        stages[0].total_gaussian_sigma=0.05;
+        stages[0].learning_rate=0.25;
+        stages[0].update_gaussian_sigma=9.;
+        stages[0].total_gaussian_sigma=0.25;
         stages[0].restrct=1;
         stages[0].constrain=0;
         DRBUDDIMetric metric;
-        metric.SetMetricType(DRBUDDIMetricEnumeration::CCJacS);
+        metric.SetMetricType(DRBUDDIMetricEnumeration::CC);
         metric.weight=1;
         stages[0].metrics.push_back(metric);
     }
     {
-        stages[1].niter=100;
+        stages[1].niter=200;
         stages[1].img_smoothing_std=2.;
         stages[1].downsample_factor=6;
-        stages[1].learning_rate=0.1;
-        stages[1].update_gaussian_sigma=5.;
-        stages[1].total_gaussian_sigma=0.05;
+        stages[1].learning_rate=0.4;
+        stages[1].update_gaussian_sigma=9.;
+        stages[1].total_gaussian_sigma=0.25;
         stages[1].restrct=1;
         stages[1].constrain=0;
         DRBUDDIMetric metric;
-        metric.SetMetricType(DRBUDDIMetricEnumeration::CCJacS);
+        metric.SetMetricType(DRBUDDIMetricEnumeration::CC);
         metric.weight=1;
         stages[1].metrics.push_back(metric);
     }
     {
-        stages[2].niter=100;
+        stages[2].niter=200;
         stages[2].img_smoothing_std=2.;
         stages[2].downsample_factor=4;
-        stages[2].learning_rate=0.2;
-        stages[2].update_gaussian_sigma=5.;
-        stages[2].total_gaussian_sigma=0.05;
+        stages[2].learning_rate=0.5;
+        stages[2].update_gaussian_sigma=9.;
+        stages[2].total_gaussian_sigma=0.25;
         stages[2].restrct=1;
         stages[2].constrain=0;
         DRBUDDIMetric metric;
-        metric.SetMetricType(DRBUDDIMetricEnumeration::CCJacS);
+        metric.SetMetricType(DRBUDDIMetricEnumeration::CC);
         metric.weight=1;
         stages[2].metrics.push_back(metric);
     }
     {
-        stages[3].niter=100;
+        stages[3].niter=200;
         stages[3].img_smoothing_std=1.;
         stages[3].downsample_factor=2;
-        stages[3].learning_rate=0.2;
-        stages[3].update_gaussian_sigma=5.;
-        stages[3].total_gaussian_sigma=0.05;
+        stages[3].learning_rate=0.75;
+        stages[3].update_gaussian_sigma=9.;
+        stages[3].total_gaussian_sigma=0.25;
         stages[3].restrct=1;
         stages[3].constrain=0;
         DRBUDDIMetric metric;
-        metric.SetMetricType(DRBUDDIMetricEnumeration::CCJacS);
+        metric.SetMetricType(DRBUDDIMetricEnumeration::CC);
         metric.weight=1;
         stages[3].metrics.push_back(metric);
     }
     {
-        stages[4].niter=100;
+        stages[4].niter=200;
         stages[4].img_smoothing_std=0.;
         stages[4].downsample_factor=1;
-        stages[4].learning_rate=0.2;
-        stages[4].update_gaussian_sigma=5.;
-        stages[4].total_gaussian_sigma=0.05;
+        stages[4].learning_rate=1.25;
+        stages[4].update_gaussian_sigma=9.;
+        stages[4].total_gaussian_sigma=0.25;
         stages[4].restrct=1;
         stages[4].constrain=0;
         DRBUDDIMetric metric;
-        metric.SetMetricType(DRBUDDIMetricEnumeration::CCJacS);
+        metric.SetMetricType(DRBUDDIMetricEnumeration::CC);
         metric.weight=1;
         stages[4].metrics.push_back(metric);
     }
@@ -246,15 +246,16 @@ void EPIREG::Step2_DiffeoRegistration()
         stages[5].niter=20;
         stages[5].img_smoothing_std=0.;
         stages[5].downsample_factor=1;
-        stages[5].learning_rate=0.2;
-        stages[5].update_gaussian_sigma=5.;
-        stages[5].total_gaussian_sigma=0.05;
+        stages[5].learning_rate=0.75;
+        stages[5].update_gaussian_sigma=9.;
+        stages[5].total_gaussian_sigma=0.25;
         stages[5].restrct=0;
         stages[5].constrain=0;
-        DRBUDDIMetric metric;
-        metric.SetMetricType(DRBUDDIMetricEnumeration::CCJacS);
+        DRBUDDIMetric metric;        
+        metric.SetMetricType(DRBUDDIMetricEnumeration::CC);
         metric.weight=1;
         stages[5].metrics.push_back(metric);
+
     }
 
 
@@ -262,6 +263,10 @@ void EPIREG::Step2_DiffeoRegistration()
     DRBUDDI_Diffeo *myEPIREG_processor = new DRBUDDI_Diffeo;
     myEPIREG_processor->SetB0UpImage(this->b0_up_quad);
     myEPIREG_processor->SetB0DownImage(this->b0_up_quad);
+    myEPIREG_processor->SetFAUpImage(this->b0_up_quad);
+    myEPIREG_processor->SetFADownImage(structural_imgs[0]);
+
+
     myEPIREG_processor->SetStructuralImages(structural_imgs);
     myEPIREG_processor->SetUpPEVector(phase_vector);
     myEPIREG_processor->SetDownPEVector(phase_vector);
@@ -269,7 +274,7 @@ void EPIREG::Step2_DiffeoRegistration()
     myEPIREG_processor->SetStagesFromExternal(stages);
     myEPIREG_processor->Process();
 
-    this->def_FINV=myEPIREG_processor->getDefFINV();    
+    this->def_FINV=myEPIREG_processor->getUp2DownINV();
 
     delete myEPIREG_processor;
 }

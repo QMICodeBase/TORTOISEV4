@@ -287,7 +287,7 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         this->AddOption( option );
     }
     {
-        std::string description = std::string("Number of cores to use in the CPU version. The default is 50\% of system cores.")  ;
+        std::string description = std::string("Number of cores to use in the CPU version of DRBUDDI. ONLY applies to the DRBUDDI executable and not TORTOISEProcess. The default is 50\% of system cores.")  ;
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "ncores");
         option->SetDescription( description );
@@ -424,14 +424,14 @@ std::string DRBUDDI_PARSERBASE::getGradNonlinInput()
     else
        return std::string("");
 }
-
+/*
 void DRBUDDI_PARSERBASE::setGradNonlinInput(std::string fname)
 {
     OptionType::Pointer option = this->GetOption( "grad_nonlin");
     option->m_OptionFunctions.clear();
     option->AddFunction(fname);
 }
-
+*/
 bool DRBUDDI_PARSERBASE::getGradNonlinIsGE()
 {
     OptionType::Pointer option = this->GetOption( "grad_nonlin");

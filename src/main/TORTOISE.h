@@ -124,9 +124,26 @@ public:
 
 
     TORTOISE(int argc, char * argv[]);
-    ~TORTOISE()
+    ~TORTOISE(){ };
+
+    std::string GetTORTOISEVersion()
     {
+        std::string version_file = this->executable_folder +std::string("/../settings/version.txt");
+        if(fs::exists(version_file))
+        {
+            std::ifstream infile(version_file.c_str());
+            std::string line;
+            std::getline(infile, line);
+            infile.close();
+
+            return line;
+        }
+        else
+            return std::string("TORTOISE V4.1.0");
     }
+
+
+
 
     void entryPoint();
     static void * staticEntryPoint(void * c){((TORTOISE*)c)->entryPoint();return NULL;};
@@ -154,6 +171,8 @@ private:
 
     std::vector<ImageType3D::Pointer> final_data;
     ImageType3D::Pointer final_mask{nullptr};
+
+    int curr_step{STEPS::Import};
 
     json processing_report_json;
 

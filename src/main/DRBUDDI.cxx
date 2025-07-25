@@ -122,11 +122,19 @@ void DRBUDDI::Step0_CreateImages()
     CreateCorrectionImage(this->up_nii_name,this->b0_up,this->FA_up);
     CreateCorrectionImage(this->down_nii_name,this->b0_down,this->FA_down);
 
-    std::string gradnonlin_field_name = parser->getGradNonlinInput();    
-    if(gradnonlin_field_name!="" && parser->getNOGradWarp()==false)
-    {
-        std::string gradnonlin_name_inv = gradnonlin_field_name.substr(0,gradnonlin_field_name.rfind(".nii"))+ "_inv.nii";
+    std::string gradnonlin_input_name = parser->getGradNonlinInput();
 
+
+    if(gradnonlin_input_name!="" && parser->getNOGradWarp()==false)
+    {
+
+        std::string up_name = this->parser->getUpInputName();
+        fs::path up_path(up_name);
+        std::string basename= fs::path(up_path).filename().string();
+        basename=basename.substr(0,basename.rfind(".nii"));
+        std::string gradnonlin_name_inv= this->proc_folder + std::string("/") + basename + std::string("_proc_gradnonlin_field_inv.nii");
+
+      //  std::string gradnonlin_name_inv = gradnonlin_field_name.substr(0,gradnonlin_field_name.rfind(".nii"))+ "_inv.nii";
         DisplacementFieldType::Pointer field= readImageD<DisplacementFieldType>(gradnonlin_name_inv);
         DisplacementFieldTransformType::Pointer gradwarp_trans=DisplacementFieldTransformType::New();
         gradwarp_trans->SetDisplacementField(field);

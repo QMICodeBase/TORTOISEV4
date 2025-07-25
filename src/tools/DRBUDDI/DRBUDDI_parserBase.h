@@ -23,7 +23,7 @@ public:
     int getDRBUDDIStep();
 
     std::string getGradNonlinInput();
-    void setGradNonlinInput(std::string fname);
+  //  void setGradNonlinInput(std::string fname);
     bool getGradNonlinIsGE();
     std::string getGradNonlinGradWarpDim();
     bool getNOGradWarp();
