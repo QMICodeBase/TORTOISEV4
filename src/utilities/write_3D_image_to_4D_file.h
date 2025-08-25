@@ -86,7 +86,7 @@ void write_3D_image_to_4D_file(typename itk::Image<PixelType,3>::Pointer img, st
             }
         }
         diff_sq= sqrt(diff_sq);
-        if(diff_sq>0.5)
+        if(diff_sq>0.1)
             mismatch=1;
 
 

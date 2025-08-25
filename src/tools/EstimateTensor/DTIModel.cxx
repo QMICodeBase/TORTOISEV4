@@ -2760,8 +2760,9 @@ void DTIModel::EstimateTensorWLLS()
                      if(denom!=0)
                          FA= sqrt( 1.5*nom/denom);
 
-                     if(FA>0.4)
+                     if(FA>0.5)
                      {
+                         /*
                          Dmat_corr(0,0)=mn;
                          Dmat_corr(1,1)=mn;
                          Dmat_corr(2,2)=mn;
@@ -2769,6 +2770,13 @@ void DTIModel::EstimateTensorWLLS()
                          Dmat_corr(0,1)=Dmat_corr(1,0)=0;
                          Dmat_corr(0,2)=Dmat_corr(2,0)=0;
                          Dmat_corr(2,1)=Dmat_corr(1,2)=0;
+*/
+                         // Forcing FA to be 0.5
+                         eig.D(0,0)= (1-sqrt(3./10))*mn;
+                         eig.D(1,1)= mn;
+                         eig.D(2,2)= (1+sqrt(3./10))*mn;
+                         Dmat_corr= eig.recompose();
+
 
                      }
                  }

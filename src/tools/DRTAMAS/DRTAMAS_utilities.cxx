@@ -26,8 +26,30 @@ CUDAIMAGE::Pointer ComputeTRMapC(CUDAIMAGE::Pointer tensor_img)
     output->components_per_voxel= 1;
     output->SetFloatDataPointer( d_output);
     return output;
-
 }
+
+CUDAIMAGE::Pointer ComputeFAMapC(CUDAIMAGE::Pointer tensor_img)
+{
+    cudaPitchedPtr d_output={0};
+
+    cudaExtent extent =  make_cudaExtent(1*sizeof(float)*tensor_img->sz.x,tensor_img->sz.y,tensor_img->sz.z);
+    cudaMalloc3D(&d_output, extent);
+    cudaMemset3D(d_output,0,extent);
+
+
+    ComputeFAMapC_cuda(tensor_img->getFloatdata(), d_output,  tensor_img->sz);
+
+
+    CUDAIMAGE::Pointer output = CUDAIMAGE::New();
+    output->sz=tensor_img->sz;
+    output->dir=tensor_img->dir;
+    output->orig=tensor_img->orig;
+    output->spc=tensor_img->spc;
+    output->components_per_voxel= 1;
+    output->SetFloatDataPointer( d_output);
+    return output;
+}
+
 
 
 

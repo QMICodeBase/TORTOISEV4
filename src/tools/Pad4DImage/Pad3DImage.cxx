@@ -79,16 +79,49 @@ int main( int argc , char * argv[] )
     new_image->FillBuffer(0.);
 
     ImageType3D::IndexType index_old,index_new;
+    ImageType3D::IndexType loop_start, loop_end;
 
-    for(int k=0;k<orig_size[2];k++)
-    {
+    if(pad_low>=0)
+        loop_start[2]=0;
+    else
+        loop_start[2]=-pad_low;
+
+    if(pad_top>=0)
+        loop_start[1]=0;
+    else
+        loop_start[1]=-pad_top;
+
+    if(pad_left>=0)
+        loop_start[0]=0;
+    else
+        loop_start[0]=-pad_left;
+
+
+    if(pad_high>=0)
+        loop_end[2]=orig_size[2];
+    else
+        loop_end[2]=orig_size[2]+pad_high;
+
+    if(pad_top>=0)
+        loop_end[1]=orig_size[1];
+    else
+        loop_end[1]=orig_size[1]+pad_bottom;
+    if(pad_right>=0)
+        loop_end[0]=orig_size[0];
+    else
+        loop_end[0]=orig_size[0]+pad_right;
+
+
+    for(int k=loop_start[2];k<loop_end[2];k++)
+    {                
         index_old[2]=k;
         index_new[2]=k+pad_low;
-        for(int j=0;j<orig_size[1];j++)
+
+        for(int j=loop_start[1];j<loop_end[1];j++)
         {
             index_old[1]=j;
             index_new[1]=j+pad_top;
-            for(int i=0;i<orig_size[0];i++)
+            for(int i=loop_start[0];i<loop_end[0];i++)
             {
                 index_old[0]=i;
                 index_new[0]=i+pad_left;
@@ -104,9 +137,20 @@ int main( int argc , char * argv[] )
     if(change_header)
     {
         itk::ContinuousIndex<double,3> cint;
-        cint[0]=-pad_left;
-        cint[1]=-pad_top;
-        cint[2]=-pad_low;
+        if(pad_left>0)
+            cint[0]=-pad_left;
+        else
+            cint[0]=pad_left;
+
+        if(pad_top>0)
+            cint[0]=-pad_left;
+        else
+            cint[0]=pad_top;
+
+        if(pad_low>0)
+            cint[2]=-pad_low;
+        else
+            cint[2]=pad_low;
 
 
         ImageType3D::PointType pt;

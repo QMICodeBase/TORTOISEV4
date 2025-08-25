@@ -10,6 +10,9 @@ using  TransformType=itk::Euler3DTransform<double>;
 void  ComputeTRMapC_cuda(cudaPitchedPtr tensor_img, cudaPitchedPtr output, const int3 data_sz);
 CUDAIMAGE::Pointer ComputeTRMapC(CUDAIMAGE::Pointer tensor_img);
 
+void  ComputeFAMapC_cuda(cudaPitchedPtr tensor_img, cudaPitchedPtr output, const int3 data_sz);
+CUDAIMAGE::Pointer ComputeFAMapC(CUDAIMAGE::Pointer tensor_img);
+
 
 void  LogTensor_cuda(cudaPitchedPtr tens, cudaPitchedPtr output, const int3 data_sz);
 CUDAIMAGE::Pointer  LogTensor(CUDAIMAGE::Pointer tens);

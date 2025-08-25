@@ -45,6 +45,7 @@ public:
     void RunDRTAMASStage();
     void PreprocessImagesAndFields();
 
+
 protected:
     void CreateVirtualImage();
 

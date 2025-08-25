@@ -567,17 +567,14 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                             char * slice_derm= derm_ptr+  dermslicePitch;
                             float * row_derm= (float *)(slice_derm+ dermcolPitch);
 
+                            updateF[0]+=row_derf[9*ii+0+dim*3]* -1*pn* 0.5/d_spc[dim];
+                            updateF[1]+=row_derf[9*ii+1+dim*3]* -1*pn* 0.5/d_spc[dim];
+                            updateF[2]+=row_derf[9*ii+2+dim*3]* -1*pn* 0.5/d_spc[dim];
 
-                            for(int px=0;px<3;px++)
-                            {
-                                int id= dim*3+px;
+                            updateM[0]-=row_derm[9*ii+0+dim*3]* -1*pn* 0.5/d_spc[dim];
+                            updateM[1]-=row_derm[9*ii+1+dim*3]* -1*pn* 0.5/d_spc[dim];
+                            updateM[2]-=row_derm[9*ii+2+dim*3]* -1*pn* 0.5/d_spc[dim];
 
-                                float delf= row_derf[9*ii+id]* -1*pn* 0.5/d_spc[dim];
-                                float delm= row_derm[9*ii+id]* -1*pn* 0.5/d_spc[dim];
-
-                                updateF[px]+=delf;
-                                updateM[px]-=delm;
-                            }
                         } //for pn
                     } //for dim
 
@@ -614,7 +611,7 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
 
 __global__ void
-FillImgs_kernel ( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
+Compute_DelEps_DelA_img_kernel ( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                   cudaPitchedPtr def_FINV, cudaPitchedPtr def_MINV,
                   cudaPitchedPtr Rf_img, cudaPitchedPtr Rm_img,
                   cudaPitchedPtr derf_img, cudaPitchedPtr derm_img)
@@ -629,8 +626,6 @@ FillImgs_kernel ( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
         {
             if(i>=1 && j>=1 && k>=1 && i<=d_sz[0]-2  && j<=d_sz[1]-2  && k<=d_sz[2]-2)
             {
-
-
                 size_t fpitch= up_img.pitch;
                 size_t fslicePitch= fpitch*d_sz[1]*k;
                 size_t fcolPitch= j*fpitch;
@@ -720,8 +715,8 @@ FillImgs_kernel ( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                         {
                             for(int r2=0;r2<3;r2++)
                             {
-                                delEQ_delRf(cnt,ma) =  derf(r2,c2);
-                                delEQ_delRm(cnt,ma) =  derm(r2,c2);
+                                delEQ_delRf(ma,cnt) =  derf(r2,c2);
+                                delEQ_delRm(ma,cnt) =  derm(r2,c2);
                                 ma++;
                             }
                         }
@@ -744,8 +739,8 @@ FillImgs_kernel ( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                         {
                             for(int r2=0;r2<3;r2++)
                             {
-                                delR_delAf(cnt,ma)=derf(r2,c2);
-                                delR_delAm(cnt,ma)=derm(r2,c2);
+                                delR_delAf(ma,cnt)=derf(r2,c2);
+                                delR_delAm(ma,cnt)=derm(r2,c2);
                                 ma++;
                             }
                         }
@@ -823,7 +818,7 @@ void ComputeMetric_DEV_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
     if(!tensonly_h)
     {
-        FillImgs_kernel<<< blockSize,gridSize>>> (up_img, down_img, def_FINV,def_MINV,
+        Compute_DelEps_DelA_img_kernel<<< blockSize,gridSize>>> (up_img, down_img, def_FINV,def_MINV,
                                               Rf_img,Rm_img,
                                              derf_img,derm_img);
     }

@@ -333,6 +333,24 @@ ScaleUpdateField_kernel(cudaPitchedPtr field, const int3 d_sz, float scale)
 }
 
 
+float TotalNorm_cuda(cudaPitchedPtr field, const int3 data_sz)
+{
+    float magnitude=1;
+    float* dev_out;
+    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+    ScalarFindSumSq<<<gSize, bSize>>>((float *)field.ptr, field.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+    ScalarFindSum<<<1, bSize>>>(dev_out, gSize, dev_out);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(&magnitude, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+    cudaFree(dev_out);
+    magnitude=sqrt(magnitude);
+
+    return magnitude;
+}
+
+
 
 void ScaleUpdateField_cuda(cudaPitchedPtr field, const int3 data_sz,float3 spc, float scale_factor )
 {

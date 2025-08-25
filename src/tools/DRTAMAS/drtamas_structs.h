@@ -13,7 +13,8 @@ enum DRTAMASMetricEnumeration
     DTDEV = 0,
     DTTR =1,
     DTCC=2,
-    DTIllegalMetric = 3
+    DTFA=3,
+    DTIllegalMetric = 4
 };
 
 class DRTAMASMetric
@@ -29,6 +30,8 @@ public:
             metric_name="DEV";
         if(type==DRTAMASMetricEnumeration::DTTR)
             metric_name="TR";
+        if(type==DRTAMASMetricEnumeration::DTFA)
+            metric_name="FA";
     }
 
 

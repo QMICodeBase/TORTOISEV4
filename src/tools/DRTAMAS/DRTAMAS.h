@@ -32,7 +32,15 @@ public:
 
     
 private:
-    void Step0_ReadImages();    
+
+    ImageType3D::Pointer PreprocessImage(ImageType3D::Pointer inputImage,
+                                                  ImageType3D::PixelType lowerScaleValue,
+                                                  ImageType3D::PixelType upperScaleValue,
+                                                  float winsorizeLowerQuantile, float winsorizeUpperQuantile,
+                                                  ImageType3D::Pointer histogramMatchSourceImage=nullptr );
+
+    void Step0_ReadImages();
+    RigidTransformType::Pointer Step00_RigidRegistration(ImageType3D::Pointer fixed_img_orig,ImageType3D::Pointer moving_img_orig);
     void Step0_AffineRegistration();
     void Step0_TransformAndWriteAffineImage();
     void Step1_DiffeoRegistration();

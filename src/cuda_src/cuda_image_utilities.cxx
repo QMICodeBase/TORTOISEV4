@@ -12,6 +12,30 @@ void AddToUpdateField(CUDAIMAGE::Pointer updateField,CUDAIMAGE::Pointer  updateF
 
 
 
+float DotProduct(CUDAIMAGE::Pointer  field1,CUDAIMAGE::Pointer  field2)
+{
+    float nrm1= TotalNorm_cuda(field1->getFloatdata(), field1->sz);
+    float nrm2= TotalNorm_cuda(field2->getFloatdata(), field2->sz);
+
+    auto ff1= MultiplyImage(field1,1./nrm1);
+    auto ff2= MultiplyImage(field2,1./nrm2);
+
+    auto mlt= MultiplyImages(ff1,ff2);
+
+    auto mlt_itk = mlt->CudaImageToITKImage();
+
+    using ImageType3D=itk::Image<float,3>;
+    float sm=0;
+    itk::ImageRegionConstIterator<ImageType3D> it(mlt_itk,mlt_itk->GetLargestPossibleRegion());
+    for(it.GoToBegin();!it.IsAtEnd();++it)
+    {
+        sm+=it.Get();
+    }
+
+    return sm;
+}
+
+
 void ScaleUpdateField(CUDAIMAGE::Pointer  field,float scale_factor)
 {
     ScaleUpdateField_cuda(field->getFloatdata(), field->sz, field->spc, scale_factor );

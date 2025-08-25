@@ -37,6 +37,11 @@ void  NegateField_cuda(cudaPitchedPtr field, const int3 data_sz);
 void ScaleUpdateField(CUDAIMAGE::Pointer  field,float scale_factor);
 void ScaleUpdateField_cuda(cudaPitchedPtr data, int3 data_sz,float3 data_res,float scale_factor);
 
+float TotalNorm_cuda(cudaPitchedPtr field, const int3 data_sz);
+
+float DotProduct(CUDAIMAGE::Pointer  field1,CUDAIMAGE::Pointer  field2);
+
+
 
 void AddToUpdateField(CUDAIMAGE::Pointer updateField,CUDAIMAGE::Pointer  updateField_temp,float weight,bool normalize=true);
 void AddToUpdateField_cuda(cudaPitchedPtr total_data, cudaPitchedPtr to_add_data,float weight, int3 data_sz,int Ncomponents,bool normalize=true  );

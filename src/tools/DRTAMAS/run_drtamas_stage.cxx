@@ -142,8 +142,6 @@ void DRTAMASStage::PreprocessImagesAndFields()
 
 
 
-
-
 void DRTAMASStage::RunDRTAMASStage()
 {   
     int Nmetrics= this->settings->metrics.size();
@@ -176,6 +174,9 @@ void DRTAMASStage::RunDRTAMASStage()
     std::vector<CurrentImageType::Pointer> resampled_smoothed_moving_structurals;
     CurrentImageType::Pointer resampled_smoothed_fixed_TR=nullptr;
     CurrentImageType::Pointer resampled_smoothed_moving_TR=nullptr;
+    CurrentImageType::Pointer resampled_smoothed_fixed_FA=nullptr;
+    CurrentImageType::Pointer resampled_smoothed_moving_FA=nullptr;
+
     for(int met=0; met< Nmetrics;met++)
     {
         if(this->settings->metrics[met].MetricType== DRTAMASMetricEnumeration::DTTR)
@@ -200,6 +201,30 @@ void DRTAMASStage::RunDRTAMASStage()
             resampled_smoothed_fixed_TR->CreateTexture();
             resampled_smoothed_moving_TR->CreateTexture();
         }
+        if(this->settings->metrics[met].MetricType== DRTAMASMetricEnumeration::DTFA)
+        {
+            resampled_smoothed_fixed_FA=CUDAIMAGE::New();
+            resampled_smoothed_fixed_FA->DuplicateFromCUDAImage(this->settings->metrics[met].fixed_img);
+            resampled_smoothed_moving_FA=CUDAIMAGE::New();
+            resampled_smoothed_moving_FA->DuplicateFromCUDAImage(this->settings->metrics[met].moving_img);
+
+            if(this->settings->img_smoothing_std!=0)
+            {
+                resampled_smoothed_fixed_FA= GaussianSmoothImage(resampled_smoothed_fixed_FA,this->settings->img_smoothing_std*this->settings->img_smoothing_std);
+                resampled_smoothed_moving_FA= GaussianSmoothImage(resampled_smoothed_moving_FA,this->settings->img_smoothing_std*this->settings->img_smoothing_std);
+            }
+
+            if(resampled_smoothed_fixed_FA->sz.x != this->virtual_img->sz.x)
+            {
+                resampled_smoothed_fixed_FA=ResampleImage(resampled_smoothed_fixed_FA,this->virtual_img);
+                resampled_smoothed_moving_FA=ResampleImage(resampled_smoothed_moving_FA,this->virtual_img);
+            }
+
+            resampled_smoothed_fixed_FA->CreateTexture();
+            resampled_smoothed_moving_FA->CreateTexture();
+        }
+
+
         if(this->settings->metrics[met].MetricType== DRTAMASMetricEnumeration::DTCC)
         {
             CurrentImageType::Pointer curr_fixed=CUDAIMAGE::New();
@@ -259,6 +284,8 @@ void DRTAMASStage::RunDRTAMASStage()
     int iter=0;
     bool converged=false;
     float curr_convergence =1;
+
+
     while( iter++ < this->settings->niter && !converged )
     {
         CurrentFieldType::Pointer updateFieldF= nullptr,updateFieldM= nullptr;
@@ -308,6 +335,14 @@ void DRTAMASStage::RunDRTAMASStage()
 
                 metric_value = ComputeMetric_CC(warped_fixed_img,warped_moving_img, updateFieldF_temp,updateFieldM_temp );
             }
+            if(this->settings->metrics[met].MetricType== DRTAMASMetricEnumeration::DTFA)
+            {
+                CurrentImageType::Pointer warped_fixed_img = WarpImage(resampled_smoothed_fixed_FA,this->def_FINV);
+                CurrentImageType::Pointer warped_moving_img = WarpImage(resampled_smoothed_moving_FA,this->def_MINV);
+
+                metric_value = ComputeMetric_CC(warped_fixed_img,warped_moving_img, updateFieldF_temp,updateFieldM_temp );
+            }
+
             if(this->settings->metrics[met].MetricType== DRTAMASMetricEnumeration::DTDEV)
             {
 
@@ -322,6 +357,7 @@ void DRTAMASStage::RunDRTAMASStage()
 
                 CurrentImageType::Pointer warped_fixed_tensor = CombineImageComponents(warped_fixed_tensorv);
                 CurrentImageType::Pointer warped_moving_tensor = CombineImageComponents(warped_moving_tensorv);
+
 
               //  warped_fixed_tensor = ExpTensor(warped_fixed_tensor) ;
               //  warped_moving_tensor = ExpTensor(warped_moving_tensor) ;
@@ -357,12 +393,16 @@ void DRTAMASStage::RunDRTAMASStage()
         updateFieldM=GaussianSmoothImage(updateFieldM,this->settings->update_gaussian_sigma);
 
 
+
+
         ScaleUpdateField(updateFieldF,this->settings->learning_rate);
         ScaleUpdateField(updateFieldM,this->settings->learning_rate);
 
 
         this->def_F  = ComposeFields(this->def_F,updateFieldF);
         this->def_M  = ComposeFields(this->def_M,updateFieldM);
+
+
         this->def_F = GaussianSmoothImage(this->def_F,this->settings->total_gaussian_sigma);
         this->def_M = GaussianSmoothImage(this->def_M,this->settings->total_gaussian_sigma);
 
@@ -388,9 +428,9 @@ void DRTAMASStage::RunDRTAMASStage()
         average_convergence/=tot_w;
         curr_convergence= average_convergence;
 
-        if( (0.7*curr_convergence+0.3*prev_conv) < 1E-7)
+        if( (0.7*curr_convergence+0.3*prev_conv) < 5E-7)
         {
-            if(this->settings->downsample_factor<=2)
+            if(this->settings->downsample_factor<=2 && iter>=20)
                 converged = true;
         }
 

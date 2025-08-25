@@ -14,6 +14,11 @@
 
 #include "DRTAMAS_utilities_cp.h"
 #include "DRTAMAS_Diffeo.h"
+#include "../tools/ResampleDWIs/resample_dwis.h"
+
+#include "itkImageToHistogramFilter.h"
+#include "itkIntensityWindowingImageFilter.h"
+#include "itkHistogramMatchingImageFilter.h"
 
 
 class CommandIterationUpdate : public itk::Command
@@ -212,6 +217,181 @@ void DRTAMAS::Step0_ReadImages()
 }
 
 
+ImageType3D::Pointer DRTAMAS::PreprocessImage(ImageType3D::Pointer inputImage,
+                                              ImageType3D::PixelType lowerScaleValue,
+                                              ImageType3D::PixelType upperScaleValue,
+                                              float winsorizeLowerQuantile, float winsorizeUpperQuantile,
+                                              ImageType3D::Pointer histogramMatchSourceImage )
+{
+    typedef itk::Statistics::ImageToHistogramFilter<ImageType3D>   HistogramFilterType;
+    typedef  HistogramFilterType::InputBooleanObjectType InputBooleanObjectType;
+    typedef  HistogramFilterType::HistogramSizeType      HistogramSizeType;
+    typedef  HistogramFilterType::HistogramType          HistogramType;
+
+    HistogramSizeType histogramSize( 1 );
+    histogramSize[0] = 256;
+
+    InputBooleanObjectType::Pointer autoMinMaxInputObject = InputBooleanObjectType::New();
+    autoMinMaxInputObject->Set( true );
+
+    HistogramFilterType::Pointer histogramFilter = HistogramFilterType::New();
+    histogramFilter->SetInput( inputImage );
+    histogramFilter->SetAutoMinimumMaximumInput( autoMinMaxInputObject );
+    histogramFilter->SetHistogramSize( histogramSize );
+    histogramFilter->SetMarginalScale( 10.0 );
+    histogramFilter->Update();
+
+    float lowerValue = histogramFilter->GetOutput()->Quantile( 0, winsorizeLowerQuantile );
+    float upperValue = histogramFilter->GetOutput()->Quantile( 0, winsorizeUpperQuantile );
+
+    typedef itk::IntensityWindowingImageFilter<ImageType3D, ImageType3D> IntensityWindowingImageFilterType;
+
+    IntensityWindowingImageFilterType::Pointer windowingFilter = IntensityWindowingImageFilterType::New();
+    windowingFilter->SetInput( inputImage );
+    windowingFilter->SetWindowMinimum( lowerValue );
+    windowingFilter->SetWindowMaximum( upperValue );
+    windowingFilter->SetOutputMinimum( lowerScaleValue );
+    windowingFilter->SetOutputMaximum( upperScaleValue );
+    windowingFilter->Update();
+
+    ImageType3D::Pointer outputImage = nullptr;
+    if( histogramMatchSourceImage )
+    {
+        typedef itk::HistogramMatchingImageFilter<ImageType3D, ImageType3D> HistogramMatchingFilterType;
+        HistogramMatchingFilterType::Pointer matchingFilter = HistogramMatchingFilterType::New();
+        matchingFilter->SetSourceImage( windowingFilter->GetOutput() );
+        matchingFilter->SetReferenceImage( histogramMatchSourceImage );
+        matchingFilter->SetNumberOfHistogramLevels( 256 );
+        matchingFilter->SetNumberOfMatchPoints( 12 );
+        matchingFilter->ThresholdAtMeanIntensityOn();
+        matchingFilter->Update();
+
+        outputImage = matchingFilter->GetOutput();
+        outputImage->Update();
+        outputImage->DisconnectPipeline();
+    }
+    else
+    {
+        outputImage = windowingFilter->GetOutput();
+        outputImage->Update();
+        outputImage->DisconnectPipeline();
+    }
+    return outputImage;
+}
+
+
+RigidTransformType::Pointer DRTAMAS::Step00_RigidRegistration(ImageType3D::Pointer fixed_img_orig,ImageType3D::Pointer moving_img_orig)
+{
+    ImageType3D::Pointer fixed_img =this->PreprocessImage(fixed_img_orig,0,1,0,1);
+    ImageType3D::Pointer moving_img =this->PreprocessImage(moving_img_orig,0,1,0,1);
+
+    writeImageD<ImageType3D>(fixed_img,"/qmi08_raid/maxif/Ruifeng_data/subj-13/subject_template_subj_13/HCP_to_subject_template/diffeo/diffeo_wrong_tensor/okan_test/aaa.nii");
+    writeImageD<ImageType3D>(moving_img,"/qmi08_raid/maxif/Ruifeng_data/subj-13/subject_template_subj_13/HCP_to_subject_template/diffeo/diffeo_wrong_tensor/okan_test/bbb.nii");
+
+
+    RigidTransformType::Pointer rigid_trans1= RigidRegisterImagesEuler( fixed_img,  moving_img, "CC",0.25);
+    RigidTransformType::Pointer rigid_trans2= RigidRegisterImagesEuler( fixed_img,  moving_img,"MI",0.25);
+
+    auto params1= rigid_trans1->GetParameters();
+    auto params2= rigid_trans2->GetParameters();
+    auto p1=params1-params2;
+
+    double diff=0;
+    diff+= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] +
+            p1[3]*p1[3]/400. + p1[4]*p1[4]/400. + p1[5]*p1[5]/400. ;
+
+    RigidTransformType::Pointer rigid_trans=nullptr;
+    std::cout<<"R1: "<< params1<<std::endl;
+    std::cout<<"R2: "<< params2<<std::endl;
+    std::cout<<"MI vs CC diff: "<< diff<<std::endl;
+    if(diff<0.005)
+        rigid_trans=rigid_trans2;
+    else
+    {
+        std::cout<<"Could not compute the rigid transformation from the structural imageto b=0 image... Starting multistart.... This could take a while"<<std::endl;
+        std::cout<<"Better be safe than sorry, right?"<<std::endl;
+
+        RigidTransformType::Pointer rigid_trans1a= RigidRegisterImagesEuler( moving_img, fixed_img,  "CC",0.25,false);
+        RigidTransformType::ParametersType b1= rigid_trans1a->GetParameters();
+
+        p1[0]= params1[0]+ b1[0];
+        p1[1]= params1[1]+ b1[1];
+        p1[2]= params1[2]+ b1[2];
+
+        double diff1= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] ;
+        RigidTransformType::Pointer rigid_trans2a= RigidRegisterImagesEuler( moving_img, fixed_img,  "MI",0.25,false);
+        RigidTransformType::ParametersType b2= rigid_trans2a->GetParameters();
+
+        std::cout<< "Trans CC F" << rigid_trans1->GetParameters()<<std::endl;
+        std::cout<< "Trans CC B" << rigid_trans1a->GetParameters()<<std::endl;
+        std::cout<< "Trans MI F" << rigid_trans2->GetParameters()<<std::endl;
+        std::cout<< "Trans MI B" << rigid_trans2a->GetParameters()<<std::endl;
+
+
+        p1[0]= params2[0]+ b2[0];
+        p1[1]= params2[1]+ b2[1];
+        p1[2]= params2[2]+ b2[2];
+
+        double diff2= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] ;
+        std::cout<< "diff1 "<<diff1 << " diff2 " <<diff2 <<std::endl;
+
+        std::string new_metric_type="MI";
+        if(diff1 < diff2)
+        {
+            std::cout<< "CC was determined to be more robust than MI. Switching..."<<std::endl;
+            new_metric_type="CC";
+        }
+
+        if(diff1<0.001)
+        {
+            b1[0]= (params1[0] - b1[0])/2.;
+            b1[1]= (params1[1] - b1[1])/2.;
+            b1[2]= (params1[2] - b1[2])/2.;
+            b1[3]= (params1[3] );
+            b1[4]= (params1[4] );
+            b1[5]= (params1[5] );
+            rigid_trans1->SetParameters(b1);
+
+            rigid_trans= RigidRegisterImagesEuler( fixed_img,  moving_img, "CC",0.25,true, rigid_trans1);
+        }
+        else
+        {
+            if(diff2<0.001)
+            {
+                b2[0]= (params2[0] - b2[0])/2.;
+                b2[1]= (params2[1] - b2[1])/2.;
+                b2[2]= (params2[2] - b2[2])/2.;
+                b2[3]= (params2[3] );
+                b2[4]= (params2[4] );
+                b2[5]= (params2[5] );
+                rigid_trans2->SetParameters(b2);
+
+                rigid_trans= RigidRegisterImagesEuler( fixed_img, moving_img, "MI",0.25,true,rigid_trans2);
+            }
+            else
+            {
+                std::vector<float> new_res; new_res.resize(3);
+                new_res[0]= fixed_img->GetSpacing()[0] * 2;
+                new_res[1]= fixed_img->GetSpacing()[1] * 2;
+                new_res[2]= fixed_img->GetSpacing()[2] * 2;
+                std::vector<float> dummy;
+                ImageType3D::Pointer fixed2= resample_3D_image(fixed_img,new_res,dummy,"Linear");
+                new_res[0]= moving_img->GetSpacing()[0] * 2;
+                new_res[1]= moving_img->GetSpacing()[1] * 2;
+                new_res[2]= moving_img->GetSpacing()[2] * 2;
+                ImageType3D::Pointer moving2= resample_3D_image(moving_img,new_res,dummy,"Linear");
+
+                rigid_trans1=MultiStartRigidSearch(fixed2,  moving2,new_metric_type);
+                rigid_trans= RigidRegisterImagesEuler( fixed_img,  moving_img, new_metric_type,0.25,rigid_trans1);
+            }
+        }
+
+    }
+    return rigid_trans;
+
+}
+
+
 void DRTAMAS::Step0_AffineRegistration()
 {
     ImageType3D::Pointer fixed_TR = ImageType3D::New();
@@ -226,7 +406,10 @@ void DRTAMAS::Step0_AffineRegistration()
         {
             ImageType3D::IndexType ind3= it.GetIndex();
             auto mat = fixed_tensor->GetPixel(ind3);
-            it.Set(mat(0,0) + mat(1,1) + mat(2,2));
+            float TR=mat(0,0) + mat(1,1) + mat(2,2);
+            if(TR>9000)
+                TR=9000;
+            it.Set(TR);
         }
     }
 
@@ -242,7 +425,10 @@ void DRTAMAS::Step0_AffineRegistration()
         {
             ImageType3D::IndexType ind3= it.GetIndex();
             auto mat = moving_tensor->GetPixel(ind3);
-            it.Set(mat(0,0) + mat(1,1) + mat(2,2));
+            float TR=mat(0,0) + mat(1,1) + mat(2,2);
+            if(TR>9000)
+                TR=9000;
+            it.Set(TR);
         }
     }
 
@@ -251,11 +437,12 @@ void DRTAMAS::Step0_AffineRegistration()
 
     if(parser->getInitialRigidTransform()=="")
     {
-        RigidTransformType::Pointer rigid_trans=RigidRegisterImagesEuler( fixed_TR, moving_TR, "MI", 0.5);
+        RigidTransformType::Pointer rigid_trans=Step00_RigidRegistration( fixed_TR, moving_TR);
         transform->SetTranslation(rigid_trans->GetTranslation());
         transform->SetOffset(rigid_trans->GetOffset());
         transform->SetFixedParameters(rigid_trans->GetFixedParameters());
         transform->SetMatrix(rigid_trans->GetMatrix());
+
     }
     else
     {
@@ -268,7 +455,6 @@ void DRTAMAS::Step0_AffineRegistration()
         itk::TransformFileReader::TransformListType::const_iterator it = transforms->begin();
         transform = static_cast<AffineTransformType*>((*it).GetPointer());
     }
-
 
 
     typedef itk::ConjugateGradientLineSearchOptimizerv4Template<double> OptimizerType;

@@ -106,6 +106,11 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         metric1.to=1;
         curr_stage.metrics.push_back(metric1);
 
+        DRTAMASMetric metric4;
+        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+        metric4.weight=1;
+        curr_stage.metrics.push_back(metric4);
+
         for(int s=0;s<Nstr;s++)
         {
             DRTAMASMetric metric3;
@@ -134,6 +139,11 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         metric1.weight=1;
         metric1.to=1;
         curr_stage.metrics.push_back(metric1);
+
+        DRTAMASMetric metric4;
+        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+        metric4.weight=2;
+        curr_stage.metrics.push_back(metric4);
 
         for(int s=0;s<Nstr;s++)
         {
@@ -164,6 +174,11 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         metric1.to=1;
         curr_stage.metrics.push_back(metric1);
 
+        DRTAMASMetric metric4;
+        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+        metric4.weight=2;
+        curr_stage.metrics.push_back(metric4);
+
         for(int s=0;s<Nstr;s++)
         {
             DRTAMASMetric metric3;
@@ -193,6 +208,11 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         metric1.to=1;
         curr_stage.metrics.push_back(metric1);
 
+        DRTAMASMetric metric4;
+        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+        metric4.weight=2;
+        curr_stage.metrics.push_back(metric4);
+
         for(int s=0;s<Nstr;s++)
         {
             DRTAMASMetric metric3;
@@ -202,12 +222,48 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         }
         this->stages.push_back(curr_stage);
     }
+
     {
         DRTAMASStageSettings curr_stage;                                   //5
+        curr_stage.niter=300;
+        curr_stage.img_smoothing_std=1.;
+        curr_stage.downsample_factor=2;
+        curr_stage.learning_rate=0.25;
+        curr_stage.update_gaussian_sigma=3.;
+        curr_stage.total_gaussian_sigma=0.0;
+
+        DRTAMASMetric metric2;
+        metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
+        metric2.weight=2;
+        curr_stage.metrics.push_back(metric2);
+
+        DRTAMASMetric metric1;
+        metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
+        metric1.weight=2;
+        metric1.to=0;
+        curr_stage.metrics.push_back(metric1);
+
+        DRTAMASMetric metric4;
+        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+        metric4.weight=2;
+        curr_stage.metrics.push_back(metric4);
+
+        for(int s=0;s<Nstr;s++)
+        {
+            DRTAMASMetric metric3;
+            metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
+            metric3.weight=1;
+            curr_stage.metrics.push_back(metric3);
+        }
+        this->stages.push_back(curr_stage);
+    }
+
+    {
+        DRTAMASStageSettings curr_stage;                                   //6
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=0.;
         curr_stage.downsample_factor=1;
-        curr_stage.learning_rate=1.5;
+        curr_stage.learning_rate=1;
 
         if(parser->getNoSmoothingLastStage())
         {
@@ -231,6 +287,11 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         metric1.to=1;
         curr_stage.metrics.push_back(metric1);
 
+        DRTAMASMetric metric4;
+        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+        metric4.weight=2;
+        curr_stage.metrics.push_back(metric4);
+
         for(int s=0;s<Nstr;s++)
         {
             DRTAMASMetric metric3;
@@ -241,11 +302,11 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         this->stages.push_back(curr_stage);
     }
     {
-        DRTAMASStageSettings curr_stage;                                   //6
+        DRTAMASStageSettings curr_stage;                                   //7
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=0.;
         curr_stage.downsample_factor=1;
-        curr_stage.learning_rate=1.25;
+        curr_stage.learning_rate=0.3;
 
         if(parser->getNoSmoothingLastStage())
         {
@@ -269,6 +330,11 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         metric1.to=0;
         curr_stage.metrics.push_back(metric1);
 
+        DRTAMASMetric metric4;
+        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+        metric4.weight=2;
+        curr_stage.metrics.push_back(metric4);
+
         for(int s=0;s<Nstr;s++)
         {
             DRTAMASMetric metric3;
@@ -286,6 +352,9 @@ void DRTAMAS_Diffeo::SetImagesForMetrics()
 {
     CurrentImageType::Pointer fixed_TR_img = ComputeTRMapC(this->fixed_tensor);
     CurrentImageType::Pointer moving_TR_img = ComputeTRMapC(this->moving_tensor);
+
+    CurrentImageType::Pointer fixed_FA_img = ComputeFAMapC(this->fixed_tensor);
+    CurrentImageType::Pointer moving_FA_img = ComputeFAMapC(this->moving_tensor);
 
     CurrentImageType::Pointer preprocessed_fixed_TR = PreprocessImage(fixed_TR_img,0,1);
     CurrentImageType::Pointer preprocessed_moving_TR = PreprocessImage(moving_TR_img,0,1);
@@ -314,6 +383,11 @@ void DRTAMAS_Diffeo::SetImagesForMetrics()
             {
                 this->stages[st].metrics[m].fixed_img= preprocessed_fixed_TR;
                 this->stages[st].metrics[m].moving_img= preprocessed_moving_TR;
+            }
+            if(this->stages[st].metrics[m].MetricType == DRTAMASMetricEnumeration::DTFA)
+            {
+                this->stages[st].metrics[m].fixed_img= fixed_FA_img;
+                this->stages[st].metrics[m].moving_img= moving_FA_img;
             }
             if(this->stages[st].metrics[m].MetricType == DRTAMASMetricEnumeration::DTCC)
             {
