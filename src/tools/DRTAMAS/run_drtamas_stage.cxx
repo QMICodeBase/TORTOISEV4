@@ -334,6 +334,7 @@ void DRTAMASStage::RunDRTAMASStage()
                 CurrentImageType::Pointer warped_moving_img = WarpImage(resampled_smoothed_moving_TR,this->def_MINV);
 
                 metric_value = ComputeMetric_CC(warped_fixed_img,warped_moving_img, updateFieldF_temp,updateFieldM_temp );
+
             }
             if(this->settings->metrics[met].MetricType== DRTAMASMetricEnumeration::DTFA)
             {

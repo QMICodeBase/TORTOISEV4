@@ -228,7 +228,7 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         curr_stage.niter=300;
         curr_stage.img_smoothing_std=1.;
         curr_stage.downsample_factor=2;
-        curr_stage.learning_rate=0.25;
+        curr_stage.learning_rate=0.15;
         curr_stage.update_gaussian_sigma=3.;
         curr_stage.total_gaussian_sigma=0.0;
 
@@ -356,6 +356,7 @@ void DRTAMAS_Diffeo::SetImagesForMetrics()
     CurrentImageType::Pointer fixed_FA_img = ComputeFAMapC(this->fixed_tensor);
     CurrentImageType::Pointer moving_FA_img = ComputeFAMapC(this->moving_tensor);
 
+
     CurrentImageType::Pointer preprocessed_fixed_TR = PreprocessImage(fixed_TR_img,0,1);
     CurrentImageType::Pointer preprocessed_moving_TR = PreprocessImage(moving_TR_img,0,1);
 
@@ -397,12 +398,8 @@ void DRTAMAS_Diffeo::SetImagesForMetrics()
                 }
                 else
                 {
-                    //this->stages[st].metrics[m].fixed_img= preprocessed_fixed_structurals[0];
-                    //this->stages[st].metrics[m].moving_img= preprocessed_moving_structurals[0];
-
                     for(int s=0;s<Nstr;s++)
                     {
-                        //this->stages[st].metrics.push_back(this->stages[st].metrics[m]);
                         this->stages[st].metrics[m+s].fixed_img= preprocessed_fixed_structurals[s];
                         this->stages[st].metrics[m+s].moving_img= preprocessed_moving_structurals[s];
                     }

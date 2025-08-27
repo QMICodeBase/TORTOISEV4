@@ -263,7 +263,9 @@ ComputeFAMapC_kernel(cudaPitchedPtr tensor, cudaPitchedPtr output,  const int3 d
             float mn = (vals[0]+vals[1]+vals[2])/3.;
             float nom = (vals[0]-mn)*(vals[0]-mn)+(vals[1]-mn)*(vals[1]-mn)+(vals[2]-mn)*(vals[2]-mn);
             float denom = vals[0]*vals[0]+vals[1]*vals[1]+vals[2]*vals[2];
-            float FA= sqrt(1.5*nom/denom);
+            float FA=0;
+            if(denom>0)
+                FA= sqrt(1.5*nom/denom);
 
             row_o[i] = FA;
         }
