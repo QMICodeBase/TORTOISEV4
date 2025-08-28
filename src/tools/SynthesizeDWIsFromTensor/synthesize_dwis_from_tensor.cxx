@@ -8,8 +8,8 @@ int main(int argc,char *argv[])
 {
     if(argc<5)
     {
-        std::cout<<"Usage: SynthesizeDWIsFromTensor full_path_to_tensor_image full_path_to_A0_image full_path_to_synthesization_Bmatrix output_filename"<<std::endl;
-        return 0;
+        std::cout<<"Usage: SynthesizeDWIsFromTensor full_path_to_tensor_image full_path_to_A0_image full_path_to_synthesization_Bmatrix output_filename VF_img(optional)"<<std::endl;
+        return EXIT_FAILURE;
     }
 
 
@@ -21,6 +21,9 @@ int main(int argc,char *argv[])
 
 
     ImageType3D::Pointer A0_image= readImageD<ImageType3D>(argv[2]);
+    ImageType3D::Pointer VF_img=nullptr;
+    if(argc>5)
+        VF_img= readImageD<ImageType3D>(argv[5]);
 
     vnl_matrix<double> Bmatrix = read_bmatrix_file(argv[3]);
 
@@ -78,16 +81,20 @@ int main(int argc,char *argv[])
     DTIModel dti_estimator;
     dti_estimator.SetOutput(dt_image);
     dti_estimator.SetA0Image(A0_image);
+    if(VF_img)
+        dti_estimator.SetVFImage(VF_img);
 
 
     int Nvols= Bmatrix.rows();
 
     for(int i=0;i<Nvols;i++)
-    {
+    {        
         vnl_vector<double> bmat_vec= Bmatrix.get_row(i);
 
         ImageType3D::Pointer dwi= dti_estimator.SynthesizeDWI( bmat_vec );
 
         write_3D_image_to_4D_file<float>(dwi,argv[4],i,Nvols);
+
+        std::cout<<"Vol " <<i <<"/"<<Nvols <<" done..."<<std::endl;
     }
 }

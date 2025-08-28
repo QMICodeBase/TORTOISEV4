@@ -34,6 +34,8 @@ public:
     ImageType3D::Pointer SynthesizeDWI(vnl_vector<double> bmat_vec);
     ImageType3D::Pointer getCSImg(){return CS_img;}
     ImageType3D::Pointer getVFImg(){return VF_img;}
+    void SetVFImage(ImageType3D::Pointer vf){this->VF_img=vf;}
+
     ImageType3D::Pointer getVFImg2(){return VF_img2;}
     DTImageType::Pointer getFlowImg(){return flow_tensor_img;}    
 
