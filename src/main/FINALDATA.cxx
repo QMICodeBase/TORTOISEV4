@@ -1804,7 +1804,6 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
             dti_estimator.PerformFitting();
             final_mask= create_mask(dti_estimator.GetA0Image());
 
-
             // MAPMRI FITTING
             const unsigned int FINAL_STAGE_MAPMRI_DEGREE=6;
 
