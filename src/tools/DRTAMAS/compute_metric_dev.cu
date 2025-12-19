@@ -185,6 +185,17 @@ __device__ Matrix3f ComputeSingleJacobianMatrixAtIndex(cudaPitchedPtr field ,int
     B(1,1)+=1;
     B(2,2)+=1;
 
+    /*
+    if(i==60 && j==157-1-68 && k==56)
+    //if(i==60 && j==68 && k==56)
+    {
+        printf("%f %f %f\n",B(0,0),B(0,1),B(0,2));
+        printf("%f %f %f\n",B(1,0),B(1,1),B(1,2));
+        printf("%f %f %f\n",B(2,0),B(2,1),B(2,2));
+        printf("\n");
+    }
+*/
+
     return B;
 }
 
@@ -520,13 +531,13 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                             char * slice_derm= derm_ptr+  dermslicePitch;
                             float * row_derm= (float *)(slice_derm+ dermcolPitch);
 
-                            updateF[0]+=row_derf[9*ii+0+dim*3]* -1*pn* 0.5/d_spc[dim];
-                            updateF[1]+=row_derf[9*ii+1+dim*3]* -1*pn* 0.5/d_spc[dim];
-                            updateF[2]+=row_derf[9*ii+2+dim*3]* -1*pn* 0.5/d_spc[dim];
+                            updateF[0]+=row_derf[9*ii+0+dim*3]* -1*pn* 0.5*(SD(dim,0)+SD(dim,1)+SD(dim,2));
+                            updateF[1]+=row_derf[9*ii+1+dim*3]* -1*pn* 0.5*(SD(dim,0)+SD(dim,1)+SD(dim,2));
+                            updateF[2]+=row_derf[9*ii+2+dim*3]* -1*pn* 0.5*(SD(dim,0)+SD(dim,1)+SD(dim,2));
 
-                            updateM[0]-=row_derm[9*ii+0+dim*3]* -1*pn* 0.5/d_spc[dim];
-                            updateM[1]-=row_derm[9*ii+1+dim*3]* -1*pn* 0.5/d_spc[dim];
-                            updateM[2]-=row_derm[9*ii+2+dim*3]* -1*pn* 0.5/d_spc[dim];
+                            updateM[0]-=row_derm[9*ii+0+dim*3]* -1*pn* 0.5*(SD(dim,0)+SD(dim,1)+SD(dim,2));
+                            updateM[1]-=row_derm[9*ii+1+dim*3]* -1*pn* 0.5*(SD(dim,0)+SD(dim,1)+SD(dim,2));
+                            updateM[2]-=row_derm[9*ii+2+dim*3]* -1*pn* 0.5*(SD(dim,0)+SD(dim,1)+SD(dim,2));
 
                         } //for pn
                     } //for dim

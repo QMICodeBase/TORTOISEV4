@@ -1,4 +1,4 @@
 {
     "_comment": "Percentage of CPU cores to be used by TORTOISE as a float. Ex, 1: use all cores  0.1: use 10% of max cores",
-    "PercentOfCpuCoresToUse": 0.5
+    "PercentOfCpuCoresToUse": 1
 }

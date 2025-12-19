@@ -120,7 +120,7 @@ void EstimateTensorWLLS_PARSER::InitializeCommandLineOptions()
         this->AddOption( option );
     }
     {
-        std::string description = std::string( "Free water diffusivity in (\mu m)^2/s for N2 fitting. Default: 3000" );
+        std::string description = std::string( "Free water diffusivity in (\\mu m)^2/s for N2 fitting. Default: 3000" );
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "free_water_diffusivity");
         option->SetShortName( 'f');
@@ -130,14 +130,14 @@ void EstimateTensorWLLS_PARSER::InitializeCommandLineOptions()
 
 
     {
-        std::string description = std::string( "For NT2 fitting, what is the maximum diffusivity for the 1st compartment in  (\mu m)^2/s . Default: 3000" );
+        std::string description = std::string( "For NT2 fitting, what is the maximum diffusivity for the 1st compartment in  (\\mu m)^2/s . Default: 3000" );
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "NT2_C1_max_ADC");
         option->SetDescription( description );
         this->AddOption( option );
     }
     {
-        std::string description = std::string( "For NT2 fitting, what is the minimum diffusivity for the 2nd compartment in  (\mu m)^2/s . Default: 9000" );
+        std::string description = std::string( "For NT2 fitting, what is the minimum diffusivity for the 2nd compartment in  (\\mu m)^2/s . Default: 9000" );
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "NT2_C2_min_ADC");
         option->SetDescription( description );

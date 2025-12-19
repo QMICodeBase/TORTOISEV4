@@ -91,9 +91,9 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         curr_stage.niter=300;
         curr_stage.img_smoothing_std=4.;
         curr_stage.downsample_factor=8;
-        curr_stage.learning_rate=0.1;
+        curr_stage.learning_rate=0.2;
         curr_stage.update_gaussian_sigma=5.;
-        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.total_gaussian_sigma=0.0;
 
         DRTAMASMetric metric2;
         metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
@@ -125,9 +125,9 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         curr_stage.niter=300;
         curr_stage.img_smoothing_std=3.;
         curr_stage.downsample_factor=6;
-        curr_stage.learning_rate=0.2;
+        curr_stage.learning_rate=0.4;
         curr_stage.update_gaussian_sigma=4.;
-        curr_stage.total_gaussian_sigma=0.05;
+        curr_stage.total_gaussian_sigma=0.0;
 
         DRTAMASMetric metric2;
         metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
@@ -159,7 +159,7 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         curr_stage.niter=300;
         curr_stage.img_smoothing_std=2.;
         curr_stage.downsample_factor=4;
-        curr_stage.learning_rate=0.25;
+        curr_stage.learning_rate=0.5;
         curr_stage.update_gaussian_sigma=4.;
         curr_stage.total_gaussian_sigma=0.0;
 
@@ -193,7 +193,7 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         curr_stage.niter=300;
         curr_stage.img_smoothing_std=1.;
         curr_stage.downsample_factor=2;
-        curr_stage.learning_rate=0.5;
+        curr_stage.learning_rate=0.75;
         curr_stage.update_gaussian_sigma=3.;
         curr_stage.total_gaussian_sigma=0.0;
 
@@ -228,7 +228,7 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         curr_stage.niter=300;
         curr_stage.img_smoothing_std=1.;
         curr_stage.downsample_factor=2;
-        curr_stage.learning_rate=0.15;
+        curr_stage.learning_rate=0.25;
         curr_stage.update_gaussian_sigma=3.;
         curr_stage.total_gaussian_sigma=0.0;
 
@@ -306,7 +306,7 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=0.;
         curr_stage.downsample_factor=1;
-        curr_stage.learning_rate=0.3;
+        curr_stage.learning_rate=0.4;
 
         if(parser->getNoSmoothingLastStage())
         {
@@ -315,7 +315,7 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         }
         else
         {
-            curr_stage.update_gaussian_sigma=3.;
+            curr_stage.update_gaussian_sigma=2.;
             curr_stage.total_gaussian_sigma=0;
         }
 

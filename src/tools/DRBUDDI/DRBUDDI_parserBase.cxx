@@ -420,7 +420,17 @@ std::string DRBUDDI_PARSERBASE::getGradNonlinInput()
 {
     OptionType::Pointer option = this->GetOption( "grad_nonlin");
     if(option->GetNumberOfFunctions())
+    {
+        std::string nm = option->GetFunction(0)->GetName();
+        std::string ext= nm.substr(nm.rfind("."));
+        if(ext!=".grad" && ext!=".dat" && ext!=".gc")
+        {
+            std::cout<<"WARNING! Gradient nonlinearity file format not recognized. Check the file extension..."<<std::endl;
+            std::cout<<"Disabling gradient nonlinearity based processing..."<<std::endl;
+            return "";
+        }
         return option->GetFunction(0)->GetName();
+    }
     else
        return std::string("");
 }

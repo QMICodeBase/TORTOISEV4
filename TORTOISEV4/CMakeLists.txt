@@ -565,7 +565,21 @@ IF(USE_VTK)
       MODULES ${VTK_LIBRARIES}
     )
 
-   # add_executable(WarpMesh ../src/utilities/read_3Dvolume_from_4D.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/WarpMesh/WarpMesh.cxx  ../src/main/defines.cxx )
-   # target_link_libraries(WarpMesh ${ITK_LIBRARIES} ${VTK_LIBRARIES} -lboost_system  )
+    add_executable(WarpMesh ../src/tools/WarpMesh/WarpMesh_parser.cxx ../src/utilities/read_3Dvolume_from_4D.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/WarpMesh/WarpMesh.cxx  ../src/main/defines.cxx ../src/main/antsCommandLineParser.cxx ../src/main/antsCommandLineOption.cxx)
+    target_link_libraries(WarpMesh ${ITK_LIBRARIES} ${VTK_LIBRARIES}  -lboost_system  )
+    # vtk_module_autoinit is needed
+    vtk_module_autoinit(
+      TARGETS WarpMesh
+      MODULES ${VTK_LIBRARIES}
+    )
+
+    add_executable(Cylinders  ../src/tools/WarpMesh/Cylinders.cxx  )
+    target_link_libraries(Cylinders ${ITK_LIBRARIES} ${VTK_LIBRARIES}  -lboost_system  )
+
+    vtk_module_autoinit(
+       TARGETS Cylinders
+       MODULES ${VTK_LIBRARIES}
+    )
+
 endif(USE_VTK)
 

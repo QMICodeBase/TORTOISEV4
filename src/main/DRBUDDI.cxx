@@ -29,6 +29,8 @@
 #include "DRBUDDI_Diffeo.h"
 #include "../tools/ResampleDWIs/resample_dwis.h"
 
+#include "itkANTSNeighborhoodCorrelationImageToImageMetricv4.h"
+
 
 DRBUDDI::DRBUDDI(std::string uname,std::string dname,std::vector<std::string> str_names,json mjson)
 {
@@ -419,6 +421,7 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
     itk::IdentityTransform<double,3>::Pointer  id=itk::IdentityTransform<double,3>::New();
     id->SetIdentity();
 
+
     CompositeTransformType::Pointer up_trans = CompositeTransformType::New();
     up_trans->AddTransform(id);
     CompositeTransformType::Pointer down_trans = CompositeTransformType::New();
@@ -427,7 +430,7 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
     RigidTransformType::Pointer total_trans=RigidTransformType::New();
     total_trans->SetIdentity();
 
-    while(diff>5E-5 && iter<4)
+    while(diff>5E-5 && iter<4 && parser->getStartWithDiffeo()==0)
     {
         DisplacementFieldType::Pointer up_field=CompositeToDispField(up_trans,b0_up_image);
         DisplacementFieldType::Pointer down_field=CompositeToDispField(down_trans,b0_up_image);
@@ -468,18 +471,119 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
 
     std::cout<<"DIFF: " <<diff<<std::endl;
 
+    ImageType3D::Pointer  new_up_img=nullptr;
+    ImageType3D::Pointer  new_down_img=nullptr;
     using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
-    ResampleImageFilterType::Pointer resampleFilter2 = ResampleImageFilterType::New();
-    resampleFilter2->SetOutputParametersFromImage(b0_up_image);
-    resampleFilter2->SetInput(b0_down_image);
-    resampleFilter2->SetTransform(total_trans);
-    resampleFilter2->Update();
-    ImageType3D::Pointer curr_down_quad_image= resampleFilter2->GetOutput();
+    double val1;
+    {
 
-    std::vector<DisplacementFieldType::Pointer> epi_fields= DRBUDDI_Initial_Register_Up_Down(b0_up_image, curr_down_quad_image, this->PE_string,false);
+        ResampleImageFilterType::Pointer resampleFilter2 = ResampleImageFilterType::New();
+        resampleFilter2->SetOutputParametersFromImage(b0_up_image);
+        resampleFilter2->SetInput(b0_down_image);
+        resampleFilter2->SetTransform(total_trans);
+        resampleFilter2->Update();
+        ImageType3D::Pointer curr_down_quad_image= resampleFilter2->GetOutput();
 
-    ImageType3D::Pointer new_up_img=   JacobianTransformImage(b0_up_image,epi_fields[0],b0_up_image);
-    ImageType3D::Pointer new_down_img=   JacobianTransformImage(curr_down_quad_image,epi_fields[1],b0_up_image);
+        std::vector<DisplacementFieldType::Pointer> epi_fields= DRBUDDI_Initial_Register_Up_Down(b0_up_image, curr_down_quad_image, this->PE_string,false);
+
+        new_up_img=   JacobianTransformImage(b0_up_image,epi_fields[0],b0_up_image);
+        new_down_img=   JacobianTransformImage(curr_down_quad_image,epi_fields[1],b0_up_image);
+
+        using MetricType = itk::ANTSNeighborhoodCorrelationImageToImageMetricv4<ImageType3D, ImageType3D>;
+        MetricType::Pointer metric = MetricType::New();
+        ImageType3D::SizeType neighborhoodRadius;
+        neighborhoodRadius.Fill(2);
+        metric->SetRadius(neighborhoodRadius);
+
+        metric->SetFixedImage(new_up_img);
+        metric->SetMovingImage(new_down_img);
+        metric->SetMovingTransform(id);
+        metric->SetFixedTransform(id);
+        metric->Initialize();
+        val1= metric->GetValue();
+    }
+    {
+
+        ResampleImageFilterType::Pointer resampleFilter2 = ResampleImageFilterType::New();
+        resampleFilter2->SetOutputParametersFromImage(b0_up_image);
+        resampleFilter2->SetInput(b0_down_image);
+        resampleFilter2->SetTransform(id);
+        resampleFilter2->Update();
+        ImageType3D::Pointer curr_down_quad_image= resampleFilter2->GetOutput();
+
+        std::vector<DisplacementFieldType::Pointer> epi_fields= DRBUDDI_Initial_Register_Up_Down(b0_up_image, curr_down_quad_image, this->PE_string,false);
+
+        ImageType3D::Pointer tnew_up_img=   JacobianTransformImage(b0_up_image,epi_fields[0],b0_up_image);
+        ImageType3D::Pointer tnew_down_img=   JacobianTransformImage(curr_down_quad_image,epi_fields[1],b0_up_image);
+
+        using MetricType = itk::ANTSNeighborhoodCorrelationImageToImageMetricv4<ImageType3D, ImageType3D>;
+        MetricType::Pointer metric = MetricType::New();
+        ImageType3D::SizeType neighborhoodRadius;
+        neighborhoodRadius.Fill(2);
+        metric->SetRadius(neighborhoodRadius);
+
+        metric->SetFixedImage(tnew_up_img);
+        metric->SetMovingImage(tnew_down_img);
+        metric->SetMovingTransform(id);
+        metric->SetFixedTransform(id);
+        metric->Initialize();
+        double val2= metric->GetValue();
+
+        std::cout<<"With rigid first similarity: " << val1 << std::endl;
+        std::cout<<"With diffeo first similarity: " << val2 << std::endl;
+
+        if(val2<val1)
+        {
+            new_up_img=tnew_up_img;
+            new_down_img=tnew_down_img;
+            total_trans->SetIdentity();
+        }
+    }
+
+    {
+        double val1,val2;
+        {
+            using MetricType = itk::ANTSNeighborhoodCorrelationImageToImageMetricv4<ImageType3D, ImageType3D>;
+            MetricType::Pointer metric = MetricType::New();
+            ImageType3D::SizeType neighborhoodRadius;
+            neighborhoodRadius.Fill(2);
+            metric->SetRadius(neighborhoodRadius);
+
+            metric->SetFixedImage(new_up_img);
+            metric->SetMovingImage(new_down_img);
+            metric->SetMovingTransform(id);
+            metric->SetFixedTransform(id);
+            metric->Initialize();
+            val2= metric->GetValue();
+        }
+
+        RigidTransformType::Pointer rigid1= RigidRegisterImagesEuler(new_up_img,new_down_img,mtype,parser->getRigidLR());
+        ResampleImageFilterType::Pointer resampleFilter3 = ResampleImageFilterType::New();
+        resampleFilter3->SetOutputParametersFromImage(b0_up_image);
+        resampleFilter3->SetInput(new_down_img);
+        resampleFilter3->SetTransform(rigid1);
+        resampleFilter3->Update();
+        ImageType3D::Pointer new_down_img2= resampleFilter3->GetOutput();
+        {
+            using MetricType = itk::ANTSNeighborhoodCorrelationImageToImageMetricv4<ImageType3D, ImageType3D>;
+            MetricType::Pointer metric = MetricType::New();
+            ImageType3D::SizeType neighborhoodRadius;
+            neighborhoodRadius.Fill(2);
+            metric->SetRadius(neighborhoodRadius);
+
+            metric->SetFixedImage(new_up_img);
+            metric->SetMovingImage(new_down_img2);
+            metric->SetMovingTransform(id);
+            metric->SetFixedTransform(id);
+            metric->Initialize();
+            val1= metric->GetValue();
+        }
+        if(val1<val2)
+        {
+            new_down_img=new_down_img2;
+            total_trans->Compose(rigid1);
+        }
+    }
 
     typedef itk::AddImageFilter<ImageType3D,ImageType3D,ImageType3D> AdderType;
     AdderType::Pointer adder= AdderType::New();
@@ -487,7 +591,6 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
     adder->SetInput2(new_down_img);
     adder->Update();
     initial_corrected_b0= adder->GetOutput();
-
 
 
     return total_trans;

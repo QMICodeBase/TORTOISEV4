@@ -119,7 +119,17 @@ TORTOISE::TORTOISE(int argc, char *argv[])
     std::string log_dir= this->temp_proc_folder + std::string("/logs");  //Create the log_Stream that will output to both
     if (!fs::exists(log_dir))                                            // std::cout and the log file
       fs::create_directories(log_dir);
-    std::string log_main=  log_dir + std::string("/log_main.txt");
+    std::string log_main=  log_dir + std::string("/log_main_0.txt");
+    while(fs::exists(log_main))
+    {
+        int pos1= log_main.rfind("_");
+        int pos2= log_main.rfind(".");
+        std::string n_string = log_main.substr(pos1+1, pos2-pos1-1);
+        int number2 = std::stoi(n_string);
+        std::ostringstream oss;
+        oss<<log_dir<<"/log_main_"<<number2+1<<".txt";
+        log_main=oss.str();
+    }
     std::ofstream log_stream;
     log_stream.open(log_main);
     Tee tee( std::cout, log_stream );
