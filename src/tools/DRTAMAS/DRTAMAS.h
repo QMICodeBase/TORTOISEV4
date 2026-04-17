@@ -65,6 +65,8 @@ private:
 
     AffineTransformType::Pointer my_affine_trans{nullptr};
     DisplacementFieldType::Pointer def{nullptr};
+    DisplacementFieldType::Pointer def_FINV{nullptr};
+    DisplacementFieldType::Pointer def_MINV{nullptr};
 
 
 };

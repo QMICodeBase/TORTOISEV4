@@ -24,6 +24,8 @@ public:
     
     std::string getOutput();
     int getStep();
+
+    bool getConstrainFixed2MidMoving2MidDefs();
     
     std::string GetInitialMINV();
     std::string GetInitialFINV();
@@ -51,6 +53,7 @@ public:
     std::string getRegistrationMethodType();
 
     bool getOnlyAffine();
+    bool getOnlyRigid();
     bool getNoSmoothingLastStage();
 
 

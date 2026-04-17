@@ -235,9 +235,9 @@ DisplacementFieldType::Pointer AnisotropicSmoothField(DisplacementFieldType::Poi
     using FilterType = itk::VectorGradientAnisotropicDiffusionImageFilterOkan<ConcatenatedImageType, ConcatenatedImageType>;
     auto filter = FilterType::New();
     filter->SetInput(concat_img);
-    filter->SetNumberOfIterations(40);
+    filter->SetNumberOfIterations(50);
     filter->SetTimeStep(0.0625);
-    double Kond = (mxf-mnf)*0.4;
+    double Kond = (mxf-mnf)*0.5;
     filter->SetConductanceParameter(Kond);
     filter->Update();
     ConcatenatedImageType::Pointer filter_img = filter->GetOutput();
@@ -567,24 +567,25 @@ void DRTAMASStage::RunDRTAMASStage()
             }
         } //metric loop
 
-
-
 /*
-        DisplacementFieldType::Pointer updateFieldFCPU=updateFieldF->CudaImageToITKField();
-        DisplacementFieldType::Pointer updateFieldMCPU=updateFieldM->CudaImageToITKField();
-
+        DisplacementFieldType::Pointer updateFieldFCPU=updateFieldF->CUDAIMAGE::CudaImageToITKField();
+        DisplacementFieldType::Pointer updateFieldMCPU=updateFieldM->CUDAIMAGE::CudaImageToITKField();
         ImageType3D::Pointer TR_img_fixed_CPU=TR_img_fixed->CudaImageToITKImage();
         ImageType3D::Pointer TR_img_moving_CPU=TR_img_moving->CudaImageToITKImage();
         ImageType3D::Pointer FA_img_fixed_CPU=FA_img_fixed->CudaImageToITKImage();
         ImageType3D::Pointer FA_img_moving_CPU=FA_img_moving->CudaImageToITKImage();
 
-        updateFieldFCPU = AnisotropicSmoothField(updateFieldFCPU,TR_img_fixed_CPU,FA_img_fixed_CPU);
+        auto updateFieldFCPU2 = AnisotropicSmoothField(updateFieldFCPU,TR_img_fixed_CPU,FA_img_fixed_CPU);
         updateFieldMCPU = AnisotropicSmoothField(updateFieldMCPU,TR_img_moving_CPU,FA_img_moving_CPU);
+
+        ImageType3D::IndexType ind3;
+        ind3[0]=9;ind3[1]=15; ind3[2]=10;
+      //  std::cout<<updateFieldFCPU2->GetPixel(ind3) - updateFieldFCPU->GetPixel(ind3)<<std::endl;
 
 
         CUDAIMAGE::Pointer updateFieldF2 = CUDAIMAGE::New();
         CUDAIMAGE::Pointer updateFieldM2 = CUDAIMAGE::New();
-        updateFieldF2->SetImageFromITK(updateFieldFCPU);
+        updateFieldF2->SetImageFromITK(updateFieldFCPU2);
         updateFieldM2->SetImageFromITK(updateFieldMCPU);
 
         ScaleUpdateField(updateFieldF2,this->settings->learning_rate);
@@ -592,19 +593,20 @@ void DRTAMASStage::RunDRTAMASStage()
 
         this->def_F  = ComposeFields(this->def_F,updateFieldF2);
         this->def_M  = ComposeFields(this->def_M,updateFieldM2);
+
+        if(iter==1 && this->settings->downsample_factor==8)
+        {
+            auto uf = updateFieldF2->CudaImageToITKField();
+            writeImageD<DisplacementFieldType>(uf,"/qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/src/tools/Test/000.nii");
+        }
+
 */
 
-        if(this->settings->update_gaussian_sigma>0.5 || this->settings->downsample_factor>=2)
-        {
-            updateFieldF=GaussianSmoothImage(updateFieldF,this->settings->update_gaussian_sigma);
-            updateFieldM=GaussianSmoothImage(updateFieldM,this->settings->update_gaussian_sigma);
-        }
-        else
-        {
-            updateFieldF = AnisotropicSmoothField(updateFieldF,TR_img_fixed,FA_img_fixed);
-            updateFieldM = AnisotropicSmoothField(updateFieldM,TR_img_moving,FA_img_moving);
-        }
 
+
+
+        updateFieldF = AnisotropicSmoothField(updateFieldF,TR_img_fixed,FA_img_fixed);
+        updateFieldM = AnisotropicSmoothField(updateFieldM,TR_img_moving,FA_img_moving);
 
         ScaleUpdateField(updateFieldF,this->settings->learning_rate);
         ScaleUpdateField(updateFieldM,this->settings->learning_rate);
@@ -612,17 +614,8 @@ void DRTAMASStage::RunDRTAMASStage()
         this->def_F  = ComposeFields(this->def_F,updateFieldF);
         this->def_M  = ComposeFields(this->def_M,updateFieldM);
 
-
-
-
-
-
-
-
-
-
-
-
+        //updateFieldF=GaussianSmoothImage(updateFieldF,this->settings->update_gaussian_sigma);
+        //updateFieldM=GaussianSmoothImage(updateFieldM,this->settings->update_gaussian_sigma);
 
 
 

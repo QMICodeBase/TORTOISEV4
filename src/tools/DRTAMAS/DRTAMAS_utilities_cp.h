@@ -27,6 +27,8 @@ void OrientAndWriteTensor(DTMatrixImageType::Pointer tens,std::string nm);
 DTMatrixImageType::Pointer TransformAndWriteAffineImage(DTMatrixImageType::Pointer moving_tensor,DRTAMAS::AffineTransformType::Pointer my_affine_trans,DTMatrixImageType::Pointer fixed_tensor, std::string output_nii_name);
 void TransformAndWriteDiffeoImage(DTMatrixImageType::Pointer moving_tensor,DisplacementFieldType::Pointer disp_field,DTMatrixImageType::Pointer fixed_tensor, std::string output_nii_name);
 
-vnl_matrix_fixed<double,3,3> ComputeJacobian(DisplacementFieldType::Pointer field,DisplacementFieldType::IndexType ind3 );
+vnl_matrix_fixed<double,3,3> ComputeJacobian(DisplacementFieldType::Pointer field,DisplacementFieldType::IndexType & ind3 );
+
+ImageType3D::Pointer ExtractComponentFromTensorImage(DTMatrixImageType::Pointer tensor_img, int row,int col);
 
 #endif

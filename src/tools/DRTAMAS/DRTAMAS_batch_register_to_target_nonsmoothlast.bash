@@ -50,6 +50,7 @@ subjects=''
 structural_subjects=''
 structural_templates=''
 output_folder=''
+init=0
 
 
 
@@ -76,6 +77,10 @@ case $i in
         output_folder="${i#*=}"
         shift 
     ;;
+    -in=*|--in=*)
+        init="${i#*=}"
+        shift 
+    ;;    
     *)
         echo Unrecognized command line option ${i}.  Exiting
         exit
@@ -138,8 +143,6 @@ listdir=$(dirname "${subjects}")
 # Setting for registering Human Data
 fixed_tensor='--fixed_tensor '${template}
 
-
-
 aa=0
 for subj in `cat ${subjects}`
 do
@@ -187,6 +190,13 @@ gpuid=0
 NGPUs=`nvidia-smi -L | wc -l`
 echo "Using ${NGPUs} GPUs"
 
+
+for ((i=1; i<NGPUs; i++))
+do
+    rm ${listdir}/log_gpu_${i}.txt
+done
+
+
 for (( ns=0; ns<$nsubjects; ns++ ))
 do
     curr_id=$((ns))
@@ -226,33 +236,63 @@ do
 
     moving_tensor="--moving_tensor ${moving_name}"
     
-    #DRTAMAS_cuda ${fixed_tensor}  ${moving_tensor} ${fixed_scalars} ${moving_scalars} --step 1 
-              
-    #my_RUN "DRTAMAS_cuda ${fixed_tensor}  ${moving_tensor} ${fixed_scalars} ${moving_scalars} --step 1"
+
     
     export CUDA_VISIBLE_DEVICES=${gpuid}
     let gpuid=gpuid+1
     let gpuid=$((gpuid % ${NGPUs}))
     echo "GPU: ${CUDA_VISIBLE_DEVICES}"
 
-    
-    if [ ${gpuid} -eq 0 ] 
+    existing_name=${listdir}/${filename}_aff_def_MINV.nii
+    if [ ! -e ${existing_name} ]
     then
-            DRTAMAS_cuda ${fixed_tensor}  ${moving_tensor} ${fixed_scalars} ${moving_scalars} --step 1  &    
+        if [ ${gpuid} -eq 0 ] 
+        then
+            if [ ${init} -eq 0 ]
+            then
+                DRTAMAS_cuda ${fixed_tensor}  ${moving_tensor} ${fixed_scalars} ${moving_scalars} --step 1  &        
+                sleep 1s                
+            else
+                dd=`dirname ${moving_name}`
+                if [  -z $dd  ]; then dd="."; fi
+                ftrans=$dd/`basename ${moving_name} .nii`_mid2F.nii
+                mtrans=$dd/`basename ${moving_name} .nii`_mid2M.nii           
+                DRTAMAS_cuda ${fixed_tensor}  ${moving_tensor} ${fixed_scalars} ${moving_scalars} --step 1 --no_smoothing_last_stage 1 &
+                sleep 1s
+            fi
+        else
+            if [ -e ${listdir}/log_gpu_${gpuid}.txt ]
+            then
+                rm ${listdir}/log_gpu_${gpuid}.txt
+            fi
+            if [ ${init} -eq 0 ]
+            then
+                DRTAMAS_cuda ${fixed_tensor}  ${moving_tensor} ${fixed_scalars} ${moving_scalars} --step 1  >> ${listdir}/log_gpu_${gpuid}.txt &      
+                sleep 1s                  
+            else
+                dd=`dirname ${moving_name}`
+                if [  -z $dd  ]; then dd="."; fi
+                ftrans=$dd/`basename ${moving_name} .nii`_mid2F.nii
+                mtrans=$dd/`basename ${moving_name} .nii`_mid2M.nii   
+                DRTAMAS_cuda ${fixed_tensor}  ${moving_tensor} ${fixed_scalars} ${moving_scalars} --step 1 --no_smoothing_last_stage 1 >> ${listdir}/log_gpu_${gpuid}.txt &            
+                sleep 1s                
+            fi
+        fi        
     else
-        rm ${listdir}/log_gpu_${gpuid}.txt
-        DRTAMAS_cuda ${fixed_tensor}  ${moving_tensor} ${fixed_scalars} ${moving_scalars} --step 1 > ${listdir}/log_gpu_${gpuid}.txt &    
+        echo "Skipping registration of ${moving_name}. Transformation exists..."
     fi
     
-    sleep 1s
+    
 
     let gcnt=$gcnt+1        
     if [ $gcnt -ge ${NGPUs} ]
     then
         wait
         let gcnt=0
-    fi
-        
-    
+    fi              
 done
+
+wait
+
+echo "Done registering subjects for this iteration..."
 

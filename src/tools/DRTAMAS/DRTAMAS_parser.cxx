@@ -114,6 +114,18 @@ void DRTAMAS_PARSER::InitializeCommandLineOptions()
         option->SetModule(0);
         this->AddOption( option );
     }
+
+
+    {
+        std::string description = std::string("Constrain the mid2fixed and mid2moving deformations to be the opposite of each other. Default: 0")  ;
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "constrain_defs_to_mid");
+        option->SetDescription( description );
+        option->SetModule(0);
+        this->AddOption( option );
+    }
+
+
     {
         std::string description = std::string("To do no smoothing of the deformation fields in the last stage of registration with he default settings. Ideal if you will analyze the Jacobian maps. Default: 0")  ;
         OptionType::Pointer option = OptionType::New();
@@ -164,6 +176,24 @@ void DRTAMAS_PARSER::InitializeCommandLineOptions()
         option->SetModule(0);
         this->AddOption( option );
     }
+    {
+        std::string description = std::string("Do rigid only?")  ;
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "only_rigid");
+        option->SetDescription( description );
+        option->SetModule(0);
+        this->AddOption( option );
+    }
+
+}
+
+bool DRTAMAS_PARSER::getConstrainFixed2MidMoving2MidDefs()
+{
+    OptionType::Pointer option = this->GetOption( "constrain_defs_to_mid");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+        return 0;
 
 }
 
@@ -180,11 +210,27 @@ bool DRTAMAS_PARSER::getNoSmoothingLastStage()
 
 bool DRTAMAS_PARSER::getOnlyAffine()
 {
+    {
+        OptionType::Pointer option = this->GetOption( "only_rigid");
+        if(option->GetNumberOfFunctions())
+            if( (bool)(atoi(option->GetFunction(0)->GetName().c_str())) == true)
+                return true;
+    }
+
     OptionType::Pointer option = this->GetOption( "only_affine");
     if(option->GetNumberOfFunctions())
         return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
     else
        return 0;
+}
+
+bool DRTAMAS_PARSER::getOnlyRigid()
+{
+    OptionType::Pointer option = this->GetOption( "only_rigid");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+        return 0;
 }
 
 std::string DRTAMAS_PARSER::getInitialRigidTransform()

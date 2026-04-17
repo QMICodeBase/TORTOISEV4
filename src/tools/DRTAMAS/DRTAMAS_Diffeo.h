@@ -39,6 +39,16 @@ class DRTAMAS_Diffeo
         return disp;
     }
 
+    DisplacementFieldType::Pointer getDef_FINV()
+    {
+        return this->def_FINV->CudaImageToITKField();
+    }
+    DisplacementFieldType::Pointer getDef_MINV()
+    {
+        return this->def_MINV->CudaImageToITKField();
+    }
+
+
 
     void SetFixedStructurals(std::vector<ImageType3D::Pointer> si)
     {

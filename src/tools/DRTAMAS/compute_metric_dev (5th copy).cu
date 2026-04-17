@@ -10,8 +10,6 @@
 #include <Eigen/Dense>
 #include <cuda_runtime.h>
 
-#undef EIGEN_DEFAULT_DENSE_INDEX_TYPE
-#define EIGEN_DEFAULT_DENSE_INDEX_TYPE int
 
 #define BLOCKSIZE 256
 #define PER_SLICE 1
@@ -36,7 +34,7 @@ extern __global__ void
 ScalarFindSum(const float *gArr, int arraySize,  float *gOut);
 
 extern __device__ void ComputeEigens(float mat[3][3], float *vals, float vecs[3][3]);
-extern __device__ void ComputeEigens2(Matrix3f &mat, Matrix3f &vals, Matrix3f &vecs);
+
 
 __device__ float3 ComputeImageGradient(cudaPitchedPtr img,int i, int j, int k, int v)
 {
@@ -187,17 +185,6 @@ __device__ Matrix3f ComputeSingleJacobianMatrixAtIndex(cudaPitchedPtr field ,int
     B(1,1)+=1;
     B(2,2)+=1;
 
-    /*
-    if(i==60 && j==157-1-68 && k==56)
-    //if(i==60 && j==68 && k==56)
-    {
-        printf("%f %f %f\n",B(0,0),B(0,1),B(0,2));
-        printf("%f %f %f\n",B(1,0),B(1,1),B(1,2));
-        printf("%f %f %f\n",B(2,0),B(2,1),B(2,2));
-        printf("\n");
-    }
-*/
-
     return B;
 }
 
@@ -238,7 +225,6 @@ ComputeDeviatoric_kernel( cudaPitchedPtr img)
 
 __device__ Matrix3f ComputeRotationMatrix(Matrix3f &A)
 {
-/*
     Matrix3f R=Matrix3f::Identity();
 
     Matrix3d Ab = A.cast <double> ();
@@ -280,83 +266,85 @@ __device__ Matrix3f ComputeRotationMatrix(Matrix3f &A)
     R= isq * A;
 
     return R;
-*/
 
 
-    Matrix3f AAT= A * A.transpose();
-
-    SelfAdjointEigenSolver<Matrix3f> es_sym;
-    es_sym.computeDirect(AAT);
-
-    Vector3f vals2= es_sym.eigenvalues();
-    Matrix3f vals = Matrix3f::Zero();
-    vals(0,0)=vals2[0];
-    vals(1,1)=vals2[1];
-    vals(2,2)=vals2[2];
-
-    Matrix3f vecs = es_sym.eigenvectors();
-
-    for(int d=0;d<3;d++)
-    {
-        if(vals(d,d)> 1E-2)
-            vals(d,d)= pow(vals(d,d),-0.5);
-        else
-            return Matrix3f::Identity();
-    }
-
-    return vecs * vals * vecs.transpose() * A;
-
-
-
-/*
-    Matrix3f AAT= A * A.transpose();
-
-    Matrix3f vecs;
-    Matrix3f vals=Matrix3f::Zero();
-
-    ComputeEigens2(AAT, vals, vecs);
-    for(int d=0;d<3;d++)
-    {
-        if(vals(d,d)>1E-2)
-            vals(d,d)= pow(vals(d,d),-0.5);
-        else
-        {
-            return Matrix3f::Identity();
-        }
-    }
-
-    return vecs  * vals * vecs.transpose() * A;
-*/
 }
 
 
 __device__ Matrix3f ComputeDelRDelA(Matrix3f &A,int r, int c)
 {
-    //Matrix3f At= A;
-    A(r,c)+=DPHI;
-    Matrix3f Rp = ComputeRotationMatrix(A);
-    A(r,c)-=2*DPHI;
-    Matrix3f Rm = ComputeRotationMatrix(A);
-    A(r,c)+=DPHI;
+    Matrix3f At= A;
+    At(r,c)+=DPHI;
+    Matrix3f Rp = ComputeRotationMatrix(At);
+    At(r,c)-=2*DPHI;
+    Matrix3f Rm = ComputeRotationMatrix(At);
 
     Matrix3f res= 0.5*(Rp-Rm)/DPHI;
     return res;
 }
 
 
-__device__ void ComputeDelEQDelR(Matrix3f &A, Matrix3f &R, Eigen::Matrix<float, 9, 9> &del)
+__device__ Matrix3f ComputeDelEQDelR(Matrix3f &A, Matrix3f &R,int r, int c)
 {
+    Matrix3f res=Matrix3f::Zero();
 
-    del << 2*R(0,0)*A(0,0) + 2*R(1,0)*A(0,1) + 2*R(2,0)*A(0,2), 2*R(0,0)*A(0,1) + 2*R(1,0)*A(1,1) + 2*R(2,0)*A(1,2), 2*R(0,0)*A(0,2) + 2*R(1,0)*A(1,2) + 2*R(2,0)*A(2,2),                                 0,                                 0,                                 0,                                 0,                                 0,                                 0,
-            R(0,1)*A(0,0) + R(1,1)*A(0,1) + R(2,1)*A(0,2),       R(0,1)*A(0,1) + R(1,1)*A(1,1) + R(2,1)*A(1,2),       R(0,1)*A(0,2) + R(1,1)*A(1,2) + R(2,1)*A(2,2),       R(0,0)*A(0,0) + R(1,0)*A(0,1) + R(2,0)*A(0,2),       R(0,0)*A(0,1) + R(1,0)*A(1,1) + R(2,0)*A(1,2),       R(0,0)*A(0,2) + R(1,0)*A(1,2) + R(2,0)*A(2,2),                                 0,                                 0,                                 0,
-            R(0,2)*A(0,0) + R(1,2)*A(0,1) + R(2,2)*A(0,2),       R(0,2)*A(0,1) + R(1,2)*A(1,1) + R(2,2)*A(1,2),       R(0,2)*A(0,2) + R(1,2)*A(1,2) + R(2,2)*A(2,2),                                 0,                                 0,                                 0,       R(0,0)*A(0,0) + R(1,0)*A(0,1) + R(2,0)*A(0,2),       R(0,0)*A(0,1) + R(1,0)*A(1,1) + R(2,0)*A(1,2),       R(0,0)*A(0,2) + R(1,0)*A(1,2) + R(2,0)*A(2,2),
-            R(0,1)*A(0,0) + R(1,1)*A(0,1) + R(2,1)*A(0,2),       R(0,1)*A(0,1) + R(1,1)*A(1,1) + R(2,1)*A(1,2),       R(0,1)*A(0,2) + R(1,1)*A(1,2) + R(2,1)*A(2,2),       R(0,0)*A(0,0) + R(1,0)*A(0,1) + R(2,0)*A(0,2),       R(0,0)*A(0,1) + R(1,0)*A(1,1) + R(2,0)*A(1,2),       R(0,0)*A(0,2) + R(1,0)*A(1,2) + R(2,0)*A(2,2),                                 0,                                 0,                                 0,
-            0,                                 0,                                 0, 2*R(0,1)*A(0,0) + 2*R(1,1)*A(0,1) + 2*R(2,1)*A(0,2), 2*R(0,1)*A(0,1) + 2*R(1,1)*A(1,1) + 2*R(2,1)*A(1,2), 2*R(0,1)*A(0,2) + 2*R(1,1)*A(1,2) + 2*R(2,1)*A(2,2),                                 0,                                 0,                                 0,
-            0,                                 0,                                 0,       R(0,2)*A(0,0) + R(1,2)*A(0,1) + R(2,2)*A(0,2),       R(0,2)*A(0,1) + R(1,2)*A(1,1) + R(2,2)*A(1,2),       R(0,2)*A(0,2) + R(1,2)*A(1,2) + R(2,2)*A(2,2),       R(0,1)*A(0,0) + R(1,1)*A(0,1) + R(2,1)*A(0,2),       R(0,1)*A(0,1) + R(1,1)*A(1,1) + R(2,1)*A(1,2),       R(0,1)*A(0,2) + R(1,1)*A(1,2) + R(2,1)*A(2,2),
-            R(0,2)*A(0,0) + R(1,2)*A(0,1) + R(2,2)*A(0,2),       R(0,2)*A(0,1) + R(1,2)*A(1,1) + R(2,2)*A(1,2),       R(0,2)*A(0,2) + R(1,2)*A(1,2) + R(2,2)*A(2,2),                                 0,                                 0,                                 0,       R(0,0)*A(0,0) + R(1,0)*A(0,1) + R(2,0)*A(0,2),       R(0,0)*A(0,1) + R(1,0)*A(1,1) + R(2,0)*A(1,2),       R(0,0)*A(0,2) + R(1,0)*A(1,2) + R(2,0)*A(2,2),
-            0,                                 0,                                 0,       R(0,2)*A(0,0) + R(1,2)*A(0,1) + R(2,2)*A(0,2),       R(0,2)*A(0,1) + R(1,2)*A(1,1) + R(2,2)*A(1,2),       R(0,2)*A(0,2) + R(1,2)*A(1,2) + R(2,2)*A(2,2),       R(0,1)*A(0,0) + R(1,1)*A(0,1) + R(2,1)*A(0,2),       R(0,1)*A(0,1) + R(1,1)*A(1,1) + R(2,1)*A(1,2),       R(0,1)*A(0,2) + R(1,1)*A(1,2) + R(2,1)*A(2,2),
-            0,                                 0,                                 0,                                 0,                                 0,                                 0, 2*R(0,2)*A(0,0) + 2*R(1,2)*A(0,1) + 2*R(2,2)*A(0,2), 2*R(0,2)*A(0,1) + 2*R(1,2)*A(1,1) + 2*R(2,2)*A(1,2), 2*R(0,2)*A(0,2) + 2*R(1,2)*A(1,2) + 2*R(2,2)*A(2,2);
+    if(r==0 && c==0)
+    {
+        res(0,0)=2*A(0,0)*R(0,0) + 2*A(0,1)*R(1,0) + 2*A(0,2)*R(2,0); res(0,1) = A(0,0)*R(0,1) + A(0,1)*R(1,1) + A(0,2)*R(2,1); res(0,2)= A(0,0)*R(0,2) + A(0,1)*R(1,2) + A(0,2)*R(2,2);
+        res(1,0)= A(0,0)*R(0,1) + A(0,1)*R(1,1) + A(0,2)*R(2,1);
+        res(2,0)= A(0,0)*R(0,2) + A(0,1)*R(1,2) + A(0,2)*R(2,2);
+    }
+    if(r==0 && c==1)
+    {
+                                                                  res(0,1)= A(0,0)*R(0,0) + A(0,1)*R(1,0) + A(0,2)*R(2,0);
+        res(1,0)=A(0,0)*R(0,0) + A(0,1)*R(1,0) + A(0,2)*R(2,0); res(1,1)= 2*A(0,0)*R(0,1) + 2*A(0,1)*R(1,1) + 2*A(0,2)*R(2,1); res(1,2) = A(0,0)*R(0,2) + A(0,1)*R(1,2) + A(0,2)*R(2,2);
+                                                             res(2,1)= A(0,0)*R(0,2) + A(0,1)*R(1,2) + A(0,2)*R(2,2);
+    }
+    if(r==0 && c==2)
+    {
+        res(0,2)=A(0,0)*R(0,0) + A(0,1)*R(1,0) + A(0,2)*R(2,0);
+        res(1,2)=A(0,0)*R(0,1) + A(0,1)*R(1,1) + A(0,2)*R(2,1);
+        res(2,0)=A(0,0)*R(0,0) + A(0,1)*R(1,0) + A(0,2)*R(2,0); res(2,1)=A(0,0)*R(0,1)+A(0,1)*R(1,1)+ A(0,2)*R(2,1); 2*A(0,0)*R(0,2)+ 2*A(0,1)*R(1,2)+ 2* A(0,2)*R(2,2);
+    }
 
+    if(r==1 && c==0)
+    {
+        res(0,0)=2*A(0,1)*R(0,0) + 2*A(1,1)*R(1,0) + 2*A(1,2)*R(2,0);  res(0,1) = A(0,1)*R(0,1) + A(1,1)*R(1,1) + A(1,2)*R(2,1); res(0,2)= A(0,1)*R(0,2) + A(1,1)*R(1,2) + A(1,2)*R(2,2);
+        res(1,0)= A(0,1)*R(0,1) + A(1,1)*R(1,1) + A(1,2)*R(2,1);
+        res(2,0)= A(0,1)*R(0,2) + A(1,1)*R(1,2) + A(1,2)*R(2,2);
+    }
+    if(r==1 && c==1)
+    {
+        res(0,1)= A(0,1)*R(0,0) + A(1,1)*R(1,0) + A(1,2)*R(2,0);
+        res(1,0)=A(0,1)*R(0,0) + A(1,1)*R(1,0) + A(1,2)*R(2,0); res(1,1)= 2*A(0,1)*R(0,1) + 2*A(1,1)*R(1,1) + 2*A(1,2)*R(2,1); res(1,2) = A(0,1)*R(0,2) + A(1,1)*R(1,2) + A(1,2)*R(2,2);
+        res(2,1)= A(0,1)*R(0,2) + A(1,1)*R(1,2) + A(1,2)*R(2,2);
+    }
+    if(r==1 && c==2)
+    {
+        res(0,2)=A(0,1)*R(0,0) + A(1,1)*R(1,0) + A(1,2)*R(2,0);
+        res(1,2)=A(0,1)*R(0,1) + A(1,1)*R(1,1) + A(1,2)*R(2,1);
+        res(2,0)=A(0,1)*R(0,0) + A(1,1)*R(1,0) + A(1,2)*R(2,0); res(2,1)=A(0,1)*R(0,1)+A(1,1)*R(1,1)+ A(1,2)*R(2,1); 2*A(0,1)*R(0,2)+ 2*A(1,1)*R(1,2)+ 2* A(1,2)*R(2,2);
+    }
+    if(r==2 && c==0)
+    {
+        res(0,0)=2*A(0,2)*R(0,0) + 2*A(1,2)*R(1,0) + 2*A(2,2)*R(2,0); res(0,1) = A(0,2)*R(0,1) + A(1,2)*R(1,1) + A(2,2)*R(2,1); res(0,2)= A(0,2)*R(0,2) + A(1,2)*R(1,2) + A(2,2)*R(2,2);
+        res(1,0)= A(0,2)*R(0,1) + A(1,2)*R(1,1) + A(2,2)*R(2,1);
+        res(2,0)= A(0,2)*R(0,2) + A(1,2)*R(1,2) + A(2,2)*R(2,2);
+    }
+    if(r==2 && c==1)
+    {
+        res(0,1)= A(0,2)*R(0,0) + A(1,2)*R(1,0) + A(2,2)*R(2,0);
+        res(1,0)=A(0,2)*R(0,0) + A(1,2)*R(1,0) + A(2,2)*R(2,0); res(1,1)= 2*A(0,2)*R(0,1) + 2*A(1,2)*R(1,1) + 2*A(2,2)*R(2,1); res(1,2) = A(0,2)*R(0,2) + A(1,2)*R(1,2) + A(2,2)*R(2,2);
+        res(2,1)= A(0,2)*R(0,2) + A(1,2)*R(1,2) + A(2,2)*R(2,2);
+    }
+    if(r==2 && c==2)
+    {
+        res(0,2)=A(0,2)*R(0,0) + A(1,2)*R(1,0) + A(2,2)*R(2,0);
+        res(1,2)=A(0,2)*R(0,1) + A(1,2)*R(1,1) + A(2,2)*R(2,1);
+        res(2,0)=A(0,2)*R(0,0) + A(1,2)*R(1,0) + A(2,2)*R(2,0); res(2,1)=A(0,2)*R(0,1)+A(1,2)*R(1,1)+ A(2,2)*R(2,1); 2*A(0,2)*R(0,2)+ 2*A(1,2)*R(1,2)+ 2* A(2,2)*R(2,2);
+    }
+
+    return res;
 }
 
 __global__ void
@@ -470,7 +458,6 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                     {
                         Matrix3f diff = F - M;
                         metric_val= diff.squaredNorm();
-                      //  metric_val = diff(0,0)*diff(0,0);
                     }
 
                     metric_val=sqrt(metric_val);
@@ -524,7 +511,7 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                         }
                         else
                         {
-                            smf= 2 * ( (F(0,0)-M(0,0)) * gradI[gdim][0]+
+                            smf= 2 * ( (F(0,0)-M(0,0)) * gradI[gdim][0] +
                                        (F(1,1)-M(1,1)) * gradI[gdim][3] +
                                        (F(2,2)-M(2,2)) * gradI[gdim][5] +
                                        2*(F(0,1)-M(0,1)) * gradI[gdim][1] +
@@ -532,9 +519,9 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                                        2*(F(1,2)-M(1,2)) * gradI[gdim][4]
                                        ) ;
 
-                            smm= 2 * ( (F(0,0)-M(0,0)) * gradJ[gdim][0]+
+                            smm= 2 * ( (F(0,0)-M(0,0)) * gradJ[gdim][0] +
                                        (F(1,1)-M(1,1)) * gradJ[gdim][3] +
-                                       (F(2,2)-M(2,2)) * gradJ[gdim][5]+
+                                       (F(2,2)-M(2,2)) * gradJ[gdim][5] +
                                        2*(F(0,1)-M(0,1)) * gradJ[gdim][1] +
                                        2*(F(0,2)-M(0,2)) * gradJ[gdim][2] +
                                        2*(F(1,2)-M(1,2)) * gradJ[gdim][4]
@@ -580,13 +567,13 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                             char * slice_derm= derm_ptr+  dermslicePitch;
                             float * row_derm= (float *)(slice_derm+ dermcolPitch);
 
-                            updateF[0]+=row_derf[9*ii+0+dim*3]* -1*pn* 0.5*(SD(dim,0)+SD(dim,1)+SD(dim,2));
-                            updateF[1]+=row_derf[9*ii+1+dim*3]* -1*pn* 0.5*(SD(dim,0)+SD(dim,1)+SD(dim,2));
-                            updateF[2]+=row_derf[9*ii+2+dim*3]* -1*pn* 0.5*(SD(dim,0)+SD(dim,1)+SD(dim,2));
+                            updateF[0]+=row_derf[9*ii+0+dim*3]* -1*pn* 0.5/d_spc[dim];
+                            updateF[1]+=row_derf[9*ii+1+dim*3]* -1*pn* 0.5/d_spc[dim];
+                            updateF[2]+=row_derf[9*ii+2+dim*3]* -1*pn* 0.5/d_spc[dim];
 
-                            updateM[0]-=row_derm[9*ii+0+dim*3]* -1*pn* 0.5*(SD(dim,0)+SD(dim,1)+SD(dim,2));
-                            updateM[1]-=row_derm[9*ii+1+dim*3]* -1*pn* 0.5*(SD(dim,0)+SD(dim,1)+SD(dim,2));
-                            updateM[2]-=row_derm[9*ii+2+dim*3]* -1*pn* 0.5*(SD(dim,0)+SD(dim,1)+SD(dim,2));
+                            updateM[0]-=row_derm[9*ii+0+dim*3]* -1*pn* 0.5/d_spc[dim];
+                            updateM[1]-=row_derm[9*ii+1+dim*3]* -1*pn* 0.5/d_spc[dim];
+                            updateM[2]-=row_derm[9*ii+2+dim*3]* -1*pn* 0.5/d_spc[dim];
 
                         } //for pn
                     } //for dim
@@ -624,7 +611,7 @@ ComputeMetric_DEV_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
 
 __global__ void
-Compute_DelEps_DelA_img_kernel ( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
+FillImgs_kernel ( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                   cudaPitchedPtr def_FINV, cudaPitchedPtr def_MINV,
                   cudaPitchedPtr Rf_img, cudaPitchedPtr Rm_img,
                   cudaPitchedPtr derf_img, cudaPitchedPtr derm_img)
@@ -639,7 +626,7 @@ Compute_DelEps_DelA_img_kernel ( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
         {
             if(i>=1 && j>=1 && k>=1 && i<=d_sz[0]-2  && j<=d_sz[1]-2  && k<=d_sz[2]-2)
             {
-                typedef Eigen::Matrix<float, 1, 9> Vector9f;
+
 
                 size_t fpitch= up_img.pitch;
                 size_t fslicePitch= fpitch*d_sz[1]*k;
@@ -690,32 +677,58 @@ Compute_DelEps_DelA_img_kernel ( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                 Matrix3f Rm= ComputeRotationMatrix(Am);
 
                 Matrix3f F,M;
+
+
                 F(0,0)=row_f[6*i+0]; F(0,1)=row_f[6*i+1]; F(0,2)=row_f[6*i+2];
-                F(1,0)=F(0,1)      ; F(1,1)=row_f[6*i+3]; F(1,2)=row_f[6*i+4];
-                F(2,0)=F(0,2)      ; F(2,1)=F(1,2)      ; F(2,2)=row_f[6*i+5];
+                F(1,0)=row_f[6*i+1]; F(1,1)=row_f[6*i+3]; F(1,2)=row_f[6*i+4];
+                F(2,0)=row_f[6*i+2]; F(2,1)=row_f[6*i+4]; F(2,2)=row_f[6*i+5];
 
                 M(0,0)=row_m[6*i+0]; M(0,1)=row_m[6*i+1]; M(0,2)=row_m[6*i+2];
-                M(1,0)=M(0,1)      ; M(1,1)=row_m[6*i+3]; M(1,2)=row_m[6*i+4];
-                M(2,0)=M(0,2)      ; M(2,1)=M(1,2);       M(2,2)=row_m[6*i+5];
+                M(1,0)=row_m[6*i+1]; M(1,1)=row_m[6*i+3]; M(1,2)=row_m[6*i+4];
+                M(2,0)=row_m[6*i+2]; M(2,1)=row_m[6*i+4]; M(2,2)=row_m[6*i+5];
 
                 Matrix3f Fi= Rf.transpose()* F * Rf;
                 Matrix3f Mi= Rm.transpose()* M * Rm;
                 Matrix3f diff= Fi -Mi;
+                VectorXf delF_delEQ(9);
 
-
-                Eigen::Map<Vector9f> delF_delEQ(diff.data(), diff.size());
-
-                Eigen::Matrix<float, 9, 9> delEQ_delRf,delEQ_delRm;                
-
-                ComputeDelEQDelR(F,Rf,delEQ_delRf);
-                ComputeDelEQDelR(M,Rm,delEQ_delRm);
-
-
-                Vector9f del_so_far_f1= (delF_delEQ* delEQ_delRf) ;
-                Vector9f del_so_far_m1= (delF_delEQ* delEQ_delRm);
-
-                Eigen::Matrix<float, 9, 9>  delR_delAf, delR_delAm;
                 int cnt=0;
+                for(int c=0;c<3;c++)
+                {
+                    for(int r=0;r<3;r++)
+                    {
+                        delF_delEQ(cnt)= 2*diff(r,c);
+                        cnt++;
+                    }
+                }
+
+
+                MatrixXf delEQ_delRf(9,9),delEQ_delRm(9,9);
+                cnt=0;
+                for(int c=0;c<3;c++)
+                {
+                    for(int r=0;r<3;r++)
+                    {
+                        Matrix3f derf= ComputeDelEQDelR(F,Rf,r,c);
+                        Matrix3f derm= ComputeDelEQDelR(M,Rm,r,c);
+
+                        int ma=0;
+                        for(int c2=0;c2<3;c2++)
+                        {
+                            for(int r2=0;r2<3;r2++)
+                            {
+                                delEQ_delRf(ma,cnt) =  derf(r2,c2);
+                                delEQ_delRm(ma,cnt) =  derm(r2,c2);
+                                ma++;
+                            }
+                        }
+                        cnt++;
+                    }
+                }
+
+
+                MatrixXf delR_delAf(9,9),delR_delAm(9,9);
+                cnt=0;
                 for(int c=0;c<3;c++)
                 {
                     for(int r=0;r<3;r++)
@@ -723,18 +736,32 @@ Compute_DelEps_DelA_img_kernel ( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                         Matrix3f derf= ComputeDelRDelA(Af,r,c);
                         Matrix3f derm= ComputeDelRDelA(Am,r,c);
 
-                        Eigen::Map<Vector9f> derf_vec(derf.data(), derf.size());
-                        Eigen::Map<Vector9f> derm_vec(derm.data(), derm.size());
-
-                        row_derf[9*i+cnt]=del_so_far_f1.dot(derf_vec);
-                        row_derm[9*i+cnt]=del_so_far_m1.dot(derm_vec);
-
-
-                        row_Rf[9*i+cnt]= Rf.data()[cnt];
-                        row_Rm[9*i+cnt]= Rm.data()[cnt];
+                        int ma=0;
+                        for(int c2=0;c2<3;c2++)
+                        {
+                            for(int r2=0;r2<3;r2++)
+                            {
+                                delR_delAf(ma,cnt)=derf(r2,c2);
+                                delR_delAm(ma,cnt)=derm(r2,c2);
+                                ma++;
+                            }
+                        }
 
                         cnt++;
                     }
+                }
+
+                VectorXf del_so_far_f= (delF_delEQ.transpose()* delEQ_delRf) * delR_delAf;
+                VectorXf del_so_far_m= (delF_delEQ.transpose()* delEQ_delRm) * delR_delAm;
+
+
+                for(int p=0;p<9;p++)
+                {
+                    row_Rf[9*i+p]= Rf.data()[p];
+                    row_Rm[9*i+p]= Rm.data()[p];
+
+                    row_derf[9*i+p]= del_so_far_f(p);
+                    row_derm[9*i+p]= del_so_far_m(p);
                 }
             }
         }
@@ -793,7 +820,7 @@ void ComputeMetric_DEV_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
     if(!tensonly_h)
     {
-        Compute_DelEps_DelA_img_kernel<<< blockSize,gridSize>>> (up_img, down_img, def_FINV,def_MINV,
+        FillImgs_kernel<<< blockSize,gridSize>>> (up_img, down_img, def_FINV,def_MINV,
                                               Rf_img,Rm_img,
                                              derf_img,derm_img);
     }

@@ -7,12 +7,12 @@ my_RUN ()
   echo "Running: ${cmd}" 
   ${cmd}
   
-  #if [ ! $? -eq 0 ] 
-  #then
-   #  echo ""
-   #  echo "Error running command ${cmd}"
-   #  exit
-  #fi 
+  if [ ! $? -eq 0 ] 
+  then
+     echo ""
+     echo "Error running command ${cmd}"
+     exit
+  fi 
 }
 
 
@@ -40,6 +40,7 @@ then
     echo '   -r=final_resolution   or --resolution=final_resolution (optional. the (isotropic) resolution of all registered images in mm.)'
     echo '   -o=output_folder   or --output_folder=full_path_to_output_folder (optional. if not provided, files are placed in the folder of the textfile of images. )'
     echo '   -ds=diffeomorphic_registration_start_iteration or --diffeomorphic_registration_start_iteration=diffeomorphic_registration_start_iteration (optional. default:0'
+    echo '   -N=Number of template creation iterations or --Niter=Number of tempalte creation iterations  (optional. default:6'
     exit
 fi
 
@@ -63,6 +64,7 @@ constrain_deformations=1
 resolution=0
 output_folder=''
 diffeomorphic_registration_start_iteration=0
+
 
 
 
@@ -102,6 +104,10 @@ case $i in
         output_folder="${i#*=}"
         shift 
     ;;
+    -N=*|--Niter=*)
+        Niter="${i#*=}"
+        shift 
+    ;;    
     *)
         echo Unrecognized command line option ${i}.  Exiting
         exit
@@ -111,7 +117,6 @@ case $i in
     ;;
 esac
 done
-
 
 
 
@@ -197,6 +202,10 @@ then
     rm ${listdir}/command.log
 fi
 
+
+
+
+
 echo DR_TAMAS vdate: ${change_date} >>${listdir}/command.log
 echo Subjects:                  ${subjects}>>${listdir}/command.log
 echo Start step:                ${start_step}>>${listdir}/command.log
@@ -214,24 +223,30 @@ then
     IFS=$' \t\n'
 fi
 
-subjects_diffeo=`echo $subjects | sed -e 's/.txt/_diffeo.txt/'`
+#subjects_diffeo=`echo $subjects | sed -e 's/.txt/_diffeo.txt/'`
+subjects_diffeo=`dirname ${subjects}`/`basename ${subjects} .txt`_diffeo.txt
+
 if [ -e "${subjects_diffeo}" ]
 then
         rm -rf ${subjects_diffeo}  
 fi
 
 
+
 for ((i=0; i<Nstructurals; i++))
 do
-    subjects_structurals_diffeo=`echo $subjects_structurals | sed -e "s/.txt/_diffeo_${i}.txt/"`
-    if [ -e "${subjects_structurals_diffeo}" ]
+    #subjects_structurals_diffeo=`echo $subjects_structurals | sed -e "s/.txt/_diffeo_${i}.txt/"`
+    subjects_structurals_diffeo=`dirname ${subjects_structurals}`/`basename ${subjects_structurals} .txt`_diffeo_${i}.txt
+    
+    if [ -e ${subjects_structurals_diffeo} ]
     then
         rm -rf ${subjects_structurals_diffeo}  
     fi
 done
 
 
-deformation_fields=`echo $subjects | sed -e 's/.txt/_defs.txt/'`
+#deformation_fields=`echo $subjects | sed -e 's/.txt/_defs.txt/'`
+deformation_fields=`dirname $subjects`/`basename $subjects .txt`_defs.txt
 if [ -e "${deformation_fields}" ]
 then
         rm -rf ${deformation_fields}  
@@ -293,10 +308,11 @@ fi
 
 #######################################################INITIAL RIGID ALIGNMENT ###############################
 
-
+DRTAMASRigid="DRTAMAS_cuda --only_rigid 1 "
 
 count=0
-subjects_affine=`echo $subjects | sed -e 's/.txt/_affine.txt/'`  
+#subjects_affine=`echo $subjects | sed -e 's/.txt/_affine.txt/'`
+subjects_affine=`dirname ${subjects}`/`basename ${subjects} .txt`_affine.txt
     
 if [ -e "${subjects_affine}" ]
 then
@@ -328,7 +344,7 @@ do
 
     fixed_name=${listdir}/average_rigid_0.nii
 
-    
+   
    echo ${filename}_aff.nii >> ${subjects_affine}
    echo ${listdir}/${filename}_aff.txt >> ${rigid_list}
 
@@ -341,8 +357,8 @@ do
 
     if [ ${start_step} -eq 0 ]   
     then       
-      # my_RUN "DRTAMASRigid ${fixed_tensor} ${moving_tensor} --affine_gradient_step_length 1. "
-       DRTAMASRigid ${fixed_tensor} ${moving_tensor} --affine_gradient_step_length 1.  &
+       #DRTAMASRigid ${fixed_tensor} ${moving_tensor} --affine_gradient_step_length 1.  &
+       ${DRTAMASRigid} ${fixed_tensor} ${moving_tensor}  &
     fi  
     
     let cnt=cnt+1         
@@ -526,7 +542,8 @@ done
 for ((i=0; i<Nstructurals; i++))
 do
 
-   subjects_structurals_aff=`echo $subjects_structurals | sed -e "s/.txt/_aff_${i}.txt/"`
+  # subjects_structurals_aff=`echo $subjects_structurals | sed -e "s/.txt/_aff_${i}.txt/"`
+   subjects_structurals_aff=`dirname $subjects_structurals`/`basename $subjects_structurals .txt`_aff_${i}.txt
 
    if [ -e "${subjects_structurals_aff}" ]
    then
@@ -547,8 +564,9 @@ do
 
     for ((i=0; i<Nstructurals; i++))
     do
-        subjects_structurals_diffeo=`echo $subjects_structurals | sed -e "s/.txt/_diffeo_${i}.txt/"`
-        echo ${filename}_diffeo_${i}.nii >> ${subjects_structurals_diffeo}
+        #subjects_structurals_diffeo=`echo $subjects_structurals | sed -e "s/.txt/_diffeo_${i}.txt/"`
+        subjects_structurals_diffeo=`dirname $subjects_structurals`/`basename $subjects_structurals .txt`_diffeo_${i}.txt
+        echo ${filename}_str_diffeo_${i}.nii >> ${subjects_structurals_diffeo}
     done
 done
 
@@ -559,56 +577,86 @@ let last_affine=${Niter_affine}+1
 if [ ${diffeomorphic_registration_start_iteration} -eq 0 ]   
 then
 
-    if [ ! -z "${subjects_structurals}" ]
+    dont_structural=1
+    for ((i=0; i<Nstructurals; i++))
+    do
+        if [ ! -e ${listdir}/average_structural_diffeo_${i}_0.nii ]
+        then
+            dont_structural=0
+        fi
+    done
+    
+    if [ ${dont_structural} -eq 0 ]
     then
-        sid=0
-        for subj in `cat ${subjects_structurals}`
-        do
 
-            all_subjects_structurals[$sid]=${subj}
-
-            IFS=','
-            read -ra line_structurals <<< "$subj"
-            IFS=$' \t\n'
-            for ((i=0; i<Nstructurals; i++))
+        if [ ! -z "${subjects_structurals}" ]
+        then
+            sid=0
+            for subj in `cat ${subjects_structurals}`
             do
-               curr_structural=${line_structurals[$i]}
-               filename=$(basename "${curr_structural}")
-               extension="${filename##*.}"
-               filename="${filename%.*}"
 
-               cmd="ApplyTransformationToScalar2 ${listdir}/${curr_structural} ${all_affine_list[$sid]} ${listdir}/${filename}_aff.nii ${listdir}/average_template_affine_0.nii BSP"
-               my_RUN "${cmd}"
+                all_subjects_structurals[$sid]=${subj}
 
-               subjects_structurals_aff=`echo $subjects_structurals | sed -e "s/.txt/_aff_${i}.txt/"`
-               echo  ${listdir}/${filename}_aff.nii >> ${subjects_structurals_aff}
+                IFS=','
+                read -ra line_structurals <<< "$subj"
+                IFS=$' \t\n'
+                for ((i=0; i<Nstructurals; i++))
+                do
+                   curr_structural=${line_structurals[$i]}
+                   filename=$(basename "${curr_structural}")
+                   extension="${filename##*.}"
+                   filename="${filename%.*}"
+
+                   cmd="ApplyTransformationToScalar2 ${listdir}/${curr_structural} ${all_affine_list[$sid]} ${listdir}/${filename}_aff.nii ${listdir}/average_template_affine_0.nii BSP"
+                   my_RUN "${cmd}"
+
+                   subjects_structurals_aff=`echo $subjects_structurals | sed -e "s/.txt/_aff_${i}.txt/"`
+                   echo  ${listdir}/${filename}_aff.nii >> ${subjects_structurals_aff}
+                done
+
+                sid=$((sid+1))
             done
 
-            sid=$((sid+1))
-        done
-
+            for ((i=0; i<Nstructurals; i++))
+            do
+                #subjects_structurals_aff=`echo $subjects_structurals | sed -e "s/.txt/_aff_${i}.txt/"`
+                subjects_structurals_aff=`dirname $subjects_structurals`/`basename $subjects_structurals .txt`_aff_${i}.txt
+                
+                echo AverageScalars ${subjects_structurals_aff} ${listdir}/average_structural_aff_${i}.nii
+                AverageScalars ${subjects_structurals_aff} ${listdir}/average_structural_aff_${i}.nii
+            done
+        fi
+        
         for ((i=0; i<Nstructurals; i++))
         do
-            subjects_structurals_aff=`echo $subjects_structurals | sed -e "s/.txt/_aff_${i}.txt/"`
-            echo AverageScalars ${subjects_structurals_aff} ${listdir}/average_structural_aff_${i}.nii
-            AverageScalars ${subjects_structurals_aff} ${listdir}/average_structural_aff_${i}.nii
+            cp ${listdir}/average_structural_aff_${i}.nii ${listdir}/average_structural_diffeo_${i}_0.nii
         done
     fi
 
-    echo "AverageTensorsWithWeights ${subjects_affine}  ${listdir}/average_template_diffeo_0.nii 0 ${Niter}"
-    AverageTensorsWithWeights ${subjects_affine}  ${listdir}/average_template_diffeo_0.nii 0 ${Niter}
-    echo "GaussianSmoothTensorImage ${listdir}/average_template_diffeo_0.nii 0.5"
-    GaussianSmoothTensorImage ${listdir}/average_template_diffeo_0.nii 0.5
-    mv ${listdir}/average_template_diffeo_0_SMTH.nii ${listdir}/average_template_diffeo_0.nii
+    if [ ! -e ${listdir}/average_template_diffeo_0.nii ]
+    then
+        my_RUN "AverageTensorsWithWeights ${subjects_affine}  ${listdir}/average_template_diffeo_0.nii 0 ${Niter}"
+        my_RUN "GaussianSmoothTensorImage ${listdir}/average_template_diffeo_0.nii 0.5"
+        mv ${listdir}/average_template_diffeo_0_SMTH.nii ${listdir}/average_template_diffeo_0.nii
+    fi
+fi
 
-    for ((i=0; i<Nstructurals; i++))
+
+
+if [ ! -z "${subjects_structurals}" ]
+then
+    sid=0
+    for subj in `cat ${subjects_structurals}`
     do
-        cp ${listdir}/average_structural_aff_${i}.nii ${listdir}/average_structural_diffeo_${i}_0.nii
+
+        all_subjects_structurals[$sid]=${subj}
+        sid=$((sid+1))
     done
 fi
 
 
 
+init=0
 count=${diffeomorphic_registration_start_iteration}
 while [ $count -lt ${Niter} ]
 do
@@ -626,25 +674,33 @@ do
         done
     fi
 
+    if [ $count -ge $((Niter-2))  ]
+    then 
+        init=1
+    fi
     
-
-    bash DRTAMAS_batch_register_to_target_main.bash  -t=${template_name} -s=${subjects} -st=${all_structural_templates} -ss=${subjects_structurals} 
-
+    #bash DRTAMAS_batch_register_to_target_nonsmoothlast.bash  -t=${template_name} -s=${subjects} -st=${all_structural_templates} -ss=${subjects_structurals} --in=0
+    bash DRTAMAS_batch_register_to_target_nonsmoothlast.bash  -t=${template_name} -s=${subjects} -st=${all_structural_templates} -ss=${subjects_structurals} --in=${init}
     
+    let count2=count
+     let count=count+1
 
-     if [ ${constrain_deformations} -eq 1 ]   
+
+    my_RUN "AverageTensorsWithWeights ${subjects_diffeo} ${listdir}/average_template_diffeo_${count}.nii  ${count} ${Niter}"
+    
+    if [ ${constrain_deformations} -eq 1 ]   
     then
-
-
-       #  echo "bash ConstrainDefFields.bash -i=${deformation_fields}"
-       #  bash ConstrainDefFields.bash -i=${deformation_fields}
-       echo ExtractImage -i ${template_name} -v 0
-       ExtractImage -i ${template_name} -v 0
-       echo ConstrainDefFields ${deformation_fields} `dirname ${template_name}`/`basename ${template_name} .nii`_V000.nii
-       ConstrainDefFields ${deformation_fields} `dirname ${template_name}`/`basename ${template_name} .nii`_V000.nii
+        echo ExtractImage -i ${template_name} -v 0
+        ExtractImage -i ${template_name} -v 0
+        echo ConstrainDefFields ${deformation_fields} `dirname ${template_name}`/`basename ${template_name} .nii`_V000.nii
+        ConstrainDefFields ${deformation_fields} `dirname ${template_name}`/`basename ${template_name} .nii`_V000.nii
        
-
-         sid=0
+        df=${listdir}/`basename ${subjects} .txt`_defs_avgfield.nii
+    
+        mv ${listdir}/average_template_diffeo_${count}.nii ${listdir}/average_template_diffeo_${count}_orig.nii
+        my_RUN "ApplyTransformationToTensor ${listdir}/average_template_diffeo_${count}_orig.nii  ${df} ${listdir}/average_template_diffeo_${count}.nii ${listdir}/average_template_diffeo_${count}_orig.nii     "
+        
+        sid=0
          for subj in `cat ${subjects}`
          do
              filename=$(basename "${subj}")
@@ -652,10 +708,10 @@ do
              filename="${filename%.*}"
 
              my_RUN "CombineTransformations ${listdir}/${filename}_aff.txt ${listdir}/${filename}_def_MINV_cnstr.nii"
-             cp ${listdir}/combined_displacement.nii ${listdir}/${filename}_aff_def_MINV_cnstr.nii
-             my_RUN "ApplyTransformationToTensor ${listdir}/${subj} ${listdir}/combined_displacement.nii  ${listdir}/${filename}_diffeo.nii ${listdir}/average_template_diffeo_${count}.nii"
-
-
+             mv ${listdir}/combined_displacement.nii ${listdir}/${filename}_aff_def_MINV_cnstr.nii
+             
+             my_RUN "ApplyTransformationToTensor ${listdir}/${subj} ${listdir}/${filename}_aff_def_MINV_cnstr.nii  ${listdir}/${filename}_diffeo.nii ${listdir}/average_template_diffeo_${count}.nii"
+             
              if [ ! -z "${subjects_structurals}" ]
              then
                  line=${all_subjects_structurals[$sid]}
@@ -665,33 +721,57 @@ do
                  for ((i=0; i<Nstructurals; i++))
                  do
                       curr_structural=${line_structurals[$i]}
-                      my_RUN "ApplyTransformationToScalar2 ${listdir}/${curr_structural} ${listdir}/combined_displacement.nii ${listdir}/${filename}_diffeo_${i}.nii ${listdir}/average_structural_diffeo_${i}_${count}.nii BSP"
+                      my_RUN "ApplyTransformationToScalar2 ${listdir}/${curr_structural} ${listdir}/${filename}_aff_def_MINV_cnstr.nii ${listdir}/${filename}_str_diffeo_${i}.nii ${listdir}/average_structural_diffeo_${i}_${count2}.nii BSP"
                  done
-             fi             
-             sid=$((sid+1))
+             fi   
+             sid=$((sid+1))                              
          done
+    else 
+        if [ ! -z "${subjects_structurals}" ] 
+        then
+            sid=0
+            for subj in `cat ${subjects}`
+            do
+                filename=$(basename "${subj}")
+                extension="${filename##*.}"
+                filename="${filename%.*}"
+                
+                 line=${all_subjects_structurals[$sid]}
+                 IFS=','
+                 read -ra line_structurals <<< "$line"
+                 IFS=$' \t\n'
+                 for ((i=0; i<Nstructurals; i++))
+                 do
+                      curr_structural=${line_structurals[$i]}
+                      my_RUN "ApplyTransformationToScalar2 ${listdir}/${curr_structural} ${listdir}/${filename}_aff_def_MINV.nii ${listdir}/${filename}_str_diffeo_${i}.nii ${listdir}/average_structural_diffeo_${i}_${count2}.nii BSP"
+                 done                
+                
+                sid=$((sid+1))                              
+            done        
+        fi                                      
     fi
-
-
-
-    let count=count+1
-
-
-    echo "AverageTensorsWithWeights ${subjects_diffeo} ${listdir}/average_template_diffeo_${count}.nii  ${count} ${Niter}"
-    AverageTensorsWithWeights ${subjects_diffeo} ${listdir}/average_template_diffeo_${count}.nii  ${count} ${Niter}
-
+    
     if [ ! -z "${subjects_structurals}" ]
     then
         echo "Averaging scalars...."
         for ((i=0; i<Nstructurals; i++))
         do
-            subjects_structurals_diffeo=`echo $subjects_structurals | sed -e "s/.txt/_diffeo_${i}.txt/"`
-             echo "AverageScalars ${subjects_structurals_diffeo} ${listdir}/average_structural_diffeo_${i}_${count}"
-             AverageScalars ${subjects_structurals_diffeo} ${listdir}/average_structural_diffeo_${i}_${count}
+            subjects_structurals_diffeo=`dirname $subjects_structurals`/`basename $subjects_structurals .txt`_diffeo_${i}.txt
+            my_RUN "AverageScalars ${subjects_structurals_diffeo} ${listdir}/average_structural_diffeo_${i}_${count}"
         done
     fi
+    
+    if [ $count -lt ${Niter}  ]
+    then
+        echo "Deleting existing transformations..."
+        rm ${listdir}/*def_MINV.nii ${listdir}/*_diffeo.nii ${listdir}/*_mid2* ${listdir}/*cnstr.nii
+    fi
+    
+ 
  
 done
 
 echo "DRTAMAS is done....."
+
+    
 

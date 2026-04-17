@@ -67,7 +67,7 @@ void DRTAMAS::Process()
 {
     Step0_ReadImages();
     if(parser->getStep()==0)
-    {        
+    {
         Step0_AffineRegistration();
         Step0_TransformAndWriteAffineImage();
     }
@@ -104,9 +104,22 @@ void DRTAMAS::Process()
 
 void DRTAMAS::Step2_WriteImages()
 {
-    std::string nm=parser->getMovingTensor();
-    nm= nm.substr(0,nm.rfind(".nii"))+"_def_MINV.nii";
-    writeImageD<DisplacementFieldType>(this->def,nm);
+
+    {
+        std::string nm=parser->getMovingTensor();
+        nm= nm.substr(0,nm.rfind(".nii"))+"_def_MINV.nii";
+        writeImageD<DisplacementFieldType>(this->def,nm);
+    }
+    {
+        std::string nm=parser->getMovingTensor();
+        nm= nm.substr(0,nm.rfind(".nii"))+"_mid2F.nii.gz";
+        writeImageD<DisplacementFieldType>(this->def_FINV,nm);
+    }
+    {
+        std::string nm=parser->getMovingTensor();
+        nm= nm.substr(0,nm.rfind(".nii"))+"_mid2M.nii.gz";
+        writeImageD<DisplacementFieldType>(this->def_MINV,nm);
+    }
 
     DisplacementFieldTransformType::Pointer disp_trans= DisplacementFieldTransformType::New();
     disp_trans->SetDisplacementField(this->def);
@@ -179,6 +192,8 @@ void DRTAMAS::Step1_DiffeoRegistration()
     myDRTAMAS_processor->Process();
 
     this->def=myDRTAMAS_processor->getDef();
+    this->def_FINV=myDRTAMAS_processor->getDef_FINV();
+    this->def_MINV=myDRTAMAS_processor->getDef_MINV();
 
     delete myDRTAMAS_processor;
 
@@ -288,8 +303,8 @@ RigidTransformType::Pointer DRTAMAS::Step00_RigidRegistration(ImageType3D::Point
     ImageType3D::Pointer moving_img =this->PreprocessImage(moving_img_orig,0,1,0,1);
 
 
-    RigidTransformType::Pointer rigid_trans1= RigidRegisterImagesEuler( fixed_img,  moving_img, "CC",0.25);
-    RigidTransformType::Pointer rigid_trans2= RigidRegisterImagesEuler( fixed_img,  moving_img,"MI",0.25);
+    RigidTransformType::Pointer rigid_trans1= RigidRegisterImagesEuler( fixed_img,  moving_img, "CC",0.5);
+    RigidTransformType::Pointer rigid_trans2= RigidRegisterImagesEuler( fixed_img,  moving_img,"MI",0.5);
 
     auto params1= rigid_trans1->GetParameters();
     auto params2= rigid_trans2->GetParameters();
@@ -310,7 +325,7 @@ RigidTransformType::Pointer DRTAMAS::Step00_RigidRegistration(ImageType3D::Point
         std::cout<<"Could not compute the rigid transformation from the structural imageto b=0 image... Starting multistart.... This could take a while"<<std::endl;
         std::cout<<"Better be safe than sorry, right?"<<std::endl;
 
-        RigidTransformType::Pointer rigid_trans1a= RigidRegisterImagesEuler( moving_img, fixed_img,  "CC",0.25,false);
+        RigidTransformType::Pointer rigid_trans1a= RigidRegisterImagesEuler( moving_img, fixed_img,  "CC",0.5,false);
         RigidTransformType::ParametersType b1= rigid_trans1a->GetParameters();
 
         p1[0]= params1[0]+ b1[0];
@@ -318,7 +333,7 @@ RigidTransformType::Pointer DRTAMAS::Step00_RigidRegistration(ImageType3D::Point
         p1[2]= params1[2]+ b1[2];
 
         double diff1= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] ;
-        RigidTransformType::Pointer rigid_trans2a= RigidRegisterImagesEuler( moving_img, fixed_img,  "MI",0.25,false);
+        RigidTransformType::Pointer rigid_trans2a= RigidRegisterImagesEuler( moving_img, fixed_img,  "MI",0.5,false);
         RigidTransformType::ParametersType b2= rigid_trans2a->GetParameters();
 
         std::cout<< "Trans CC F" << rigid_trans1->GetParameters()<<std::endl;
@@ -351,7 +366,7 @@ RigidTransformType::Pointer DRTAMAS::Step00_RigidRegistration(ImageType3D::Point
             b1[5]= (params1[5] );
             rigid_trans1->SetParameters(b1);
 
-            rigid_trans= RigidRegisterImagesEuler( fixed_img,  moving_img, "CC",0.25,true, rigid_trans1);
+            rigid_trans= RigidRegisterImagesEuler( fixed_img,  moving_img, "CC",0.5,true, rigid_trans1);
         }
         else
         {
@@ -365,7 +380,7 @@ RigidTransformType::Pointer DRTAMAS::Step00_RigidRegistration(ImageType3D::Point
                 b2[5]= (params2[5] );
                 rigid_trans2->SetParameters(b2);
 
-                rigid_trans= RigidRegisterImagesEuler( fixed_img, moving_img, "MI",0.25,true,rigid_trans2);
+                rigid_trans= RigidRegisterImagesEuler( fixed_img, moving_img, "MI",0.5,true,rigid_trans2);
             }
             else
             {
@@ -381,7 +396,7 @@ RigidTransformType::Pointer DRTAMAS::Step00_RigidRegistration(ImageType3D::Point
                 ImageType3D::Pointer moving2= resample_3D_image(moving_img,new_res,dummy,"Linear");
 
                 rigid_trans1=MultiStartRigidSearch(fixed2,  moving2,new_metric_type);
-                rigid_trans= RigidRegisterImagesEuler( fixed_img,  moving_img, new_metric_type,0.25,rigid_trans1);
+                rigid_trans= RigidRegisterImagesEuler( fixed_img,  moving_img, new_metric_type,0.5,rigid_trans1);
             }
         }
 
@@ -455,182 +470,190 @@ void DRTAMAS::Step0_AffineRegistration()
         transform = static_cast<AffineTransformType*>((*it).GetPointer());
     }
 
-
-    typedef itk::ConjugateGradientLineSearchOptimizerv4Template<double> OptimizerType;
-    typedef itk::ImageRegistrationMethodv4<ImageType3D,ImageType3D,AffineTransformType> RegistrationType;
-    typedef itk::MattesMutualInformationImageToImageMetricv4<ImageType3D, ImageType3D, ImageType3D, double> MetricType;
-    typedef itk::CorrelationImageToImageMetricv4<ImageType3D, ImageType3D, ImageType3D, double> MetricType2;
-
-    const unsigned int numberOfLevels = 4;
-    typename RegistrationType::ShrinkFactorsArrayType shrinkFactorsPerLevel;
-    shrinkFactorsPerLevel.SetSize( 4 );
-    shrinkFactorsPerLevel[0] = 6;
-    shrinkFactorsPerLevel[1] = 4;
-    shrinkFactorsPerLevel[2] = 2;
-    shrinkFactorsPerLevel[3] = 1;
-
-    typename RegistrationType::SmoothingSigmasArrayType smoothingSigmasPerLevel;
-    smoothingSigmasPerLevel.SetSize( 4 );
-    smoothingSigmasPerLevel[0] = 3;
-    smoothingSigmasPerLevel[1] = 2;
-    smoothingSigmasPerLevel[2] = 1;
-    smoothingSigmasPerLevel[3] = 0.5;
-
-    AffineTransformType::Pointer transform_MI= AffineTransformType::New();
-    AffineTransformType::Pointer transform_CC= AffineTransformType::New();
+    if(!parser->getOnlyRigid())
     {
-        transform_MI->SetTranslation(transform->GetTranslation());
-        transform_MI->SetFixedParameters(transform->GetFixedParameters());
-        transform_MI->SetMatrix(transform->GetMatrix());
+        typedef itk::ConjugateGradientLineSearchOptimizerv4Template<double> OptimizerType;
+        typedef itk::ImageRegistrationMethodv4<ImageType3D,ImageType3D,AffineTransformType> RegistrationType;
+        typedef itk::MattesMutualInformationImageToImageMetricv4<ImageType3D, ImageType3D, ImageType3D, double> MetricType;
+        typedef itk::CorrelationImageToImageMetricv4<ImageType3D, ImageType3D, ImageType3D, double> MetricType2;
 
-        OptimizerType::Pointer      optimizer     = OptimizerType::New();
-        MetricType::Pointer         metric        = MetricType::New();
-        RegistrationType::Pointer   registration  = RegistrationType::New();
+        const unsigned int numberOfLevels = 4;
+        typename RegistrationType::ShrinkFactorsArrayType shrinkFactorsPerLevel;
+        shrinkFactorsPerLevel.SetSize( 4 );
+        shrinkFactorsPerLevel[0] = 6;
+        shrinkFactorsPerLevel[1] = 4;
+        shrinkFactorsPerLevel[2] = 2;
+        shrinkFactorsPerLevel[3] = 1;
 
-        registration->SetMetric(        metric        );
-        registration->SetOptimizer(     optimizer     );
-        metric->SetVirtualDomainFromImage( fixed_TR );
-        metric->SetNumberOfHistogramBins(40 );
+        typename RegistrationType::SmoothingSigmasArrayType smoothingSigmasPerLevel;
+        smoothingSigmasPerLevel.SetSize( 4 );
+        smoothingSigmasPerLevel[0] = 3;
+        smoothingSigmasPerLevel[1] = 2;
+        smoothingSigmasPerLevel[2] = 1;
+        smoothingSigmasPerLevel[3] = 0.5;
 
-        registration->SetMetricSamplingStrategy(RegistrationType::MetricSamplingStrategyEnum::NONE);
-        registration->SetInitialTransform(transform_MI);
-        registration->SetInPlace(true);
-        registration->SetFixedImage(fixed_TR);
-        registration->SetMovingImage(moving_TR);
-
-
-        typedef itk::RegistrationParameterScalesFromPhysicalShift<MetricType> ScalesEstimatorType;
-        typename ScalesEstimatorType::Pointer scalesEstimator = ScalesEstimatorType::New();
-        scalesEstimator->SetMetric( metric );
-        scalesEstimator->SetTransformForward( true );
-
-        optimizer->SetLearningRate( 0.25 );
-        optimizer->SetScalesEstimator(scalesEstimator);
-
-        optimizer->SetMaximumStepSizeInPhysicalUnits(  0.25 );
-        optimizer->SetNumberOfIterations( 200 );
-        optimizer->SetLowerLimit( 0.0005 );
-        optimizer->SetUpperLimit( 2.);
-        optimizer->SetEpsilon( 0.05 );
-        optimizer->SetDoEstimateLearningRateOnce( true );
-        optimizer->SetMinimumConvergenceValue( 1.e-6 );
-        optimizer->SetConvergenceWindowSize( 7 );
-        optimizer->SetReturnBestParametersAndValue(true);
-        CommandIterationUpdate::Pointer observer = CommandIterationUpdate::New();
-        optimizer->AddObserver( itk::IterationEvent(), observer );
-
-
-        registration->SetNumberOfLevels ( numberOfLevels );
-        registration->SetSmoothingSigmasPerLevel( smoothingSigmasPerLevel );
-        registration->SetSmoothingSigmasAreSpecifiedInPhysicalUnits(false);
-        registration->SetShrinkFactorsPerLevel( shrinkFactorsPerLevel );
-
-        try
+        AffineTransformType::Pointer transform_MI= AffineTransformType::New();
+        AffineTransformType::Pointer transform_CC= AffineTransformType::New();
         {
-            registration->Update();
-            std::cout << "Optimizer stop condition: "
-                      << registration->GetOptimizer()->GetStopConditionDescription()
-                      << std::endl;
-        }
-        catch( itk::ExceptionObject & err )
-        {
-            std::cerr << "ExceptionObject caught !" << std::endl;
-            std::cerr << err << std::endl;
-            return;
-        }
-    }
+            transform_MI->SetTranslation(transform->GetTranslation());
+            transform_MI->SetFixedParameters(transform->GetFixedParameters());
+            transform_MI->SetMatrix(transform->GetMatrix());
+
+            OptimizerType::Pointer      optimizer     = OptimizerType::New();
+            MetricType::Pointer         metric        = MetricType::New();
+            RegistrationType::Pointer   registration  = RegistrationType::New();
+
+            registration->SetMetric(        metric        );
+            registration->SetOptimizer(     optimizer     );
+            metric->SetVirtualDomainFromImage( fixed_TR );
+            metric->SetNumberOfHistogramBins(40 );
+
+            registration->SetMetricSamplingStrategy(RegistrationType::MetricSamplingStrategyEnum::NONE);
+            registration->SetInitialTransform(transform_MI);
+            registration->SetInPlace(true);
+            registration->SetFixedImage(fixed_TR);
+            registration->SetMovingImage(moving_TR);
 
 
-    {
-        transform_CC->SetTranslation(transform->GetTranslation());
-        transform_CC->SetFixedParameters(transform->GetFixedParameters());
-        transform_CC->SetMatrix(transform->GetMatrix());
+            typedef itk::RegistrationParameterScalesFromPhysicalShift<MetricType> ScalesEstimatorType;
+            typename ScalesEstimatorType::Pointer scalesEstimator = ScalesEstimatorType::New();
+            scalesEstimator->SetMetric( metric );
+            scalesEstimator->SetTransformForward( true );
 
-        OptimizerType::Pointer      optimizer     = OptimizerType::New();
-        MetricType2::Pointer         metric2        = MetricType2::New();
-        RegistrationType::Pointer   registration  = RegistrationType::New();
+            optimizer->SetLearningRate( 0.25 );
+            optimizer->SetScalesEstimator(scalesEstimator);
 
-        registration->SetMetric(        metric2        );
-        registration->SetOptimizer(     optimizer     );
-        metric2->SetVirtualDomainFromImage( fixed_TR );
-
-        registration->SetMetricSamplingStrategy(RegistrationType::MetricSamplingStrategyEnum::NONE);
-        registration->SetInitialTransform(transform_CC);
-        registration->SetInPlace(true);
-        registration->SetFixedImage(fixed_TR);
-        registration->SetMovingImage(moving_TR);
-
-
-        typedef itk::RegistrationParameterScalesFromPhysicalShift<MetricType2> ScalesEstimatorType;
-        typename ScalesEstimatorType::Pointer scalesEstimator = ScalesEstimatorType::New();
-        scalesEstimator->SetMetric( metric2 );
-        scalesEstimator->SetTransformForward( true );
-
-        optimizer->SetLearningRate( 0.25 );
-        optimizer->SetScalesEstimator(scalesEstimator);
-
-        optimizer->SetMaximumStepSizeInPhysicalUnits(  0.25 );
-        optimizer->SetNumberOfIterations( 200 );
-        optimizer->SetLowerLimit( 0.0005 );
-        optimizer->SetUpperLimit( 2.);
-        optimizer->SetEpsilon( 0.05 );
-        optimizer->SetDoEstimateLearningRateOnce( true );
-        optimizer->SetMinimumConvergenceValue( 1.e-6 );
-        optimizer->SetConvergenceWindowSize( 7 );
-        optimizer->SetReturnBestParametersAndValue(true);
-        CommandIterationUpdate::Pointer observer = CommandIterationUpdate::New();
-        optimizer->AddObserver( itk::IterationEvent(), observer );
+            optimizer->SetMaximumStepSizeInPhysicalUnits(  0.25 );
+            optimizer->SetNumberOfIterations( 200 );
+            optimizer->SetLowerLimit( 0.0005 );
+            optimizer->SetUpperLimit( 2.);
+            optimizer->SetEpsilon( 0.05 );
+            optimizer->SetDoEstimateLearningRateOnce( true );
+            optimizer->SetMinimumConvergenceValue( 1.e-6 );
+            optimizer->SetConvergenceWindowSize( 7 );
+            optimizer->SetReturnBestParametersAndValue(true);
+            CommandIterationUpdate::Pointer observer = CommandIterationUpdate::New();
+            optimizer->AddObserver( itk::IterationEvent(), observer );
 
 
-        registration->SetNumberOfLevels ( numberOfLevels );
-        registration->SetSmoothingSigmasPerLevel( smoothingSigmasPerLevel );
-        registration->SetSmoothingSigmasAreSpecifiedInPhysicalUnits(false);
-        registration->SetShrinkFactorsPerLevel( shrinkFactorsPerLevel );
+            registration->SetNumberOfLevels ( numberOfLevels );
+            registration->SetSmoothingSigmasPerLevel( smoothingSigmasPerLevel );
+            registration->SetSmoothingSigmasAreSpecifiedInPhysicalUnits(false);
+            registration->SetShrinkFactorsPerLevel( shrinkFactorsPerLevel );
 
-        try
-        {
-            registration->Update();
-            std::cout << "Optimizer stop condition: "
-                      << registration->GetOptimizer()->GetStopConditionDescription()
-                      << std::endl;
-        }
-        catch( itk::ExceptionObject & err )
-        {
-            std::cerr << "ExceptionObject caught !" << std::endl;
-            std::cerr << err << std::endl;
-            return;
-        }
-    }
-
-    AffineTransformType::TranslationType transl_MI= transform_MI->GetTranslation();
-    AffineTransformType::TranslationType transl_cc= transform_CC->GetTranslation();
-
-    double diff= (transl_MI[0]-transl_cc[0])*(transl_MI[0]-transl_cc[0]) +
-                  (transl_MI[1]-transl_cc[1])*(transl_MI[1]-transl_cc[1]) +
-                  (transl_MI[2]-transl_cc[2])*(transl_MI[2]-transl_cc[2]) ;
-
-    std::cout<<"Affine MI: " << transform_MI->GetParameters() <<std::endl;
-    std::cout<<"Affine CC : " << transform_CC->GetParameters() <<std::endl;
-    std::cout<<"Diff: " <<diff <<std::endl;
-    if(diff>5)
-    {
-        if(rigid_trans)
-        {
-            AffineTransformType::TranslationType rigid_transl = rigid_trans->GetTranslation();
-
-            double diff1= (transl_MI[0]-rigid_transl[0])*(transl_MI[0]-rigid_transl[0]) +
-                          (transl_MI[1]-rigid_transl[1])*(transl_MI[1]-rigid_transl[1]) +
-                          (transl_MI[2]-rigid_transl[2])*(transl_MI[2]-rigid_transl[2]) ;
-
-            double diff2= (transl_cc[0]-rigid_transl[0])*(transl_cc[0]-rigid_transl[0]) +
-                           (transl_cc[1]-rigid_transl[1])*(transl_cc[1]-rigid_transl[1]) +
-                           (transl_cc[2]-rigid_transl[2])*(transl_cc[2]-rigid_transl[2]) ;
-
-            if(diff1<diff2)
+            try
             {
-                transform->SetMatrix(transform_MI->GetMatrix());
-                transform->SetTranslation(transform_MI->GetTranslation());
-                transform->SetFixedParameters(transform_MI->GetFixedParameters());
+                registration->Update();
+                std::cout << "Optimizer stop condition: "
+                          << registration->GetOptimizer()->GetStopConditionDescription()
+                          << std::endl;
+            }
+            catch( itk::ExceptionObject & err )
+            {
+                std::cerr << "ExceptionObject caught !" << std::endl;
+                std::cerr << err << std::endl;
+                return;
+            }
+        }
+
+
+        {
+            transform_CC->SetTranslation(transform->GetTranslation());
+            transform_CC->SetFixedParameters(transform->GetFixedParameters());
+            transform_CC->SetMatrix(transform->GetMatrix());
+
+            OptimizerType::Pointer      optimizer     = OptimizerType::New();
+            MetricType2::Pointer         metric2        = MetricType2::New();
+            RegistrationType::Pointer   registration  = RegistrationType::New();
+
+            registration->SetMetric(        metric2        );
+            registration->SetOptimizer(     optimizer     );
+            metric2->SetVirtualDomainFromImage( fixed_TR );
+
+            registration->SetMetricSamplingStrategy(RegistrationType::MetricSamplingStrategyEnum::NONE);
+            registration->SetInitialTransform(transform_CC);
+            registration->SetInPlace(true);
+            registration->SetFixedImage(fixed_TR);
+            registration->SetMovingImage(moving_TR);
+
+
+            typedef itk::RegistrationParameterScalesFromPhysicalShift<MetricType2> ScalesEstimatorType;
+            typename ScalesEstimatorType::Pointer scalesEstimator = ScalesEstimatorType::New();
+            scalesEstimator->SetMetric( metric2 );
+            scalesEstimator->SetTransformForward( true );
+
+            optimizer->SetLearningRate( 0.25 );
+            optimizer->SetScalesEstimator(scalesEstimator);
+
+            optimizer->SetMaximumStepSizeInPhysicalUnits(  0.25 );
+            optimizer->SetNumberOfIterations( 200 );
+            optimizer->SetLowerLimit( 0.0005 );
+            optimizer->SetUpperLimit( 2.);
+            optimizer->SetEpsilon( 0.05 );
+            optimizer->SetDoEstimateLearningRateOnce( true );
+            optimizer->SetMinimumConvergenceValue( 1.e-6 );
+            optimizer->SetConvergenceWindowSize( 7 );
+            optimizer->SetReturnBestParametersAndValue(true);
+            CommandIterationUpdate::Pointer observer = CommandIterationUpdate::New();
+            optimizer->AddObserver( itk::IterationEvent(), observer );
+
+
+            registration->SetNumberOfLevels ( numberOfLevels );
+            registration->SetSmoothingSigmasPerLevel( smoothingSigmasPerLevel );
+            registration->SetSmoothingSigmasAreSpecifiedInPhysicalUnits(false);
+            registration->SetShrinkFactorsPerLevel( shrinkFactorsPerLevel );
+
+            try
+            {
+                registration->Update();
+                std::cout << "Optimizer stop condition: "
+                          << registration->GetOptimizer()->GetStopConditionDescription()
+                          << std::endl;
+            }
+            catch( itk::ExceptionObject & err )
+            {
+                std::cerr << "ExceptionObject caught !" << std::endl;
+                std::cerr << err << std::endl;
+                return;
+            }
+        }
+
+        AffineTransformType::TranslationType transl_MI= transform_MI->GetTranslation();
+        AffineTransformType::TranslationType transl_cc= transform_CC->GetTranslation();
+
+        double diff= (transl_MI[0]-transl_cc[0])*(transl_MI[0]-transl_cc[0]) +
+                      (transl_MI[1]-transl_cc[1])*(transl_MI[1]-transl_cc[1]) +
+                      (transl_MI[2]-transl_cc[2])*(transl_MI[2]-transl_cc[2]) ;
+
+        std::cout<<"Affine MI: " << transform_MI->GetParameters() <<std::endl;
+        std::cout<<"Affine CC : " << transform_CC->GetParameters() <<std::endl;
+        std::cout<<"Diff: " <<diff <<std::endl;
+        if(diff>5)
+        {
+            if(rigid_trans)
+            {
+                AffineTransformType::TranslationType rigid_transl = rigid_trans->GetTranslation();
+
+                double diff1= (transl_MI[0]-rigid_transl[0])*(transl_MI[0]-rigid_transl[0]) +
+                              (transl_MI[1]-rigid_transl[1])*(transl_MI[1]-rigid_transl[1]) +
+                              (transl_MI[2]-rigid_transl[2])*(transl_MI[2]-rigid_transl[2]) ;
+
+                double diff2= (transl_cc[0]-rigid_transl[0])*(transl_cc[0]-rigid_transl[0]) +
+                               (transl_cc[1]-rigid_transl[1])*(transl_cc[1]-rigid_transl[1]) +
+                               (transl_cc[2]-rigid_transl[2])*(transl_cc[2]-rigid_transl[2]) ;
+
+                if(diff1<diff2)
+                {
+                    transform->SetMatrix(transform_MI->GetMatrix());
+                    transform->SetTranslation(transform_MI->GetTranslation());
+                    transform->SetFixedParameters(transform_MI->GetFixedParameters());
+                }
+                else
+                {
+                    transform->SetMatrix(transform_CC->GetMatrix());
+                    transform->SetTranslation(transform_CC->GetTranslation());
+                    transform->SetFixedParameters(transform_CC->GetFixedParameters());
+                }
             }
             else
             {
@@ -641,21 +664,11 @@ void DRTAMAS::Step0_AffineRegistration()
         }
         else
         {
-            transform->SetMatrix(transform_CC->GetMatrix());
-            transform->SetTranslation(transform_CC->GetTranslation());
-            transform->SetFixedParameters(transform_CC->GetFixedParameters());
+            transform->SetMatrix(transform_MI->GetMatrix());
+            transform->SetTranslation(transform_MI->GetTranslation());
+            transform->SetFixedParameters(transform_MI->GetFixedParameters());
         }
     }
-    else
-    {
-        transform->SetMatrix(transform_MI->GetMatrix());
-        transform->SetTranslation(transform_MI->GetTranslation());
-        transform->SetFixedParameters(transform_MI->GetFixedParameters());
-    }
-
-
-
-
 
      this->my_affine_trans=transform;
 

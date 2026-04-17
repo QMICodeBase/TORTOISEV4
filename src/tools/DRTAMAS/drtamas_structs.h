@@ -12,9 +12,10 @@ enum DRTAMASMetricEnumeration
 {
     DTDEV = 0,
     DTTR =1,
-    DTCC=2,
-    DTFA=3,
-    DTIllegalMetric = 4
+    TRCC =2,
+    DTCC=3,
+    DTFA=4,
+    DTIllegalMetric = 6
 };
 
 class DRTAMASMetric
@@ -29,7 +30,9 @@ public:
         if(type==DRTAMASMetricEnumeration::DTDEV)
             metric_name="DEV";
         if(type==DRTAMASMetricEnumeration::DTTR)
-            metric_name="TR";
+            metric_name="TRMSQ";
+        if(type==DRTAMASMetricEnumeration::TRCC)
+            metric_name="TRCC";
         if(type==DRTAMASMetricEnumeration::DTFA)
             metric_name="FA";
     }
@@ -54,6 +57,8 @@ struct DRTAMASStageSettings
     float img_smoothing_std{0};
     int downsample_factor{1};
 
+    CUDAIMAGE::Pointer const_init_finv{nullptr};
+    CUDAIMAGE::Pointer const_init_minv{nullptr};
 
     CUDAIMAGE::Pointer init_finv{nullptr};
     CUDAIMAGE::Pointer init_minv{nullptr};
@@ -64,6 +69,8 @@ struct DRTAMASStageSettings
     RigidTransformType::Pointer rigid_trans{nullptr};
 
     std::vector<DRTAMASMetric> metrics;
+
+    bool constrain{0};
 
     float learning_rate{0.25};
     float update_gaussian_sigma{3};

@@ -23,7 +23,12 @@ vnl_matrix_fixed<double,3,3> ComputeRotationFromAffine(vnl_matrix_fixed<double,3
 
     vnl_symmetric_eigensystem<double> eig(AAT);
 
-
+    if(eig.D(0,0)<1E-2)
+        eig.D(0,0)=1E-2;
+    if(eig.D(1,1)<1E-2)
+        eig.D(1,1)=1E-2;
+    if(eig.D(2,2)<1E-2)
+        eig.D(2,2)=1E-2;
     eig.D(0,0)= pow(eig.D(0,0), -0.5);
     eig.D(1,1)= pow(eig.D(1,1), -0.5);
     eig.D(2,2)= pow(eig.D(2,2), -0.5);
@@ -104,8 +109,6 @@ DTMatrixImageType::Pointer ExpTensorImage(DTMatrixImageType::Pointer dt_img)
             {
                 ind3[0]=i;
 
-                if(ind3[0]==104 && ind3[1]==22 && ind3[2]==10)
-                    int ma=0;
 
                 DTMatrixImageType::PixelType mat= out_img->GetPixel(ind3);
 
@@ -467,6 +470,27 @@ DTMatrixImageType::Pointer ReadAndOrientTensor(std::string fname)
 
 }
 
+ImageType3D::Pointer ExtractComponentFromTensorImage(DTMatrixImageType::Pointer tensor_img, int row,int col)
+{
+    ImageType3D::Pointer output_img=ImageType3D::New();
+    output_img->SetRegions(tensor_img->GetLargestPossibleRegion());
+    output_img->Allocate();
+    output_img->FillBuffer(0);
+    output_img->SetSpacing(tensor_img->GetSpacing());
+    output_img->SetOrigin(tensor_img->GetOrigin());
+    output_img->SetDirection(tensor_img->GetDirection());
+
+    itk::ImageRegionIteratorWithIndex<ImageType3D> it(output_img,output_img->GetLargestPossibleRegion());
+    for(it.GoToBegin();!it.IsAtEnd();++it)
+    {
+        ImageType3D::IndexType ind3= it.GetIndex();
+        auto mat =tensor_img->GetPixel(ind3);
+        it.Set(mat(row,col));
+    }
+
+    return output_img;
+}
+
 DTMatrixImageType::Pointer TransformAndWriteAffineImage(DTMatrixImageType::Pointer moving_tensor,DRTAMAS::AffineTransformType::Pointer my_affine_trans, DTMatrixImageType::Pointer fixed_tensor, std::string output_nii_name)
 {
     using DupType=itk::ImageDuplicator<DTMatrixImageType>;
@@ -475,7 +499,7 @@ DTMatrixImageType::Pointer TransformAndWriteAffineImage(DTMatrixImageType::Point
     dup->Update();
     auto moving_tensor_aff=dup->GetOutput();
 
-    DTMatrixImageType::PixelType small_tens; small_tens.fill(0);small_tens.fill_diagonal(-1E10);
+    DTMatrixImageType::PixelType small_tens; small_tens.fill(0);small_tens.fill_diagonal(1E-10);
     moving_tensor_aff->FillBuffer(small_tens);
 
 
@@ -563,6 +587,8 @@ void TransformAndWriteDiffeoImage(DTMatrixImageType::Pointer moving_tensor,Displ
                 auto J = ComputeJacobian(disp_field,ind3) ;
                 auto R =  ComputeRotationFromAffine(J);
 
+
+
                 InternalMatrixType mat_trans = InterpolateAt(log_moving_tensor, pt_trans);
                 mat_trans = R.transpose() *  mat_trans * R;
 
@@ -613,7 +639,7 @@ void TransformAndWriteDiffeoImage(DTMatrixImageType::Pointer moving_tensor,Displ
 }
 
 
-vnl_matrix_fixed<double,3,3> ComputeJacobian(DisplacementFieldType::Pointer field,DisplacementFieldType::IndexType ind3 )
+vnl_matrix_fixed<double,3,3> ComputeJacobian(DisplacementFieldType::Pointer field,DisplacementFieldType::IndexType &ind3 )
 {
     vnl_matrix_fixed<double,3,3> A;
     A.set_identity();

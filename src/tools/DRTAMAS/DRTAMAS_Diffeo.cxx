@@ -85,228 +85,313 @@ void DRTAMAS_Diffeo::SetDefaultStages()
 {
     int Nstr=parser->getNumberOfStructurals();
 
-
+    if(parser->GetInitialFINV()=="")
     {
-        DRTAMASStageSettings curr_stage;                                   //1
-        curr_stage.niter=300;
-        curr_stage.img_smoothing_std=4.;
-        curr_stage.downsample_factor=8;
-        curr_stage.learning_rate=0.2;
-        curr_stage.update_gaussian_sigma=5.;
-        curr_stage.total_gaussian_sigma=0.0;
-
-        DRTAMASMetric metric2;
-        metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
-        metric2.weight=2;
-        curr_stage.metrics.push_back(metric2);
-
-        DRTAMASMetric metric1;
-        metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
-        metric1.weight=1;
-        metric1.to=1;
-        curr_stage.metrics.push_back(metric1);
-
-        DRTAMASMetric metric4;
-        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
-        metric4.weight=1;
-        curr_stage.metrics.push_back(metric4);
-
-        for(int s=0;s<Nstr;s++)
         {
-            DRTAMASMetric metric3;
-            metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
-            metric3.weight=1;
-            curr_stage.metrics.push_back(metric3);
+            DRTAMASStageSettings curr_stage;                                   //1
+            curr_stage.niter=300;
+            curr_stage.img_smoothing_std=4.;
+            curr_stage.downsample_factor=8;
+            curr_stage.learning_rate=0.2;
+            curr_stage.update_gaussian_sigma=5.;
+            curr_stage.total_gaussian_sigma=0.0;
+
+
+            DRTAMASMetric metric2;
+            metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
+            metric2.weight=2;
+            curr_stage.metrics.push_back(metric2);
+
+            DRTAMASMetric metric5;
+            metric5.SetMetricType(DRTAMASMetricEnumeration::TRCC);
+            metric5.weight=0.75;
+            curr_stage.metrics.push_back(metric5);
+
+
+            DRTAMASMetric metric1;
+            metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
+            metric1.weight=1.25;
+            metric1.to=1;
+            curr_stage.metrics.push_back(metric1);
+
+            DRTAMASMetric metric4;
+            metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+            metric4.weight=2.;
+            curr_stage.metrics.push_back(metric4);
+
+            for(int s=0;s<Nstr;s++)
+            {
+                DRTAMASMetric metric3;
+                metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
+                metric3.weight=1;
+                curr_stage.metrics.push_back(metric3);
+            }
+            this->stages.push_back(curr_stage);
         }
-        this->stages.push_back(curr_stage);
-    }
-    {
-        DRTAMASStageSettings curr_stage;                                   //2
-        curr_stage.niter=300;
-        curr_stage.img_smoothing_std=3.;
-        curr_stage.downsample_factor=6;
-        curr_stage.learning_rate=0.4;
-        curr_stage.update_gaussian_sigma=4.;
-        curr_stage.total_gaussian_sigma=0.0;
-
-        DRTAMASMetric metric2;
-        metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
-        metric2.weight=2;
-        curr_stage.metrics.push_back(metric2);
-
-        DRTAMASMetric metric1;
-        metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
-        metric1.weight=1;
-        metric1.to=1;
-        curr_stage.metrics.push_back(metric1);
-
-        DRTAMASMetric metric4;
-        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
-        metric4.weight=2;
-        curr_stage.metrics.push_back(metric4);
-
-        for(int s=0;s<Nstr;s++)
         {
-            DRTAMASMetric metric3;
-            metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
-            metric3.weight=1;
-            curr_stage.metrics.push_back(metric3);
+            DRTAMASStageSettings curr_stage;                                   //2
+            curr_stage.niter=300;
+            curr_stage.img_smoothing_std=3.;
+            curr_stage.downsample_factor=6;
+            curr_stage.learning_rate=0.4;
+            curr_stage.update_gaussian_sigma=4.;
+            curr_stage.total_gaussian_sigma=0.0;
+
+            DRTAMASMetric metric2;
+            metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
+            metric2.weight=2;
+            curr_stage.metrics.push_back(metric2);
+
+            DRTAMASMetric metric5;
+            metric5.SetMetricType(DRTAMASMetricEnumeration::TRCC);
+            metric5.weight=0.75;
+            curr_stage.metrics.push_back(metric5);
+
+            DRTAMASMetric metric1;
+            metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
+            metric1.weight=1.25;
+            metric1.to=1;
+            curr_stage.metrics.push_back(metric1);
+
+            DRTAMASMetric metric4;
+            metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+            metric4.weight=2.;
+            curr_stage.metrics.push_back(metric4);
+
+            for(int s=0;s<Nstr;s++)
+            {
+                DRTAMASMetric metric3;
+                metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
+                metric3.weight=1;
+                curr_stage.metrics.push_back(metric3);
+            }
+            this->stages.push_back(curr_stage);
         }
-        this->stages.push_back(curr_stage);
-    }
-    {
-        DRTAMASStageSettings curr_stage;                                   //3
-        curr_stage.niter=300;
-        curr_stage.img_smoothing_std=2.;
-        curr_stage.downsample_factor=4;
-        curr_stage.learning_rate=0.5;
-        curr_stage.update_gaussian_sigma=4.;
-        curr_stage.total_gaussian_sigma=0.0;
-
-        DRTAMASMetric metric2;
-        metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
-        metric2.weight=3;
-        curr_stage.metrics.push_back(metric2);
-
-        DRTAMASMetric metric1;
-        metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
-        metric1.weight=2;
-        metric1.to=1;
-        curr_stage.metrics.push_back(metric1);
-
-        DRTAMASMetric metric4;
-        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
-        metric4.weight=2;
-        curr_stage.metrics.push_back(metric4);
-
-        for(int s=0;s<Nstr;s++)
         {
-            DRTAMASMetric metric3;
-            metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
-            metric3.weight=1;
-            curr_stage.metrics.push_back(metric3);
+            DRTAMASStageSettings curr_stage;                                   //3
+            curr_stage.niter=300;
+            curr_stage.img_smoothing_std=2.;
+            curr_stage.downsample_factor=4;
+            curr_stage.learning_rate=0.5;
+            curr_stage.update_gaussian_sigma=4.;
+            curr_stage.total_gaussian_sigma=0.0;
+
+            DRTAMASMetric metric2;
+            metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
+            metric2.weight=2;
+            curr_stage.metrics.push_back(metric2);
+
+            DRTAMASMetric metric5;
+            metric5.SetMetricType(DRTAMASMetricEnumeration::TRCC);
+            metric5.weight=0.75;
+            curr_stage.metrics.push_back(metric5);
+
+            DRTAMASMetric metric1;
+            metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
+            metric1.weight=1.25;
+            metric1.to=1;
+            curr_stage.metrics.push_back(metric1);
+
+            DRTAMASMetric metric4;
+            metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+            metric4.weight=2.;
+            curr_stage.metrics.push_back(metric4);
+
+            for(int s=0;s<Nstr;s++)
+            {
+                DRTAMASMetric metric3;
+                metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
+                metric3.weight=1;
+                curr_stage.metrics.push_back(metric3);
+            }
+            this->stages.push_back(curr_stage);
         }
-        this->stages.push_back(curr_stage);
-    }
-    {
-        DRTAMASStageSettings curr_stage;                                   //4
-        curr_stage.niter=300;
-        curr_stage.img_smoothing_std=1.;
-        curr_stage.downsample_factor=2;
-        curr_stage.learning_rate=0.75;
-        curr_stage.update_gaussian_sigma=3.;
-        curr_stage.total_gaussian_sigma=0.0;
-
-        DRTAMASMetric metric2;
-        metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
-        metric2.weight=3;
-        curr_stage.metrics.push_back(metric2);
-
-        DRTAMASMetric metric1;
-        metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
-        metric1.weight=2;
-        metric1.to=1;
-        curr_stage.metrics.push_back(metric1);
-
-        DRTAMASMetric metric4;
-        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
-        metric4.weight=2;
-        curr_stage.metrics.push_back(metric4);
-
-        for(int s=0;s<Nstr;s++)
         {
-            DRTAMASMetric metric3;
-            metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
-            metric3.weight=1;
-            curr_stage.metrics.push_back(metric3);
-        }
-        this->stages.push_back(curr_stage);
-    }
-
-    {
-        DRTAMASStageSettings curr_stage;                                   //5
-        curr_stage.niter=300;
-        curr_stage.img_smoothing_std=1.;
-        curr_stage.downsample_factor=2;
-        curr_stage.learning_rate=0.25;
-        curr_stage.update_gaussian_sigma=3.;
-        curr_stage.total_gaussian_sigma=0.0;
-
-        DRTAMASMetric metric2;
-        metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
-        metric2.weight=2;
-        curr_stage.metrics.push_back(metric2);
-
-        DRTAMASMetric metric1;
-        metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
-        metric1.weight=2;
-        metric1.to=0;
-        curr_stage.metrics.push_back(metric1);
-
-        DRTAMASMetric metric4;
-        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
-        metric4.weight=2;
-        curr_stage.metrics.push_back(metric4);
-
-        for(int s=0;s<Nstr;s++)
-        {
-            DRTAMASMetric metric3;
-            metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
-            metric3.weight=1;
-            curr_stage.metrics.push_back(metric3);
-        }
-        this->stages.push_back(curr_stage);
-    }
-
-    {
-        DRTAMASStageSettings curr_stage;                                   //6
-        curr_stage.niter=100;
-        curr_stage.img_smoothing_std=0.;
-        curr_stage.downsample_factor=1;
-        curr_stage.learning_rate=1;
-
-        if(parser->getNoSmoothingLastStage())
-        {
-            curr_stage.update_gaussian_sigma=0.25;
-            curr_stage.total_gaussian_sigma=0;
-        }
-        else
-        {
+            DRTAMASStageSettings curr_stage;                                   //4
+            curr_stage.niter=300;
+            curr_stage.img_smoothing_std=1.;
+            curr_stage.downsample_factor=2;
+            curr_stage.learning_rate=0.75;
             curr_stage.update_gaussian_sigma=3.;
-            curr_stage.total_gaussian_sigma=0;
+            curr_stage.total_gaussian_sigma=0.0;
+
+            DRTAMASMetric metric2;
+            metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
+            metric2.weight=2;
+            curr_stage.metrics.push_back(metric2);
+
+            DRTAMASMetric metric5;
+            metric5.SetMetricType(DRTAMASMetricEnumeration::TRCC);
+            metric5.weight=0.75;
+            curr_stage.metrics.push_back(metric5);
+
+            DRTAMASMetric metric1;
+            metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
+            metric1.weight=1.25;
+            metric1.to=1;
+            curr_stage.metrics.push_back(metric1);
+
+            DRTAMASMetric metric4;
+            metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+            metric4.weight=2.;
+            curr_stage.metrics.push_back(metric4);
+
+            for(int s=0;s<Nstr;s++)
+            {
+                DRTAMASMetric metric3;
+                metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
+                metric3.weight=1;
+                curr_stage.metrics.push_back(metric3);
+            }
+            this->stages.push_back(curr_stage);
         }
 
-        DRTAMASMetric metric2;
-        metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
-        metric2.weight=3;
-        curr_stage.metrics.push_back(metric2);
-
-        DRTAMASMetric metric1;
-        metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
-        metric1.weight=2;
-        metric1.to=1;
-        curr_stage.metrics.push_back(metric1);
-
-        DRTAMASMetric metric4;
-        metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
-        metric4.weight=2;
-        curr_stage.metrics.push_back(metric4);
-
-        for(int s=0;s<Nstr;s++)
         {
-            DRTAMASMetric metric3;
-            metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
-            metric3.weight=1;
-            curr_stage.metrics.push_back(metric3);
+            DRTAMASStageSettings curr_stage;                                   //5
+            curr_stage.niter=300;
+            curr_stage.img_smoothing_std=1.;
+            curr_stage.downsample_factor=2;
+            curr_stage.learning_rate=0.25;
+            curr_stage.update_gaussian_sigma=3.;
+            curr_stage.total_gaussian_sigma=0.0;
+
+            DRTAMASMetric metric2;
+            metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
+            metric2.weight=2;
+            curr_stage.metrics.push_back(metric2);
+
+            DRTAMASMetric metric5;
+            metric5.SetMetricType(DRTAMASMetricEnumeration::TRCC);
+            metric5.weight=0.75;
+            curr_stage.metrics.push_back(metric5);
+
+            DRTAMASMetric metric1;
+            metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
+            metric1.weight=1.25;
+            metric1.to=1;
+            curr_stage.metrics.push_back(metric1);
+
+            DRTAMASMetric metric4;
+            metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+            metric4.weight=2.;
+            curr_stage.metrics.push_back(metric4);
+
+            for(int s=0;s<Nstr;s++)
+            {
+                DRTAMASMetric metric3;
+                metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
+                metric3.weight=1;
+                curr_stage.metrics.push_back(metric3);
+            }
+            this->stages.push_back(curr_stage);
         }
-        this->stages.push_back(curr_stage);
+
+        {
+            DRTAMASStageSettings curr_stage;                                   //6
+            curr_stage.niter=200;
+            curr_stage.img_smoothing_std=0.25;
+            curr_stage.downsample_factor=1;
+            curr_stage.learning_rate=0.75;
+
+            if(parser->getNoSmoothingLastStage())
+            {
+                curr_stage.learning_rate=0.5;
+                curr_stage.update_gaussian_sigma=1.;
+                curr_stage.total_gaussian_sigma=0;
+            }
+            else
+            {
+                curr_stage.update_gaussian_sigma=2.5;
+                curr_stage.total_gaussian_sigma=0;
+            }
+
+            DRTAMASMetric metric2;
+            metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
+            metric2.weight=2;
+            curr_stage.metrics.push_back(metric2);
+
+            DRTAMASMetric metric5;
+            metric5.SetMetricType(DRTAMASMetricEnumeration::TRCC);
+            metric5.weight=0.75;
+            curr_stage.metrics.push_back(metric5);
+
+            DRTAMASMetric metric1;
+            metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
+            metric1.weight=1.25;
+            metric1.to=1;
+            curr_stage.metrics.push_back(metric1);
+
+            DRTAMASMetric metric4;
+            metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+            metric4.weight=2.;
+            curr_stage.metrics.push_back(metric4);
+
+            for(int s=0;s<Nstr;s++)
+            {
+                DRTAMASMetric metric3;
+                metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
+                metric3.weight=1;
+                curr_stage.metrics.push_back(metric3);
+            }
+            this->stages.push_back(curr_stage);
+        }
+        {
+            DRTAMASStageSettings curr_stage;                                   //7
+            curr_stage.niter=100;
+            curr_stage.img_smoothing_std=0.0;
+            curr_stage.downsample_factor=1;
+
+
+            curr_stage.total_gaussian_sigma=0;
+            if(parser->getNoSmoothingLastStage())
+            {
+                curr_stage.learning_rate=0.4;
+                curr_stage.update_gaussian_sigma=0.25;                
+            }
+            else
+            {
+                curr_stage.learning_rate=0.4;
+                curr_stage.update_gaussian_sigma=2.5;
+            }
+
+            DRTAMASMetric metric2;
+            metric2.SetMetricType(DRTAMASMetricEnumeration::DTTR);
+            metric2.weight=2.;
+            curr_stage.metrics.push_back(metric2);
+
+            DRTAMASMetric metric5;
+            metric5.SetMetricType(DRTAMASMetricEnumeration::TRCC);
+            metric5.weight=0.75;
+            curr_stage.metrics.push_back(metric5);
+
+            DRTAMASMetric metric1;
+            metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
+            metric1.weight=1.25;
+            metric1.to=0;
+            curr_stage.metrics.push_back(metric1);
+
+            DRTAMASMetric metric4;
+            metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
+            metric4.weight=2.;
+            curr_stage.metrics.push_back(metric4);
+
+            for(int s=0;s<Nstr;s++)
+            {
+                DRTAMASMetric metric3;
+                metric3.SetMetricType( DRTAMASMetricEnumeration::DTCC);
+                metric3.weight=1;
+                curr_stage.metrics.push_back(metric3);
+            }
+            this->stages.push_back(curr_stage);
+        }
     }
+    else
     {
         DRTAMASStageSettings curr_stage;                                   //7
         curr_stage.niter=100;
         curr_stage.img_smoothing_std=0.;
         curr_stage.downsample_factor=1;
-        curr_stage.learning_rate=0.4;
+        curr_stage.learning_rate=0.5;
 
         if(parser->getNoSmoothingLastStage())
         {
@@ -324,15 +409,20 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         metric2.weight=2;
         curr_stage.metrics.push_back(metric2);
 
+        DRTAMASMetric metric5;
+        metric5.SetMetricType(DRTAMASMetricEnumeration::TRCC);
+        metric5.weight=0.75;
+        curr_stage.metrics.push_back(metric5);
+
         DRTAMASMetric metric1;
         metric1.SetMetricType(DRTAMASMetricEnumeration::DTDEV);
-        metric1.weight=2;
-        metric1.to=0;
+        metric1.weight=1.25;
+        metric1.to=1;
         curr_stage.metrics.push_back(metric1);
 
         DRTAMASMetric metric4;
         metric4.SetMetricType(DRTAMASMetricEnumeration::DTFA);
-        metric4.weight=2;
+        metric4.weight=2.;
         curr_stage.metrics.push_back(metric4);
 
         for(int s=0;s<Nstr;s++)
@@ -344,7 +434,6 @@ void DRTAMAS_Diffeo::SetDefaultStages()
         }
         this->stages.push_back(curr_stage);
     }
-
 }
 
 
@@ -359,6 +448,7 @@ void DRTAMAS_Diffeo::SetImagesForMetrics()
 
     CurrentImageType::Pointer preprocessed_fixed_TR = PreprocessImage(fixed_TR_img,0,1);
     CurrentImageType::Pointer preprocessed_moving_TR = PreprocessImage(moving_TR_img,0,1);
+
 
     int Nstr=parser->getNumberOfStructurals();
     std::vector<CurrentImageType::Pointer> preprocessed_fixed_structurals, preprocessed_moving_structurals;
@@ -381,6 +471,11 @@ void DRTAMAS_Diffeo::SetImagesForMetrics()
                 this->stages[st].metrics[m].moving_img= this->moving_tensor;
             }
             if(this->stages[st].metrics[m].MetricType == DRTAMASMetricEnumeration::DTTR)
+            {
+                this->stages[st].metrics[m].fixed_img= fixed_TR_img;
+                this->stages[st].metrics[m].moving_img= moving_TR_img;
+            }
+            if(this->stages[st].metrics[m].MetricType == DRTAMASMetricEnumeration::TRCC)
             {
                 this->stages[st].metrics[m].fixed_img= preprocessed_fixed_TR;
                 this->stages[st].metrics[m].moving_img= preprocessed_moving_TR;
@@ -445,27 +540,43 @@ void DRTAMAS_Diffeo::Process()
 
     for(int st=0;st< stages.size();st++)
     {
+        if(parser->getConstrainFixed2MidMoving2MidDefs()==1)
+            stages[st].constrain=1;
+
         (*stream)<<"Stage number: "<<st+1<< " / " << stages.size() << std::endl;
         (*stream)<<"Current learning rate: "<<stages[st].learning_rate<<std::endl;
         (*stream)<<"Number of iterations: "<<stages[st].niter<<std::endl;
         (*stream)<<"Image smoothing stdev: "<<stages[st].img_smoothing_std<<std::endl;
         (*stream)<<"Downsampling factor: "<<stages[st].downsample_factor<<std::endl;
+        (*stream)<<"Constrain mid fields: "<<stages[st].constrain<<std::endl;
 
         (*stream)<<"Current update sigma: "<<stages[st].update_gaussian_sigma<<std::endl;
         (*stream)<<"Current total sigma: "<<stages[st].total_gaussian_sigma<<std::endl;
 
         (*stream)<<"Current metrics: ";
         for(int m=0;m<this->stages[st].metrics.size();m++)
-            (*stream)<<this->stages[st].metrics[m].metric_name<<" ";
+            (*stream)<<this->stages[st].metrics[m].metric_name<<"\["<<stages[st].metrics[m].weight<<"\] ";
         (*stream)<<std::endl;
 
 
-
-        if(prev_finv && prev_minv)
+        if(st==stages.size()-1 && stages[st].constrain==0)
         {
-            stages[st].init_finv=prev_finv;
-            stages[st].init_minv=prev_minv;
+            stages[st].const_init_finv=prev_finv;
+            stages[st].const_init_minv=prev_minv;
+
+            stages[st].init_finv=nullptr;
+            stages[st].init_minv=nullptr;
         }
+        else
+        {
+            if(prev_finv && prev_minv)
+            {
+                stages[st].init_finv=prev_finv;
+                stages[st].init_minv=prev_minv;
+            }
+        }
+
+
 
         DRTAMASStage current_stage(&(stages[st]));
         current_stage.PreprocessImagesAndFields();
