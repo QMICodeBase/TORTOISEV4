@@ -163,7 +163,7 @@ tar -xvf InsightToolkit-6.0b02.tar.gz
 mkdir InsightToolkit-6.0b02_build
 cd InsightToolkit-6.0b02_build
 
-cmake -DITK_USE_SYSTEM_EIGEN:BOOL=ON ../InsightData-6.0b02
+cmake -DITK_USE_SYSTEM_EIGEN:BOOL=ON ../InsightToolkit-6.0b02
 make -j 16
 cd ..
 ```
@@ -192,17 +192,17 @@ cd TORTOISEV4/TORTOISEV4
 ```
 For nonCUDA version:
 ```
-cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightData-6.0b02_build 
+cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-6.0b02_build 
 ```
 
 For CUDA version:
 ```
-cmake . -D USECUDA=1 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightData-6.0b02_build
+cmake . -D USECUDA=1 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-6.0b02_build
 ```
 
 For ComputeGlyphMaps and WarpMesh executable version:
 ```
-cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightData-6.0b02_build  -D VTK_DIR=../../libraries/VTK-9.4.2_build
+cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightToolkit-6.0b02_build  -D VTK_DIR=../../libraries/VTK-9.4.2_build
 ```
 
 Then,
