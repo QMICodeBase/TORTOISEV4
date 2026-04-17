@@ -28,6 +28,26 @@ inline void gpuAssert(cudaError_t code,  std::string file, int line, bool abort=
 }
 
 
+inline void copy3DPitchedPtrToHost(cudaPitchedPtr _src, double *_dst, int width, int height, int depth)
+
+{
+
+    cudaExtent copy_extent = make_cudaExtent(width*sizeof(double),height,depth);
+
+    cudaMemcpy3DParms copyParams = {0};
+
+    double *h_dest = _dst;
+
+    copyParams.srcPtr = _src;
+
+    copyParams.dstPtr = make_cudaPitchedPtr((void*)h_dest, width*sizeof(double), width, height);
+
+    copyParams.kind = cudaMemcpyDeviceToHost;
+
+    copyParams.extent = copy_extent;
+
+    gpuErrchk(cudaMemcpy3D(&copyParams));
+}
 
 
 
@@ -50,9 +70,6 @@ inline void copy3DPitchedPtrToHost(cudaPitchedPtr _src, float *_dst, int width, 
   copyParams.extent = copy_extent;
 
   gpuErrchk(cudaMemcpy3D(&copyParams));
-
-
-
 }
 
 inline void copy3DHostToPitchedPtr(float *_src, cudaPitchedPtr _dst, int width, int height, int depth)

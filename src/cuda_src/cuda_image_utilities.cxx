@@ -5,6 +5,37 @@
 
 
 
+
+CUDAIMAGE::Pointer AnisotropicSmoothField(CUDAIMAGE::Pointer field, CUDAIMAGE::Pointer TR_img, CUDAIMAGE::Pointer FA_img )
+{
+    cudaPitchedPtr d_output={0};
+    cudaExtent extent =  make_cudaExtent(field->components_per_voxel*sizeof(float)*field->sz.x,field->sz.y,field->sz.z);
+    cudaMalloc3D(&d_output, extent);
+    cudaMemset3D(d_output,0,extent);
+
+
+
+    AnisotropicSmoothField_cuda(field->getFloatdata(),
+                       TR_img->getFloatdata(),FA_img->getFloatdata(),
+                       field->sz,
+                       field->spc,
+                       field->dir(0,0),field->dir(0,1),field->dir(0,2),field->dir(1,0),field->dir(1,1),field->dir(1,2),field->dir(2,0),field->dir(2,1),field->dir(2,2),
+                       field->orig,
+                       d_output
+                       );
+
+    CUDAIMAGE::Pointer output = CUDAIMAGE::New();
+    output->sz=field->sz;
+    output->dir=field->dir;
+    output->orig=field->orig;
+    output->spc=field->spc;
+    output->components_per_voxel= field->components_per_voxel;
+    output->SetFloatDataPointer( d_output);
+    return output;
+
+}
+
+
 void AddToUpdateField(CUDAIMAGE::Pointer updateField,CUDAIMAGE::Pointer  updateField_temp,float weight,bool normalize)
 {
     AddToUpdateField_cuda(updateField->getFloatdata(), updateField_temp->getFloatdata(),weight, updateField->sz,updateField->components_per_voxel ,normalize);

@@ -167,6 +167,36 @@ ScalarFindMin(const float *gArr, int arraySize,  float *gOut)
 
 
 __global__ void
+ScalarFindSum(const double *gArr, int arraySize,  double *gOut)
+{
+    int thIdx = threadIdx.x;
+    int gthIdx = thIdx + blockIdx.x*bSize;
+    const int gridSize = bSize*gridDim.x;
+    double sum = 0;
+
+    for (int i = gthIdx; i < arraySize; i += gridSize)
+    {
+        sum+= gArr[i ];
+    }
+
+    __shared__ double shArr[bSize];
+    shArr[thIdx] = sum;
+    __syncthreads();
+
+    for (int size = bSize/2; size>0; size/=2)
+    { //uniform
+        if (thIdx<size)
+        {
+            shArr[thIdx] += shArr[thIdx+size];
+        }
+        __syncthreads();
+    }
+    if (thIdx == 0)
+        gOut[blockIdx.x] = shArr[0];
+}
+
+
+__global__ void
 ScalarFindSum(const float *gArr, int arraySize,  float *gOut)
 {
     int thIdx = threadIdx.x;
@@ -695,9 +725,6 @@ void ComposeFields_cuda(cudaPitchedPtr main_field,cudaPitchedPtr update_field,
 
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
-
-
-
 }
 
 
@@ -998,9 +1025,10 @@ void InvertField_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 data
     //const float m_MeanErrorToleranceThreshold=0.0008;
     //const int Niter=20;
 
-    const float m_MaxErrorToleranceThreshold=0.01;
-    const float m_MeanErrorToleranceThreshold=0.0001;
-    const int Niter=30;
+    const float m_MaxErrorToleranceThreshold=0.0005;
+    const float m_MeanErrorToleranceThreshold=0.00005;
+    const int Niter=200;
+
 
 //    const float m_MaxErrorToleranceThreshold=0.03;
 //    const float m_MeanErrorToleranceThreshold=0.0003;
@@ -1012,8 +1040,7 @@ void InvertField_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 data
     int iteration=0;
 
     while (iteration++ < Niter && m_MaxErrorNorm > m_MaxErrorToleranceThreshold &&m_MeanErrorNorm > m_MeanErrorToleranceThreshold)
-    {
-
+    {       
         ComposeFields_cuda(output,field,
                      data_sz, data_spc,
                      data_d00,  data_d01, data_d02, data_d10, data_d11, data_d12, data_d20, data_d21, data_d22,
@@ -1995,6 +2022,8 @@ MultiplyImages_kernel(cudaPitchedPtr im1, cudaPitchedPtr im2,cudaPitchedPtr outp
 }
 
 
+
+
 void  MultiplyImages_cuda(cudaPitchedPtr im1,cudaPitchedPtr im2, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp)
 {
     dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
@@ -2015,6 +2044,793 @@ void  MultiplyImages_cuda(cudaPitchedPtr im1,cudaPitchedPtr im2, cudaPitchedPtr 
 
 
 
+__global__ void
+ScaleImageForAnisotropicSmoothing_kernel(cudaPitchedPtr img, float scale, float add )
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
 
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+        if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2])
+        {
+            size_t im1pitch= img.pitch;
+            size_t im1slicePitch= im1pitch*d_sz[1]*k;
+            size_t im1colPitch= j*im1pitch;
+            char *im1_ptr= (char *)(img.ptr);
+            char * slice_im1= im1_ptr+  im1slicePitch;
+            float * row_img= (float *)(slice_im1+ im1colPitch);
+
+            row_img[i]= row_img[i] *scale + add;
+        }
+    }
+}
+
+
+__global__ void
+ConcatImagesForAnisotropicSmoothing_kernel(cudaPitchedPtr field, cudaPitchedPtr TR_img, cudaPitchedPtr FA_img, cudaPitchedPtr concat_img )
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+        if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2])
+        {
+            size_t fieldpitch= field.pitch;
+            size_t fieldslicePitch= fieldpitch*d_sz[1]*k;
+            size_t fieldcolPitch= j*fieldpitch;
+            char * field_ptr= (char *)(field.ptr);
+            char * slice_field= field_ptr+  fieldslicePitch;
+            float * row_field= (float *)(slice_field+ fieldcolPitch);
+
+            size_t TR_imgpitch= TR_img.pitch;
+            size_t TR_imgslicePitch= TR_imgpitch*d_sz[1]*k;
+            size_t TR_imgcolPitch= j*TR_imgpitch;
+            char * TR_img_ptr= (char *)(TR_img.ptr);
+            char * slice_TR_img= TR_img_ptr+  TR_imgslicePitch;
+            float * row_TR_img= (float *)(slice_TR_img+ TR_imgcolPitch);
+
+            size_t FA_imgpitch= FA_img.pitch;
+            size_t FA_imgslicePitch= FA_imgpitch*d_sz[1]*k;
+            size_t FA_imgcolPitch= j*FA_imgpitch;
+            char * FA_img_ptr= (char *)(FA_img.ptr);
+            char * slice_FA_img= FA_img_ptr+  FA_imgslicePitch;
+            float * row_FA_img= (float *)(slice_FA_img+ FA_imgcolPitch);
+
+            size_t concat_imgpitch= concat_img.pitch;
+            size_t concat_imgslicePitch= concat_imgpitch*d_sz[1]*k;
+            size_t concat_imgcolPitch= j*concat_imgpitch;
+            char * concat_img_ptr= (char *)(concat_img.ptr);
+            char * slice_concat_img= concat_img_ptr+  concat_imgslicePitch;
+            float * row_concat_img= (float *)(slice_concat_img+ concat_imgcolPitch);
+
+            row_concat_img[i*5+0] = row_field[i*3+0];
+            row_concat_img[i*5+1] = row_field[i*3+1];
+            row_concat_img[i*5+2] = row_field[i*3+2];
+            row_concat_img[i*5+3] = row_TR_img[i];
+            row_concat_img[i*5+4] = row_FA_img[i];
+        }
+    }
+}
+
+
+__device__ double ComputeVectorImageGradientMagnitudeSquare(cudaPitchedPtr img,int i, int j, int k, int N)
+{
+    double grad_sq=0;
+
+
+    //if(i==0 || i== d_sz[0]-1 || j==0 || j== d_sz[1]-1 || k==0 || k== d_sz[2]-1 )
+      //  return 0;
+
+
+    size_t pitch= img.pitch;
+    char *ptr= (char *)(img.ptr);
+
+    for(int V=0;V<N;V++)
+    {
+        {
+            size_t slicePitch= pitch*d_sz[1]*k;
+            char * slice= ptr+  slicePitch;
+            size_t colPitch= j*pitch;
+            float * row= (float *)(slice+ colPitch);
+
+            float val=0;
+            if(i!=0 && i!=d_sz[0]-1)
+                val= 0.5*(row[(i+1)*N+V]-row[(i-1)*N+V]);
+            else
+            {
+                if(i==0)
+                    val= 0.5*(row[(i+1)*N+V]-row[(i)*N+V]);
+                else
+                    val= 0.5*(row[(i)*N+V]-row[(i-1)*N+V]);
+            }
+            grad_sq+= val*val;
+
+
+
+            {
+                size_t colPitch;
+                if(j!=d_sz[1]-1)
+                    colPitch= (j+1)*pitch;
+                else
+                    colPitch= (j)*pitch;
+                float * row= (float *)(slice+ colPitch);
+                float val= row[i*N+V];
+
+                if(j!=0)
+                    colPitch= (j-1)*pitch;
+                else
+                    colPitch= (j)*pitch;
+                row= (float *)(slice+ colPitch);
+                val= 0.5*(val- row[i*N+V]);
+                grad_sq+= val*val;
+            }
+        }
+
+        {
+            size_t slicePitch;
+            if(k!=d_sz[2]-1)
+                slicePitch= pitch*d_sz[1]*(k+1);
+            else
+                slicePitch= pitch*d_sz[1]*(k);
+            char * slice= ptr+  slicePitch;
+            size_t colPitch= j*pitch;
+            float * row= (float *)(slice+ colPitch);
+            float val= row[i*N+V];
+
+            if(k!=0)
+                slicePitch= pitch*d_sz[1]*(k-1);
+            else
+                slicePitch= pitch*d_sz[1]*(k);
+            slice= ptr+  slicePitch;
+            row= (float *)(slice+ colPitch);
+            val= 0.5*(val -row[i*N+V]);
+
+            grad_sq+= val*val;
+        }
+    }
+    return grad_sq;
+}
+
+
+
+
+__global__ void
+ComputeAverageSquaredGradientImage_kernel(cudaPitchedPtr concat_img, cudaPitchedPtr grad_sq_img)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+        if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2] )
+        {
+            size_t grad_sq_imgpitch= grad_sq_img.pitch;
+            size_t grad_sq_imgslicePitch= grad_sq_imgpitch*d_sz[1]*k;
+            size_t grad_sq_imgcolPitch= j*grad_sq_imgpitch;
+            char * grad_sq_img_ptr= (char *)(grad_sq_img.ptr);
+            char * slice_grad_sq_img= grad_sq_img_ptr+  grad_sq_imgslicePitch;
+            double * row_grad_sq_img= (double *)(slice_grad_sq_img+ grad_sq_imgcolPitch);
+
+            double grad_sq= ComputeVectorImageGradientMagnitudeSquare(concat_img, i,  j,  k, 5);
+            row_grad_sq_img[i]=grad_sq;
+        }
+    }
+}
+
+
+
+
+
+
+
+__global__ void
+ComputeAnisotropicFilteringUpdate_kernel(cudaPitchedPtr concat_img, double *dev_mK, float *dev_deltaT, cudaPitchedPtr update_img)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+        if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2])
+        //if(i<d_sz[0]-1 && j <d_sz[1]-1 && k<d_sz[2]-1 && i>1 && j>1 && k>1)
+        {
+            size_t update_imgpitch= update_img.pitch;
+            size_t update_imgslicePitch= update_imgpitch*d_sz[1]*k;
+            size_t update_imgcolPitch= j*update_imgpitch;
+            char * update_img_ptr= (char *)(update_img.ptr);
+            char * slice_update_img= update_img_ptr+  update_imgslicePitch;
+            float * row_update_img= (float *)(slice_update_img+ update_imgcolPitch);
+
+            double m_K=dev_mK[0];
+            float deltaT=dev_deltaT[0];
+
+
+            const int N=5;
+            float dx_forward[3][N];
+            float dx_backward[3][N];
+            float dx[3][N];
+
+
+            size_t pitch= concat_img.pitch;
+            char *ptr= (char *)(concat_img.ptr);
+
+            int ip=i+1;
+            int im=i-1;
+            int jp=j+1;
+            int jm=j-1;
+            int kp=k+1;
+            int km=k-1;
+
+            if(ip>d_sz[0]-1)
+                ip=d_sz[0]-1;
+            if(im<0)
+                im=0;
+            if(jp>d_sz[1]-1)
+                jp=d_sz[1]-1;
+            if(jm<0)
+                jm=0;
+            if(kp>d_sz[2]-1)
+                kp=d_sz[2]-1;
+            if(km<0)
+                km=0;
+
+
+            for(int V=0;V<N;V++)
+            {
+                float val_c;
+                {
+                    size_t slicePitch= pitch*d_sz[1]*k;
+                    char * slice= ptr+  slicePitch;
+                    {
+                        size_t colPitch= j*pitch;
+                        float * row= (float *)(slice+ colPitch);
+                        val_c= row[(i)*N+V] ;
+                        float val_p= row[(ip)*N+V] ;
+                        float val_m= row[(im)*N+V] ;
+
+                        dx_forward[0][V]=  (val_p - val_c)/d_spc[0];
+                        dx_backward[0][V]= (val_c - val_m)/d_spc[0];
+                        dx[0][V]= 0.5*(val_p - val_m)/d_spc[0];
+
+                    }
+                    {
+                        size_t colPitch= (jp)*pitch;
+                        float * row= (float *)(slice+ colPitch);
+                        float val_p= row[i*N+V];
+
+                        colPitch= (jm)*pitch;
+                        row= (float *)(slice+ colPitch);
+                        float val_m= row[i*N+V];
+
+                        dx_forward[1][V]=  (val_p - val_c)/d_spc[1];
+                        dx_backward[1][V]= (val_c - val_m)/d_spc[1];
+                        dx[1][V]= 0.5*(val_p - val_m)/d_spc[1];
+
+                    }
+                }
+
+                {
+                    size_t slicePitch= pitch*d_sz[1]*(kp);
+                    char * slice= ptr+  slicePitch;
+                    size_t colPitch= j*pitch;
+                    float * row= (float *)(slice+ colPitch);
+                    float val_p= row[i*N+V];
+
+                    slicePitch= pitch*d_sz[1]*(km);
+                    slice= ptr+  slicePitch;
+                    row= (float *)(slice+ colPitch);
+                    float val_m= row[i*N+V];
+
+                    dx_forward[2][V]=  (val_p - val_c)/d_spc[2];
+                    dx_backward[2][V]= (val_c - val_m)/d_spc[2];
+                    dx[2][V]= 0.5*(val_p - val_m)/d_spc[2];
+                }
+            } //for V
+
+
+
+            double shifted_derivs_aug[3][3][N]={0};
+            double shifted_derivs_dim[3][3][N]={0};
+
+            for(int V=0;V<N;V++)
+            {
+                {
+                    size_t slicePitch= pitch*d_sz[1]*k;
+                    char * slice= ptr+  slicePitch;
+
+                    size_t colPitch= (jp)*pitch;
+                    float * row= (float *)(slice+ colPitch);
+                    float val_p= row[(ip)*N+V] ;
+                    float val_m= row[(im)*N+V] ;
+
+                    shifted_derivs_aug[0][1][V]= 0.5*(val_p - val_m)/d_spc[0];
+
+                    colPitch= (jm)*pitch;
+                    row= (float *)(slice+ colPitch);
+                    val_p= row[(ip)*N+V] ;
+                    val_m= row[(im)*N+V] ;
+
+                    shifted_derivs_dim[0][1][V]= 0.5*(val_p - val_m)/d_spc[0];
+                }
+
+                {
+                    size_t slicePitch= pitch*d_sz[1]*(kp);
+                    char * slice= ptr+  slicePitch;
+                    size_t colPitch= j*pitch;
+                    float * row= (float *)(slice+ colPitch);
+                    float val_p= row[(ip)*N+V] ;
+                    float val_m= row[(im)*N+V] ;
+
+                    shifted_derivs_aug[0][2][V]= 0.5*(val_p - val_m)/d_spc[0];
+
+                    slicePitch= pitch*d_sz[1]*(km);
+                    slice= ptr+  slicePitch;
+                    colPitch= j*pitch;
+                    row= (float *)(slice+ colPitch);
+                    val_p= row[(ip)*N+V] ;
+                    val_m= row[(im)*N+V] ;
+
+                    shifted_derivs_dim[0][2][V]= 0.5*(val_p - val_m)/d_spc[0];
+                }
+
+
+                {
+                    size_t slicePitch= pitch*d_sz[1]*(k);
+                    char *slice= ptr+  slicePitch;
+                    size_t colPitch= (jp)*pitch;
+                    float * row= (float *)(slice+ colPitch);
+                    float val_pp= row[(ip)*N+V];
+                    float val_pm= row[(im)*N+V];
+
+                    colPitch= (jm)*pitch;
+                    row= (float *)(slice+ colPitch);
+                    float val_mp= row[(ip)*N+V];
+                    float val_mm= row[(im)*N+V];
+
+                    shifted_derivs_aug[1][0][V]= 0.5*(val_pp - val_mp)/d_spc[1];
+                    shifted_derivs_dim[1][0][V]= 0.5*(val_pm - val_mm)/d_spc[1];
+                }
+
+
+                {
+                    size_t slicePitch= pitch*d_sz[1]*(kp);
+                    char * slice= ptr+  slicePitch;
+                    size_t colPitch= j*pitch;
+                    float * row= (float *)(slice+ colPitch);
+                    float val_pp= row[(ip)*N+V] ;
+                    float val_pm= row[(im)*N+V] ;
+
+                    slicePitch= pitch*d_sz[1]*(km);
+                    slice= ptr+  slicePitch;
+                    colPitch= j*pitch;
+                    row= (float *)(slice+ colPitch);
+                    float val_mp= row[(ip)*N+V] ;
+                    float val_mm= row[(im)*N+V] ;
+
+                    shifted_derivs_aug[2][0][V]= 0.5*(val_pp - val_mp)/d_spc[2];
+                    shifted_derivs_dim[2][0][V]= 0.5*(val_pm - val_mm)/d_spc[2];
+                }
+
+
+
+                {
+                    size_t slicePitch= pitch*d_sz[1]*(kp);
+                    char * slice= ptr+  slicePitch;
+                    size_t colPitch= (jp)*pitch;
+                    float * row= (float *)(slice+ colPitch);
+                    float val_pp= row[(i)*N+V] ;
+                    colPitch= (jm)*pitch;
+                    row= (float *)(slice+ colPitch);
+                    float val_pm= row[(i)*N+V] ;
+
+                    slicePitch= pitch*d_sz[1]*(km);
+                    slice= ptr+  slicePitch;
+                    colPitch= (jp)*pitch;
+                    row= (float *)(slice+ colPitch);
+                    float val_mp= row[(i)*N+V] ;
+                    colPitch= (jm)*pitch;
+                    row= (float *)(slice+ colPitch);
+                    float val_mm= row[(i)*N+V] ;
+
+                    shifted_derivs_aug[2][1][V]= 0.5*(val_pp - val_mp)/d_spc[2];
+                    shifted_derivs_dim[2][1][V]= 0.5*(val_pm - val_mm)/d_spc[2];
+                }
+
+                {
+                    size_t slicePitch= pitch*d_sz[1]*(kp);
+                    char * slice= ptr+  slicePitch;
+                    size_t colPitch= (jp)*pitch;
+                    float * row= (float *)(slice+ colPitch);
+                    float val_pp= row[(i)*N+V] ;
+                    colPitch= (jm)*pitch;
+                    row= (float *)(slice+ colPitch);
+                    float val_mp= row[(i)*N+V] ;
+
+                    slicePitch= pitch*d_sz[1]*(km);
+                    slice= ptr+  slicePitch;
+                    colPitch= (jp)*pitch;
+                    row= (float *)(slice+ colPitch);
+                    float val_pm= row[(i)*N+V] ;
+                    colPitch= (jm)*pitch;
+                    row= (float *)(slice+ colPitch);
+                    float val_mm= row[(i)*N+V] ;
+
+                    shifted_derivs_aug[1][2][V]= 0.5*(val_pp - val_mp)/d_spc[1];
+                    shifted_derivs_dim[1][2][V]= 0.5*(val_pm - val_mm)/d_spc[1];
+                }
+            } //for V
+
+
+
+
+
+            double Cx[3];
+            double Cxd[3];
+
+            for (unsigned int d = 0; d < 3; ++d) //derivative direction
+            {
+                double GradMag = 0.0;
+                double GradMag_d = 0.0;
+                for (unsigned int V = 3; V < N; ++V)
+                {
+                    GradMag += dx_forward[d][V]*dx_forward[d][V];
+                    GradMag_d += dx_backward[d][V]*dx_backward[d][V];
+
+
+                    for (unsigned int d2 = 0; d2 < 3; ++d2) //offset direction
+                    {
+                        if (d2 != d)
+                        {
+                            double dx_aug= shifted_derivs_aug[d2][d][V];
+                            double dx_dim= shifted_derivs_dim[d2][d][V];
+
+                            GradMag   += 0.25 * (dx[d2][V] + dx_aug) * (dx[d2][V] + dx_aug);
+                            GradMag_d += 0.25 * (dx[d2][V] + dx_dim) * (dx[d2][V] + dx_dim);
+                        }
+                    }
+                }
+                if (m_K == 0.0)
+                {
+                    Cx[d] = 0.0;
+                    Cxd[d] = 0.0;
+                }
+                else
+                {
+                    Cx[d] = exp(GradMag / m_K);
+                    Cxd[d] = exp(GradMag_d / m_K);
+                }
+            }
+
+            double delta;
+            for (unsigned int V = 0; V < 5; ++V)
+            {
+                delta = 0;
+
+                for (unsigned int d = 0; d < 3; ++d)
+                {
+                    dx_forward[d][V] *= Cx[d];
+                    dx_backward[d][V] *= Cxd[d];
+                    delta += dx_forward[d][V] - dx_backward[d][V];
+                }
+
+                row_update_img[i*N+V]= deltaT* delta;
+            }
+        }
+    }
+}
+
+
+
+__global__ void
+CopyNecessary_kernel(cudaPitchedPtr input_img, cudaPitchedPtr output_img)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+        if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2] )
+        {
+            size_t input_imgpitch= input_img.pitch;
+            size_t input_imgslicePitch= input_imgpitch*d_sz[1]*k;
+            size_t input_imgcolPitch= j*input_imgpitch;
+            char * input_img_ptr= (char *)(input_img.ptr);
+            char * slice_input_img= input_img_ptr+  input_imgslicePitch;
+            float * row_input_img= (float *)(slice_input_img+ input_imgcolPitch);
+
+            size_t output_imgpitch= output_img.pitch;
+            size_t output_imgslicePitch= output_imgpitch*d_sz[1]*k;
+            size_t output_imgcolPitch= j*output_imgpitch;
+            char * output_img_ptr= (char *)(output_img.ptr);
+            char * slice_output_img= output_img_ptr+  output_imgslicePitch;
+            float * row_output_img= (float *)(slice_output_img+ output_imgcolPitch);
+
+
+            row_output_img[3*i+0] =row_input_img[5*i+0];
+            row_output_img[3*i+1] =row_input_img[5*i+1];
+            row_output_img[3*i+2] =row_input_img[5*i+2];
+        }
+    }
+}
+
+__global__ void
+ZeroOut_kernel(cudaPitchedPtr img)
+{
+    uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint kk = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int k=PER_SLICE*kk;k<PER_SLICE*kk+PER_SLICE;k++)
+    {
+        if( j <d_sz[1] && k<d_sz[2] )
+        {
+            size_t imgpitch= img.pitch;
+            size_t imgslicePitch= imgpitch*d_sz[1]*k;
+            size_t imgcolPitch= j*imgpitch;
+            char * img_ptr= (char *)(img.ptr);
+            char * slice_img= img_ptr+  imgslicePitch;
+            char * row_img= (char *)(slice_img+ imgcolPitch);
+
+            if(i==0)
+            {
+                for(int ma=0;ma<imgpitch;ma++)
+                    row_img[ma]=0;
+            }
+
+
+        }
+    }
+}
+
+__global__ void sum3DArray(double* data, double* result, int size) {
+    //int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // Grid-striding loop for arrays larger than the grid size
+   // for (int i = idx; i < size; i += blockDim.x * gridDim.x)
+    //{
+      //  atomicAdd(result, data[i]);
+    //}
+
+    if(blockIdx.x==0 &&threadIdx.x ==0)
+    {
+        result[0]=0;
+        for(int i=0;i<size;i++)
+            result[0]+=data[i];
+    }
+}
+
+void AnisotropicSmoothField_cuda(cudaPitchedPtr field,
+                                 cudaPitchedPtr TR_img,cudaPitchedPtr FA_img,
+                                 int3 data_sz,float3 data_spc,
+                                 float data_d00,  float data_d01,float data_d02,float data_d10,float data_d11,float data_d12,float data_d20,float data_d21,float data_d22,
+                                 float3 data_orig,
+                                 cudaPitchedPtr output )
+{
+    float h_d_dir[]= {data_d00,data_d01,data_d02,data_d10,data_d11,data_d12,data_d20,data_d21,data_d22};
+    gpuErrchk(cudaMemcpyToSymbol(d_dir, &h_d_dir, 9 * sizeof(float)));
+
+    float h_d_orig[]= {data_orig.x,data_orig.y,data_orig.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_orig, &h_d_orig, 3 * sizeof(float)));
+
+    float h_d_spc[]= {data_spc.x,data_spc.y,data_spc.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_spc, &h_d_spc, 3 * sizeof(float)));
+
+    int h_d_sz[]= {data_sz.x,data_sz.y,data_sz.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
+
+
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    while(gridSize.x *gridSize.y *gridSize.z >1024)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
+
+
+    float max_val_field , min_val_field;
+    {
+        float* dev_out;
+        float out;
+        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+        ScalarFindMax<<<gSize, bSize>>>((float *)field.ptr, field.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+        cudaDeviceSynchronize();
+        ScalarFindMax<<<1, bSize>>>(dev_out, gSize, dev_out);
+        cudaDeviceSynchronize();
+
+        cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+        cudaFree(dev_out);
+        max_val_field=out;
+    }
+    {
+        float* dev_out;
+        float out;
+        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+        ScalarFindMin<<<gSize, bSize>>>((float *)field.ptr, field.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+        cudaDeviceSynchronize();
+        ScalarFindMin<<<1, bSize>>>(dev_out, gSize, dev_out);
+        cudaDeviceSynchronize();
+
+        cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+        cudaFree(dev_out);
+        min_val_field=out;
+    }
+
+    ScaleImageForAnisotropicSmoothing_kernel<<< blockSize,gridSize>>>( TR_img, (max_val_field -min_val_field)/9000., min_val_field );
+    ScaleImageForAnisotropicSmoothing_kernel<<< blockSize,gridSize>>>( FA_img, (max_val_field -min_val_field), min_val_field );
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize())
+
+    cudaPitchedPtr concat_img={0};
+    cudaExtent extent =  make_cudaExtent(5*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
+    cudaMalloc3D(&concat_img, extent);
+    //cudaMemset3D(concat_img, 0,extent);
+    ZeroOut_kernel<<< blockSize,gridSize>>>(concat_img);
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+    ConcatImagesForAnisotropicSmoothing_kernel<<< blockSize,gridSize>>>( field,TR_img,FA_img, concat_img);
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+    int Niter=30;
+    double Kond=(max_val_field-min_val_field)*0.7;
+    float timestep=0.0625;
+
+    float *dev_deltaT;
+    cudaMalloc((void**)&dev_deltaT, sizeof(float));
+    cudaMemcpy(dev_deltaT, &timestep, sizeof(float), cudaMemcpyHostToDevice);
+
+
+    cudaExtent extent2 =  make_cudaExtent(sizeof(double)*data_sz.x,data_sz.y,data_sz.z);
+    cudaPitchedPtr grad_sq_img={0};
+    cudaMalloc3D(&grad_sq_img, extent2);
+
+    cudaPitchedPtr update_img={0};
+    cudaMalloc3D(&update_img, extent);
+
+
+    for(int iter=0;iter<Niter;iter++)
+    {
+       // cudaMemset3D(grad_sq_img,0,extent2);
+        ZeroOut_kernel<<< blockSize,gridSize>>>(grad_sq_img);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+       // cudaMemset3D(update_img,0,extent);
+        ZeroOut_kernel<<< blockSize,gridSize>>>(update_img);
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+        ComputeAverageSquaredGradientImage_kernel<<< blockSize,gridSize>>>(concat_img, grad_sq_img );
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+        double out;
+        {
+            double* dev_out;
+
+            cudaMalloc((void**)&dev_out, sizeof(double)*gSize);
+
+            ScalarFindSum<<<gSize, bSize>>>((double *)grad_sq_img.ptr, grad_sq_img.pitch/sizeof(double)*data_sz.y*data_sz.z,dev_out);
+            cudaDeviceSynchronize();
+            ScalarFindSum<<<1, bSize>>>(dev_out, gSize, dev_out);
+            cudaDeviceSynchronize();
+
+            cudaMemcpy(&out, dev_out, sizeof(double), cudaMemcpyDeviceToHost);
+            cudaFree(dev_out);
+        }
+
+        double avg_grad_sq = out/data_sz.x/data_sz.y/data_sz.z;
+        double mK = avg_grad_sq * Kond * Kond * -2.;
+
+
+        //std::cout<<out<< " " << avg_grad_sq<< " " << mK << std::endl;
+
+        double *dev_mK;
+        cudaMalloc((void**)&dev_mK, sizeof(double));
+        cudaMemcpy(dev_mK, &mK, sizeof(double), cudaMemcpyHostToDevice);
+
+        ComputeAnisotropicFilteringUpdate_kernel<<< blockSize,gridSize>>>(concat_img, dev_mK,dev_deltaT,update_img  );
+        gpuErrchk(cudaPeekAtLastError());
+        gpuErrchk(cudaDeviceSynchronize());
+
+        AddImages_cuda(concat_img, update_img , concat_img,data_sz,5);
+        cudaFree(dev_mK);
+    }
+
+
+    CopyNecessary_kernel<<< blockSize,gridSize>>>(concat_img, output );
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+    cudaFree(update_img.ptr);
+    cudaFree(grad_sq_img.ptr);
+    cudaFree(dev_deltaT);
+    cudaFree(concat_img.ptr);
+
+
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+}
 
 #endif
+
+
+
+
+
+
+
+/*
+    {
+
+        const int Ncomp=3;
+        using ConcatenatedImagePixelType= itk::Vector<float,Ncomp>;
+        using ConcatenatedImageType = itk::Image<ConcatenatedImagePixelType,3>;
+        using ImageType3D= itk::Image<float,3>;
+        using ImageType4D= itk::Image<float,4>;
+
+
+        ImageType3D::SizeType sz2;
+        sz2[0]= data_sz.x;
+        sz2[1]= data_sz.y;
+        sz2[2]= data_sz.z;
+        ImageType3D::IndexType start;
+        start.Fill(0);
+        ImageType3D::RegionType reg(start,sz2);
+
+        ImageType3D::PointType orig;
+        orig[0]= data_orig.x;
+        orig[1]= data_orig.y;
+        orig[2]= data_orig.z;
+
+        ImageType3D::SpacingType spc;
+        spc[0]= data_spc.x;
+        spc[1]= data_spc.y;
+        spc[2]= data_spc.z;
+
+        float * itk_image_data2 = new float[(long)sz2[0]*sz2[1]*sz2[2]*Ncomp];
+        copy3DPitchedPtrToHost(output,itk_image_data2,Ncomp*sz2[0],sz2[1],sz2[2]);
+
+
+        ConcatenatedImageType::PixelType* itk_image_data = (ConcatenatedImageType::PixelType*)itk_image_data2 ;
+
+        typedef itk::ImportImageFilter< ConcatenatedImageType::PixelType , 3 >   ImportFilterType;
+        ImportFilterType::Pointer importFilter = ImportFilterType::New();
+        importFilter->SetRegion( reg );
+        importFilter->SetOrigin( orig );
+        importFilter->SetSpacing( spc );
+
+
+        const bool importImageFilterWillOwnTheBuffer = true;
+        importFilter->SetImportPointer( itk_image_data, (long)sz2[0]*sz2[1]*sz2[2]*Ncomp,    importImageFilterWillOwnTheBuffer );
+        importFilter->Update();
+        ConcatenatedImageType::Pointer itk_image_float= importFilter->GetOutput();
+
+        ConcatenatedImageType::IndexType ind3;
+        ind3[0]=9;ind3[1]=15;ind3[2]=10;
+        std::cout<<itk_image_float->GetPixel(ind3)<<std::endl;
+        using WrType = itk::ImageFileWriter<ConcatenatedImageType>;
+        WrType::Pointer aa =WrType::New();
+        aa->SetFileName("/qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/src/tools/Test/aaabbbb_gpu.nii");
+        aa->SetInput(itk_image_float);
+        aa->Update();
+
+        exit(0);
+    }
+*/
+
+
+

@@ -228,6 +228,40 @@ float ComputeMetric_CCSK(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Point
 }
 
 
+float ComputeMetric_MSQ(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img,
+                       CUDAIMAGE::Pointer &updateFieldF, CUDAIMAGE::Pointer &updateFieldM)
+
+{
+    updateFieldF = CUDAIMAGE::New();
+    updateFieldF->sz=up_img->sz;
+    updateFieldF->dir=up_img->dir;
+    updateFieldF->orig=up_img->orig;
+    updateFieldF->spc=up_img->spc;
+    updateFieldF->components_per_voxel= 3;
+    updateFieldF->Allocate();
+
+    updateFieldM = CUDAIMAGE::New();
+    updateFieldM->sz=up_img->sz;
+    updateFieldM->dir=up_img->dir;
+    updateFieldM->orig=up_img->orig;
+    updateFieldM->spc=up_img->spc;
+    updateFieldM->components_per_voxel= 3;
+    updateFieldM->Allocate();
+
+
+    float metric_value;
+
+    ComputeMetric_MSQ_cuda(up_img->getFloatdata(), down_img->getFloatdata(),
+                          up_img->sz, up_img->spc,
+                          up_img->dir(0,0),up_img->dir(0,1),up_img->dir(0,2),up_img->dir(1,0),up_img->dir(1,1),up_img->dir(1,2),up_img->dir(2,0),up_img->dir(2,1),up_img->dir(2,2),
+                          updateFieldF->getFloatdata(), updateFieldM->getFloatdata(),
+                          metric_value
+                          );
+
+    return metric_value;
+
+}
+
 
 
 float ComputeMetric_CC(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img,

@@ -2485,6 +2485,89 @@ void ComputeMetric_CCSK_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cud
 
 
 
+__global__ void
+ComputeMetric_MSQ_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
+                        cudaPitchedPtr updateFieldF, cudaPitchedPtr updateFieldM,
+                        cudaPitchedPtr metric_img)
+{
+
+    uint ii = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
+    uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
+    uint k = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
+
+    for(int i=PER_GROUP*ii;i<PER_GROUP*ii+PER_GROUP;i++)
+    {
+        if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2])
+        {
+            float updateF[3]={0,0,0};
+            float updateM[3]={0,0,0};
+
+            {
+                size_t pitch= up_img.pitch;
+                char *metric_ptr= (char *)(metric_img.ptr);
+                char *up_ptr= (char *)(up_img.ptr);
+                char *down_ptr= (char *)(down_img.ptr);
+
+                size_t slicePitch= pitch*d_sz[1]*k;
+                size_t colPitch= j*pitch;
+
+                char * slice_M= metric_ptr+  slicePitch;
+                float * row_M= (float *)(slice_M+ colPitch);
+
+                size_t uslicePitch= pitch*d_sz[1]*k;
+                size_t ucolPitch= j*pitch;
+                char * slice_u= up_ptr+  uslicePitch;
+                float * row_up= (float *)(slice_u+ ucolPitch);
+                char * slice_d= down_ptr+  uslicePitch;
+                float * row_down= (float *)(slice_d+ ucolPitch);
+
+                float val1=row_up[i];
+                float val2=row_down[i];
+
+                float K =(val1-val2);
+                row_M[i]= K*K;
+
+                float3 gradI= ComputeImageGradient(up_img,i,j,k);
+                float3 gradJ= ComputeImageGradient(down_img,i,j,k);
+
+                updateF[0] = 2*K * gradI.x;
+                updateF[1] = 2*K * gradI.y;
+                updateF[2] = 2*K * gradI.z;
+                updateM[0] = -2*K * gradJ.x;
+                updateM[1] = -2*K * gradJ.y;
+                updateM[2] = -2*K * gradJ.z;
+            }
+
+
+            size_t upitch= updateFieldF.pitch;
+            size_t uslicePitch= upitch*d_sz[1]*k;
+            size_t ucolPitch= j*upitch;
+            char *uf_ptr= (char *)(updateFieldF.ptr);
+            char * slice_uf= uf_ptr+  uslicePitch;
+            float * row_uf= (float *)(slice_uf+ ucolPitch);
+
+            size_t dpitch= updateFieldM.pitch;
+            size_t dslicePitch= dpitch*d_sz[1]*k;
+            size_t dcolPitch= j*dpitch;
+            char *df_ptr= (char *)(updateFieldM.ptr);
+            char * slice_df= df_ptr+  dslicePitch;
+            float * row_df= (float *)(slice_df+ dcolPitch);
+
+
+            row_uf[3*i]= updateF[0];
+            row_uf[3*i+1]= updateF[1];
+            row_uf[3*i+2]= updateF[2];
+
+            row_df[3*i]= updateM[0];
+            row_df[3*i+1]= updateM[1];
+            row_df[3*i+2]= updateM[2];
+
+        }
+    }
+}
+
+
+
 
 
 
@@ -2646,6 +2729,70 @@ ComputeMetric_CC_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     }
 }
 
+
+void ComputeMetric_MSQ_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
+                           int3 data_sz, float3 data_spc,
+                           float d00,float d01,float d02,float d10,float d11,float d12,float d20,float d21,float d22,
+                           cudaPitchedPtr updateFieldF, cudaPitchedPtr updateFieldM,
+                           float &metric_value)
+
+{
+    float h_d_dir[]= {d00,d01,d02,d10,d11,d12,d20,d21,d22};
+    gpuErrchk(cudaMemcpyToSymbol(d_dir, &h_d_dir, 9 * sizeof(float)));
+    float h_d_spc[]= {data_spc.x,data_spc.y,data_spc.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_spc, &h_d_spc, 3 * sizeof(float)));
+    int h_d_sz[]= {data_sz.x,data_sz.y,data_sz.z};
+    gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
+
+    cudaPitchedPtr metric_image={0};
+    cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
+    cudaMalloc3D(&metric_image, extent);
+    cudaMemset3D(metric_image,0,extent);
+
+
+    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
+    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
+    while(gridSize.x *gridSize.y *gridSize.z >450)
+    {
+        blockSize.x*=2;
+        blockSize.y*=2;
+        blockSize.z*=2;
+        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
+    }
+
+
+    ComputeMetric_MSQ_kernel<<< blockSize,gridSize>>>(up_img,down_img, updateFieldF, updateFieldM, metric_image );
+    gpuErrchk(cudaPeekAtLastError());
+    gpuErrchk(cudaDeviceSynchronize());
+
+    float* dev_out;
+    float out;
+    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+
+    ScalarFindSum<<<gSize, bSize>>>((float *)metric_image.ptr, metric_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
+    cudaDeviceSynchronize();
+    ScalarFindSum<<<1, bSize>>>(dev_out, gSize, dev_out);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
+    cudaFree(dev_out);
+    metric_value=out/data_sz.x/data_sz.y/data_sz.z;
+    metric_value= sqrt(metric_value);
+
+    cudaFree(metric_image.ptr);
+}
+
+
+
+
+
+
+
+
+
+
+
+
 void ComputeMetric_CC_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                              int3 data_sz, float3 data_spc,
                              float d00,float d01,float d02,float d10,float d11,float d12,float d20,float d21,float d22,
@@ -2695,7 +2842,6 @@ void ComputeMetric_CC_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     metric_value=out/data_sz.x/data_sz.y/data_sz.z;
 
     cudaFree(metric_image.ptr);
-
 }
 
 void ComputeDetImg_cuda(cudaPitchedPtr img, cudaPitchedPtr field,

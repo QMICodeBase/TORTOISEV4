@@ -56,7 +56,7 @@ int main( int argc , char * argv[] )
     if(argc<2)    
     {
         std::cout<<"Usage:   InvertTransformation   full_path_to_transformation_file "<<std::endl;
-        return 0;
+        return EXIT_FAILURE;
     }
 
     std::string currdir;

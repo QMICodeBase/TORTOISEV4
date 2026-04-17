@@ -19,8 +19,6 @@ CUDAIMAGE::~CUDAIMAGE()
     {
         cudaFree(this->PitchedFloatData.ptr);
         this->PitchedFloatData.ptr=nullptr;
-
-
     }
 }
 

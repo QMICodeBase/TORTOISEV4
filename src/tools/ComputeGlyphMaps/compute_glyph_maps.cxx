@@ -45,7 +45,13 @@ float FA_thr;
 ImageType4D::Pointer dti_image;
 ImageType4D::SizeType sz;
 
+ImageType3D::Pointer underlay_img;
+
 int slice_view=2;
+
+bool disp_ax=1;
+bool disp_sag=1;
+bool disp_cor=1;
 
 std::vector< vtkSmartPointer<vtkImageActor> > image_actors[3];
 std::vector< vtkSmartPointer<vtkActor> > actors[3];
@@ -72,6 +78,7 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
      vtkSmartPointer<vtkImageActor> image_actor_z = vtkSmartPointer<vtkImageActor>::New();
 
     //axis 2
+    if(disp_ax)
     {
         vtkSmartPointer<vtkImageData> imageData =  vtkSmartPointer<vtkImageData>::New();
         imageData->SetDimensions(sz[0],sz[1],1);
@@ -89,15 +96,19 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
 
         int counter=0;
         ImageType4D::IndexType ind4;
+        ImageType3D::IndexType ind3;
         ind4[2]=sl_numbers[2];
+        ind3[2]=sl_numbers[2];
 
         double max_FA=-1;
         for(int j=0;j<sz[1];j++)
         {
             ind4[1]=j;
+            ind3[1]=j;
             for(int i=0;i<sz[0];i++)
             {
                 ind4[0]=i;
+                ind3[0]=i;
 
                 InternalMatrixType mat;
                 ind4[3]=0;
@@ -132,7 +143,12 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
 
 
                 float* pixelfR = static_cast<float*>(imageData->GetScalarPointer(i,sz[1]-j-1,0));
-                pixelfR[0]= FAf  *255;
+                if(underlay_img)
+                {
+                    pixelfR[0]= underlay_img->GetPixel(ind3)*255;
+                }
+                else
+                    pixelfR[0]= FAf  *255;
 
                 if(FAf>max_FA)
                     max_FA=FAf;
@@ -193,6 +209,7 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
 
 
      //axis 0
+    if(disp_sag)
      {
          vtkSmartPointer<vtkImageData> imageData =  vtkSmartPointer<vtkImageData>::New();
          imageData->SetDimensions(1,sz[1],sz[2]);
@@ -210,15 +227,22 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
 
          int counter=0;
          ImageType4D::IndexType ind4;
+         ImageType3D::IndexType ind3;
          ind4[0]=sl_numbers[0];
+         ind3[0]=sl_numbers[0];
+
 
          double max_FA=-1;
          for(int k=0;k<sz[2];k++)
          {
              ind4[2]=k;
+             ind3[2]=k;
+
              for(int j=0;j<sz[1];j++)
              {
                  ind4[1]=j;
+                 ind3[0]=j;
+
 
                  InternalMatrixType mat;
                  ind4[3]=0;
@@ -253,7 +277,12 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
 
 
                  float* pixelfR = static_cast<float*>(imageData->GetScalarPointer(0,sz[1]-j-1,k));
-                 pixelfR[0]= FAf  *255;
+                 if(underlay_img)
+                 {
+                     pixelfR[0]= underlay_img->GetPixel(ind3)*255;
+                 }
+                 else
+                     pixelfR[0]= FAf  *255;
 
                  if(FAf>max_FA)
                      max_FA=FAf;
@@ -314,6 +343,7 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
 
 
      //axis 1
+     if(disp_cor)
      {
          vtkSmartPointer<vtkImageData> imageData2 =  vtkSmartPointer<vtkImageData>::New();
          imageData2->SetDimensions(sz[0],1,sz[2]);
@@ -331,15 +361,19 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
 
          int counter=0;
          ImageType4D::IndexType ind4;
+         ImageType3D::IndexType ind3;
          ind4[1]=sl_numbers[1];
+         ind3[1]=sl_numbers[1];
 
          double max_FA=-1;
          for(int k=0;k<sz[2];k++)
          {
              ind4[2]=k;
+             ind3[2]=k;
              for(int i=0;i<sz[0];i++)
              {
                  ind4[0]=i;
+                 ind3[0]=i;
 
                  InternalMatrixType mat;
                  ind4[3]=0;
@@ -374,7 +408,12 @@ void MyRender(vtkSmartPointer<vtkRenderer> renderer, vtkSmartPointer<vtkRenderWi
 
 
                  float* pixelfR = static_cast<float*>(imageData2->GetScalarPointer(i,0,k));
-                 pixelfR[0]= FAf  *255;
+                 if(underlay_img)
+                 {
+                     pixelfR[0]= underlay_img->GetPixel(ind3)*255;
+                 }
+                 else
+                     pixelfR[0]= FAf  *255;
 
                  if(FAf>max_FA)
                      max_FA=FAf;
@@ -520,7 +559,21 @@ public:
     {
         slice_view = (slice_view+1)%3;
         MyRender(renderer,renderWindow);
-
+    }
+    if (key == "a")
+    {
+        disp_ax=!disp_ax;
+        MyRender(renderer,renderWindow);
+    }
+    if (key == "c")
+    {
+        disp_cor=!disp_cor;
+        MyRender(renderer,renderWindow);
+    }
+    if (key == "s")
+    {
+        disp_sag=!disp_sag;
+        MyRender(renderer,renderWindow);
     }
 
     renderWindow->Render();
@@ -539,23 +592,44 @@ int main(int argc, char *argv[])
 {
     if(argc<2)
     {
-        std::cout<<"Usage: ComputeGlyphMaps  full_path_to_tensor_NIFTI_file  max_FA_to_threshold (optional.Default:0.3)"<<std::endl;
+        std::cout<<"Usage: ComputeGlyphMaps  full_path_to_tensor_NIFTI_file  max_FA_to_threshold (optional.Default:0.3) under_img(optional. Default:FA)"<<std::endl;
         return 0;
     }
 
     std::cout<<"Use the up/down/left/arrow arrow keys and PageUp/PageDown to change slices..."<<std::endl;
     std::cout<<"Rotate with Left-mouse, zooom in-out with right mouse..."<<std::endl;
     std::cout<<"Drag with Shift+Left mouse..."<<std::endl;
+    std::cout<<std::endl<<"a/c/s to disable/reenable axial/coronal/sagittal views"<<std::endl;
+
     std::cout<<"A screenshot will be taken when you close the VTK window..."<<std::endl;
 
 
 
+    underlay_img=nullptr;
 
     vtkObject::GlobalWarningDisplayOff();
 
     FA_thr=0.3;
     if(argc>2)
         FA_thr=atof(argv[2]);
+    if(argc>3)
+    {
+        underlay_img=readImageD<ImageType3D>(argv[3]);
+        itk::ImageRegionIteratorWithIndex<ImageType3D> it(underlay_img,underlay_img->GetLargestPossibleRegion());
+        double mx=-1E10;
+        for(it.GoToBegin();!it.IsAtEnd();++it)
+        {
+            if(it.Get()>mx)
+                mx=it.Get();
+        }
+        if(mx!=0)
+        {
+            for(it.GoToBegin();!it.IsAtEnd();++it)
+            {
+                it.Set(it.Get()/mx);
+            }
+        }
+    }
 
 
 

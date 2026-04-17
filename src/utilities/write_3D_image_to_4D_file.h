@@ -8,7 +8,7 @@
 #include <stdio.h>
 //#include "itkNiftiImageIOHeader.h"
 //#include "itkNiftiImageIOHeaderFactory.h"
-
+#include "itkImageFileWriter.h"
 
 template<typename PixelType>
 void write_3D_image_to_4D_file(typename itk::Image<PixelType,3>::Pointer img, std::string filename, int curr_vol, int total_vols )

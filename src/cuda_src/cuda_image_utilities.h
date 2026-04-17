@@ -16,6 +16,18 @@
 */
 
 
+
+
+CUDAIMAGE::Pointer AnisotropicSmoothField(CUDAIMAGE::Pointer field, CUDAIMAGE::Pointer TR_img, CUDAIMAGE::Pointer FA_img );
+void AnisotropicSmoothField_cuda(cudaPitchedPtr field,
+                                 cudaPitchedPtr TR_img,cudaPitchedPtr FA_img,
+                        int3 data_sz,float3 data_res,
+                        float data_d00,  float data_d01,float data_d02,float data_d10,float data_d11,float data_d12,float data_d20,float data_d21,float data_d22,
+                        float3 data_orig,
+                        cudaPitchedPtr output );
+
+
+
 std::vector<CUDAIMAGE::Pointer> ComputeImageGradientImg(CUDAIMAGE::Pointer img);
 void  ComputeImageGradient_cuda(cudaPitchedPtr img, const int3 data_sz, const float3 data_spc,
                                 float data_d00,  float data_d01,float data_d02,float data_d10,float data_d11,float data_d12,float data_d20,float data_d21,float data_d22,

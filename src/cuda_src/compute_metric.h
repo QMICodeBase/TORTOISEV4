@@ -97,6 +97,17 @@ void ComputeMetric_CCSK_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cud
 
 
 
+float ComputeMetric_MSQ(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img,
+                       CUDAIMAGE::Pointer &updateFieldF, CUDAIMAGE::Pointer &updateFieldM
+                       );
+void ComputeMetric_MSQ_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
+                           int3 data_sz, float3 data_spc,
+                           float d00,float d01,float d02,float d10,float d11,float d12,float d20,float d21,float d22,
+                           cudaPitchedPtr updateFieldF, cudaPitchedPtr updateFieldM,
+                           float &metric_value
+                           );
+
+
 
 
 float ComputeMetric_CC(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer down_img,

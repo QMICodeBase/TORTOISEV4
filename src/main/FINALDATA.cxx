@@ -1776,7 +1776,21 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
             if(data_names[1]!="")
             {
                 temp_data.insert(temp_data.end(), all_final_data[1].begin(),all_final_data[1].end());
-                temp_weights.insert(temp_weights.end(), all_final_weight_imgs[1].begin(),all_final_weight_imgs[1].end());
+                if(all_final_weight_imgs[1].size())
+                    temp_weights.insert(temp_weights.end(), all_final_weight_imgs[1].begin(),all_final_weight_imgs[1].end());
+                else
+                {
+                    using DupType= itk::ImageDuplicator<ImageType3D>;
+                    DupType::Pointer dup= DupType::New();
+                    dup->SetInputImage(all_final_weight_imgs[0][0]);
+                    dup->Update();
+                    ImageType3D::Pointer dum_weight_img = dup->GetOutput();
+                    dum_weight_img->FillBuffer(1);
+                    for(int vv=0;vv<all_final_data[1].size();vv++)
+                    {
+                        temp_weights.push_back(dum_weight_img);
+                    }
+                }
             }
             temp_bmat.set_size(temp_data.size(),6);
             temp_bmat.update(all_bmats[0],0,0);
@@ -1920,7 +1934,8 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
             synth_imgs.resize(Nvols[PE]);
 
             #pragma omp parallel for
-            for(int vol=0;vol<Nvols[PE];vol++)
+            for(int vol=0;vol<all_final_weight_imgs[PE].size();vol++)
+            //for(int vol=0;vol<Nvols[PE];vol++)
             {
                 TORTOISE::EnableOMPThread();
 
@@ -1974,7 +1989,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                     {
                         ImageType3D::IndexType ind3= it.GetIndex();
                         int Ncount=0;
-                        for(int vv=0;vv<Nvols[PE];vv++)
+                        for(int vv=0;vv<all_final_weight_imgs[PE].size();vv++)
                         {
                             if(all_final_weight_imgs[PE][vv]->GetPixel(ind3)> THR)
                                 Ncount++;
@@ -2007,7 +2022,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
 
 
             #pragma omp parallel for
-            for(int vol=0;vol<Nvols[PE];vol++)
+            for(int vol=0;vol<all_final_inclusion_imgs[PE].size();vol++)
             {
                 TORTOISE::EnableOMPThread();
 
@@ -2065,7 +2080,7 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
                         else
                         {
                             //get noise from a similar image for the background
-                            for(int v2=0;v2<Nvols[PE];v2++)
+                            for(int v2=0;v2<all_final_data[PE].size();v2++)
                             {
                                 if( fabs(bvals[vol]-bvals[dists[v2].second])<10)
                                 {
@@ -2243,7 +2258,8 @@ std::vector< std::vector<ImageType3D::Pointer> >  FINALDATA::GenerateTransformed
             std::string new_synth_name=  this->temp_folder + "/" + basename + "_final_temp_synth.nii";
             for(int v=0;v<Nvols[PE];v++)
             {
-                write_3D_image_to_4D_file<float>(synth_imgs[v],new_synth_name,v,Nvols[PE]);
+                if(synth_imgs[v])
+                    write_3D_image_to_4D_file<float>(synth_imgs[v],new_synth_name,v,Nvols[PE]);
             }
         }//for PE
     } //if repol

@@ -34,16 +34,6 @@ GaussianSmoothImageRow_kernel(cudaPitchedPtr data, cudaPitchedPtr output ,int Nc
 
      if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2])
      {
-         /*
-         if(i==100 && j==100&& k==60)
-         {
-             printf("%d %d %d\n",blockDim.x,blockDim.y,blockDim.z );
-             printf("%d %d %d\n",gridDim.x,gridDim.y,gridDim.z );
-         }
-         if(blockIdx.x!=0)
-             printf("%d \n", blockIdx.x);
-             */
-
          size_t dpitch= data.pitch;
          size_t dslicePitch= dpitch*d_sz[1]*k;
          size_t dcolPitch= j*dpitch;
