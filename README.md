@@ -158,15 +158,12 @@ cd ..
 #### 5) ITK installation
 
 ```
-wget https://github.com/InsightSoftwareConsortium/ITK/releases/download/v5.3rc04/InsightToolkit-5.3rc04.tar.gz
-tar -xvf InsightToolkit-5.3rc04.tar.gz
-mkdir InsightToolkit-5.3rc04_build
-cd InsightToolkit-5.3rc04_build
+wget https://github.com/InsightSoftwareConsortium/ITK/releases/download/v6.0b02/InsightData-6.0b02.tar.gz
+tar -xvf InsightData-6.0b02.tar.gz
+mkdir InsightData-6.0b02_build
+cd InsightData-6.0b02_build
 
-sed -i 's/this->m_SparseGetValueAndDerivativeThreader->SetMaximumNumberOfThreads(number);/this->m_SparseGetValueAndDerivativeThreader->SetMaximumNumberOfThreads(number);this->m_SparseGetValueAndDerivativeThreader->SetNumberOfWorkUnits(number);/g' ../InsightToolkit-5.3rc04/Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx
-sed -i 's/this->m_DenseGetValueAndDerivativeThreader->SetMaximumNumberOfThreads(number);/this->m_DenseGetValueAndDerivativeThreader->SetMaximumNumberOfThreads(number);this->m_DenseGetValueAndDerivativeThreader->SetNumberOfWorkUnits(number);/g' ../InsightToolkit-5.3rc04/Modules/Registration/Metricsv4/include/itkImageToImageMetricv4.hxx
-
-cmake ../InsightToolkit-5.3rc04
+cmake ../InsightData-6.0b02
 make -j 16
 cd ..
 ```
@@ -180,7 +177,7 @@ wget https://www.vtk.org/files/release/9.4/VTK-9.4.2.tar.gz
 tar -xvf  VTK-9.4.2.tar.gz
 mkdir VTK-9.4.2_build
 cd VTK-9.4.2_build
-cmake ../VTK-9.4.2
+cmake -DITK_USE_SYSTEM_EIGEN:BOOL=ON ../VTK-9.4.2
 make -j 16
 cd ..
 ```
@@ -195,17 +192,17 @@ cd TORTOISEV4/TORTOISEV4
 ```
 For nonCUDA version:
 ```
-cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build  
+cmake . -D USECUDA=0 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightData-6.0b02_build 
 ```
 
 For CUDA version:
 ```
-cmake . -D USECUDA=1 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build
+cmake . -D USECUDA=1 -D USE_VTK=0 -D ITK_DIR=../../libraries/InsightData-6.0b02_build
 ```
 
-For ComputeGlyphMaps executable version:
+For ComputeGlyphMaps and WarpMesh executable version:
 ```
-cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightToolkit-5.3rc04_build -D VTK_DIR=../../libraries/VTK-9.4.2_build
+cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightData-6.0b02_build  -D VTK_DIR=../../libraries/VTK-9.4.2_build
 ```
 
 Then,
