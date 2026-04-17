@@ -163,7 +163,7 @@ tar -xvf InsightData-6.0b02.tar.gz
 mkdir InsightData-6.0b02_build
 cd InsightData-6.0b02_build
 
-cmake ../InsightData-6.0b02
+cmake -DITK_USE_SYSTEM_EIGEN:BOOL=ON ../InsightData-6.0b02
 make -j 16
 cd ..
 ```
@@ -177,7 +177,7 @@ wget https://www.vtk.org/files/release/9.4/VTK-9.4.2.tar.gz
 tar -xvf  VTK-9.4.2.tar.gz
 mkdir VTK-9.4.2_build
 cd VTK-9.4.2_build
-cmake -DITK_USE_SYSTEM_EIGEN:BOOL=ON ../VTK-9.4.2
+cmake  ../VTK-9.4.2
 make -j 16
 cd ..
 ```
