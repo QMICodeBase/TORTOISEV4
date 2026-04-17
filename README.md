@@ -158,10 +158,10 @@ cd ..
 #### 5) ITK installation
 
 ```
-wget https://github.com/InsightSoftwareConsortium/ITK/releases/download/v6.0b02/InsightData-6.0b02.tar.gz
-tar -xvf InsightData-6.0b02.tar.gz
-mkdir InsightData-6.0b02_build
-cd InsightData-6.0b02_build
+wget https://github.com/InsightSoftwareConsortium/ITK/releases/download/v6.0b02/InsightToolkit-6.0b02.tar.gz
+tar -xvf InsightToolkit-6.0b02.tar.gz
+mkdir InsightToolkit-6.0b02_build
+cd InsightToolkit-6.0b02_build
 
 cmake -DITK_USE_SYSTEM_EIGEN:BOOL=ON ../InsightData-6.0b02
 make -j 16
