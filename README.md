@@ -210,6 +210,10 @@ Then,
 make -j 16
 cd ..
 export PATH=${PATH}:$(pwd)/bin
+export PATH=${PATH}:$(pwd)/bin/DRTAMAS
+
+echo "export PATH=${PATH}:$(pwd)/bin" >~/.bashrc
+echo "export PATH=${PATH}:$(pwd)/bin/DRTAMAS" >~/.bashrc
 ```
 
 # TORTOISEV4 Usage examples
