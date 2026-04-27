@@ -80,7 +80,7 @@ Windows Subsystem for Linux (WSL)  enables users to call Linux executables under
 2) Make sure docker works with:  docker run hello-world
 3) Download TORTOISEV4 Docker image:
 ```
-docker pull eurotomania/tortoise:latest
+docker pull eurotomania/tortoise:latest --platform linux/amd64
 ```
 4) Make sure TORTOISE runs fine:
 ```
