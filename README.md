@@ -128,7 +128,6 @@ Install CUDA to default location at /usr/local/cuda
 For debian systems:
 ```
 sudo apt-get update -y
-sudo apt-get install -y fftw3
 sudo apt-get install libfftw3-dev
 ```
 
