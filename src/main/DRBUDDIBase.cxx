@@ -93,8 +93,8 @@ void DRBUDDIBase::CreateBlipUpQuadImage()
     b0_up_ref_img->SetRegions(nreg);
 
     int pad=16;
-    if(parser->getDisableInitRigid())
-        pad=0;
+    //if(parser->getDisableInitRigid())
+      //  pad=0;
 
     ind[0]=-pad/2;
     ind[1]=-pad/2;

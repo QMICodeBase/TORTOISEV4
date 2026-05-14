@@ -538,244 +538,264 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
     itk::IdentityTransform<double,3>::Pointer  id=itk::IdentityTransform<double,3>::New();
     id->SetIdentity();
 
-    std::vector<ImageType3D::Pointer> imgs;
+    RigidTransformType::Pointer final_trans =nullptr;
 
-    double val_diffeo_first;
-    RigidTransformType::Pointer diffeo_first_rigid_trans=nullptr;
-
-    const int Niter=3;
+    if(parser->getRigidForHeavilyDistorted())
     {
-        ImageType3D::Pointer new_img=nullptr;
-        for(int iter=0; iter<Niter;iter++)
+        std::vector<ImageType3D::Pointer> imgs;
+
+        double val_diffeo_first;
+        RigidTransformType::Pointer diffeo_first_rigid_trans=nullptr;
+
+        const int Niter=2;
         {
-            diffeo_first_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, diffeo_first_rigid_trans, val_diffeo_first,new_img);
+            ImageType3D::Pointer new_img=nullptr;
+            for(int iter=0; iter<Niter;iter++)
+            {
+                diffeo_first_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, diffeo_first_rigid_trans, val_diffeo_first,new_img);
+            }
+            imgs.push_back(new_img);
+            std::cout<<"Diffeo first similarity: " << val_diffeo_first<<std::endl;
         }
-        imgs.push_back(new_img);
-        std::cout<<"Diffeo first similarity: " << val_diffeo_first<<std::endl;
+
+
+        double val_translation_diffeo;
+        RigidTransformType::Pointer translation_diffeo_rigid_trans=nullptr;
+        RigidTransformType::Pointer translation_trans=nullptr;
+
+        {
+            float val_CC_tr, val_MI_tr;
+
+            RigidTransformType::Pointer rigid_CC= TranslationRegisterImages(b0_up_img,b0_down_img,"CC");
+            RigidTransformType::Pointer rigid_MI= TranslationRegisterImages(b0_up_img,b0_down_img,"MI");
+
+            {
+
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(rigid_CC);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_CC_tr= metric->GetValue();
+            }
+            {
+                using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(rigid_MI);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_MI_tr= metric->GetValue();
+            }
+
+            if(val_CC_tr<val_MI_tr)
+            {
+                translation_diffeo_rigid_trans=rigid_CC;
+                translation_trans=rigid_CC;
+            }
+            else
+            {
+                translation_diffeo_rigid_trans=rigid_MI;
+                translation_trans=rigid_MI;
+            }
+
+            ImageType3D::Pointer new_img=nullptr;
+            for(int iter=0; iter<Niter;iter++)
+            {
+                translation_diffeo_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, translation_diffeo_rigid_trans, val_translation_diffeo,new_img);
+            }
+            imgs.push_back(new_img);
+
+            std::cout<<"Translation+Diffeo  similarity: " << val_translation_diffeo<<std::endl;
+            std::cout<<"Translation+Diffeo  trans: " << translation_diffeo_rigid_trans->GetParameters()<<std::endl;
+        }
+
+
+        double val_translation_rigid_diffeo;
+        RigidTransformType::Pointer translation_rigid_diffeo_rigid_trans=nullptr;
+        {
+            float val_CC_rigid, val_MI_rigid;
+
+            RigidTransformType::Pointer rigid_CC=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"CC",0.4,0,translation_trans);
+            RigidTransformType::Pointer rigid_MI=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"MI",0.4,0,translation_trans);
+
+            {
+
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(rigid_CC);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_CC_rigid= metric->GetValue();
+            }
+            {
+                using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(rigid_MI);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_MI_rigid= metric->GetValue();
+            }
+
+            if(val_CC_rigid<val_MI_rigid)
+                translation_rigid_diffeo_rigid_trans=rigid_CC;
+            else
+                translation_rigid_diffeo_rigid_trans=rigid_MI;
+
+            ImageType3D::Pointer new_img=nullptr;
+            for(int iter=0; iter<Niter;iter++)
+            {
+                translation_rigid_diffeo_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, translation_rigid_diffeo_rigid_trans, val_translation_rigid_diffeo,new_img);
+            }
+            imgs.push_back(new_img);
+
+            std::cout<<"Translation+Rigid+Diffeo  similarity: " << val_translation_rigid_diffeo<<std::endl;
+            std::cout<<"Translation+Rigid+Diffeo  trans: " << translation_rigid_diffeo_rigid_trans->GetParameters()<<std::endl;
+        }
+
+
+
+        double val_rigid_diffeo;
+        RigidTransformType::Pointer rigid_diffeo_rigid_trans=nullptr;
+        {
+            float val_CC_rigid, val_MI_rigid;
+
+            RigidTransformType::Pointer rigid_CC=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"CC",0.4);
+            RigidTransformType::Pointer rigid_MI=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"MI",0.4);
+
+            {
+
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(rigid_CC);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_CC_rigid= metric->GetValue();
+            }
+            {
+                using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(rigid_MI);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_MI_rigid= metric->GetValue();
+            }
+
+            if(val_CC_rigid<val_MI_rigid)
+                rigid_diffeo_rigid_trans=rigid_CC;
+            else
+                rigid_diffeo_rigid_trans=rigid_MI;
+
+            ImageType3D::Pointer new_img=nullptr;
+            for(int iter=0; iter<Niter;iter++)
+            {
+                rigid_diffeo_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, rigid_diffeo_rigid_trans, val_rigid_diffeo,new_img);
+            }
+            imgs.push_back(new_img);
+
+            std::cout<<"Rigid+Diffeo  similarity: " << val_rigid_diffeo<<std::endl;
+            std::cout<<"Rigid+Diffeo  trans: " << rigid_diffeo_rigid_trans->GetParameters()<<std::endl;
+        }
+
+
+
+        std::vector<double> vals;
+        std::vector<RigidTransformType::Pointer> rigids;
+
+        vals.push_back(val_diffeo_first);
+        vals.push_back(val_translation_diffeo);
+        vals.push_back(val_translation_rigid_diffeo);
+        vals.push_back(val_rigid_diffeo);
+
+        rigids.push_back(diffeo_first_rigid_trans);
+        rigids.push_back(translation_diffeo_rigid_trans);
+        rigids.push_back(translation_rigid_diffeo_rigid_trans);
+        rigids.push_back(rigid_diffeo_rigid_trans);
+
+        auto it = std::min_element(vals.begin(), vals.end());
+        int index = std::distance(vals.begin(), it);
+
+        final_trans= rigids[index];
+        initial_corrected_b0= imgs[index];
+    }
+    else
+    {
+        double val_rigid_diffeo;
+        RigidTransformType::Pointer rigid_diffeo_rigid_trans=nullptr;
+        {
+            RigidTransformType::Pointer rigid_CC=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"CC",parser->getRigidLR());
+
+
+            ImageType3D::Pointer new_img=nullptr;
+            final_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, rigid_diffeo_rigid_trans, val_rigid_diffeo,new_img);
+            initial_corrected_b0=new_img;
+        }
     }
 
 
-    double val_translation_diffeo;
-    RigidTransformType::Pointer translation_diffeo_rigid_trans=nullptr;
-    RigidTransformType::Pointer translation_trans=nullptr;
-
-    {
-        float val_CC_tr, val_MI_tr;
-
-        RigidTransformType::Pointer rigid_CC= TranslationRegisterImages(b0_up_img,b0_down_img,"CC");
-        RigidTransformType::Pointer rigid_MI= TranslationRegisterImages(b0_up_img,b0_down_img,"MI");
-
-        {
-
-            ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
-            resampleFilter->SetOutputParametersFromImage(b0_up_img);
-            resampleFilter->SetInput(b0_down_img);
-            resampleFilter->SetTransform(rigid_CC);
-            resampleFilter->Update();
-            ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
-
-            using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
-            MetricType::Pointer metric = MetricType::New();
-
-            metric->SetFixedImage(b0_up_img);
-            metric->SetMovingImage(b0_down_on_up_temp);
-            metric->SetMovingTransform(id);
-            metric->SetFixedTransform(id);
-            metric->Initialize();
-            val_CC_tr= metric->GetValue();
-        }
-        {
-            using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
-            ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
-            resampleFilter->SetOutputParametersFromImage(b0_up_img);
-            resampleFilter->SetInput(b0_down_img);
-            resampleFilter->SetTransform(rigid_MI);
-            resampleFilter->Update();
-            ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
-
-
-            using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
-            MetricType::Pointer metric = MetricType::New();
-
-            metric->SetFixedImage(b0_up_img);
-            metric->SetMovingImage(b0_down_on_up_temp);
-            metric->SetMovingTransform(id);
-            metric->SetFixedTransform(id);
-            metric->Initialize();
-            val_MI_tr= metric->GetValue();
-        }
-
-        if(val_CC_tr<val_MI_tr)
-        {
-            translation_diffeo_rigid_trans=rigid_CC;
-            translation_trans=rigid_CC;
-        }
-        else
-        {
-            translation_diffeo_rigid_trans=rigid_MI;
-            translation_trans=rigid_MI;
-        }
-
-        ImageType3D::Pointer new_img=nullptr;
-        for(int iter=0; iter<Niter;iter++)
-        {
-            translation_diffeo_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, translation_diffeo_rigid_trans, val_translation_diffeo,new_img);
-        }
-        imgs.push_back(new_img);
-
-        std::cout<<"Translation+Diffeo  similarity: " << val_translation_diffeo<<std::endl;
-        std::cout<<"Translation+Diffeo  trans: " << translation_diffeo_rigid_trans->GetParameters()<<std::endl;
-    }
-
-
-    double val_translation_rigid_diffeo;
-    RigidTransformType::Pointer translation_rigid_diffeo_rigid_trans=nullptr;
-    {
-        float val_CC_rigid, val_MI_rigid;
-
-        RigidTransformType::Pointer rigid_CC=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"CC",0.4,0,translation_trans);
-        RigidTransformType::Pointer rigid_MI=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"MI",0.4,0,translation_trans);
-
-        {
-
-            ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
-            resampleFilter->SetOutputParametersFromImage(b0_up_img);
-            resampleFilter->SetInput(b0_down_img);
-            resampleFilter->SetTransform(rigid_CC);
-            resampleFilter->Update();
-            ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
-
-            using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
-            MetricType::Pointer metric = MetricType::New();
-
-            metric->SetFixedImage(b0_up_img);
-            metric->SetMovingImage(b0_down_on_up_temp);
-            metric->SetMovingTransform(id);
-            metric->SetFixedTransform(id);
-            metric->Initialize();
-            val_CC_rigid= metric->GetValue();
-        }
-        {
-            using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
-            ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
-            resampleFilter->SetOutputParametersFromImage(b0_up_img);
-            resampleFilter->SetInput(b0_down_img);
-            resampleFilter->SetTransform(rigid_MI);
-            resampleFilter->Update();
-            ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
-
-            using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
-            MetricType::Pointer metric = MetricType::New();
-
-            metric->SetFixedImage(b0_up_img);
-            metric->SetMovingImage(b0_down_on_up_temp);
-            metric->SetMovingTransform(id);
-            metric->SetFixedTransform(id);
-            metric->Initialize();
-            val_MI_rigid= metric->GetValue();
-        }
-
-        if(val_CC_rigid<val_MI_rigid)
-            translation_rigid_diffeo_rigid_trans=rigid_CC;
-        else
-            translation_rigid_diffeo_rigid_trans=rigid_MI;
-
-        ImageType3D::Pointer new_img=nullptr;
-        for(int iter=0; iter<Niter;iter++)
-        {
-            translation_rigid_diffeo_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, translation_rigid_diffeo_rigid_trans, val_translation_rigid_diffeo,new_img);
-        }
-        imgs.push_back(new_img);
-
-        std::cout<<"Translation+Rigid+Diffeo  similarity: " << val_translation_rigid_diffeo<<std::endl;
-        std::cout<<"Translation+Rigid+Diffeo  trans: " << translation_rigid_diffeo_rigid_trans->GetParameters()<<std::endl;
-    }
-
-
-
-    double val_rigid_diffeo;
-    RigidTransformType::Pointer rigid_diffeo_rigid_trans=nullptr;
-    {
-        float val_CC_rigid, val_MI_rigid;
-
-        RigidTransformType::Pointer rigid_CC=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"CC",0.4);
-        RigidTransformType::Pointer rigid_MI=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"MI",0.4);
-
-        {
-
-            ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
-            resampleFilter->SetOutputParametersFromImage(b0_up_img);
-            resampleFilter->SetInput(b0_down_img);
-            resampleFilter->SetTransform(rigid_CC);
-            resampleFilter->Update();
-            ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
-
-            using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
-            MetricType::Pointer metric = MetricType::New();
-
-            metric->SetFixedImage(b0_up_img);
-            metric->SetMovingImage(b0_down_on_up_temp);
-            metric->SetMovingTransform(id);
-            metric->SetFixedTransform(id);
-            metric->Initialize();
-            val_CC_rigid= metric->GetValue();
-        }
-        {
-            using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
-            ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
-            resampleFilter->SetOutputParametersFromImage(b0_up_img);
-            resampleFilter->SetInput(b0_down_img);
-            resampleFilter->SetTransform(rigid_MI);
-            resampleFilter->Update();
-            ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
-
-            using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
-            MetricType::Pointer metric = MetricType::New();
-
-            metric->SetFixedImage(b0_up_img);
-            metric->SetMovingImage(b0_down_on_up_temp);
-            metric->SetMovingTransform(id);
-            metric->SetFixedTransform(id);
-            metric->Initialize();
-            val_MI_rigid= metric->GetValue();
-        }
-
-        if(val_CC_rigid<val_MI_rigid)
-            rigid_diffeo_rigid_trans=rigid_CC;
-        else
-            rigid_diffeo_rigid_trans=rigid_MI;
-
-        ImageType3D::Pointer new_img=nullptr;
-        for(int iter=0; iter<Niter;iter++)
-        {
-            rigid_diffeo_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, rigid_diffeo_rigid_trans, val_rigid_diffeo,new_img);
-        }
-        imgs.push_back(new_img);
-
-        std::cout<<"Rigid+Diffeo  similarity: " << val_rigid_diffeo<<std::endl;
-        std::cout<<"Rigid+Diffeo  trans: " << rigid_diffeo_rigid_trans->GetParameters()<<std::endl;
-    }
-
-
-
-    std::vector<double> vals;
-    std::vector<RigidTransformType::Pointer> rigids;
-
-    vals.push_back(val_diffeo_first);
-    vals.push_back(val_translation_diffeo);
-    vals.push_back(val_translation_rigid_diffeo);
-    vals.push_back(val_rigid_diffeo);
-
-    rigids.push_back(diffeo_first_rigid_trans);
-    rigids.push_back(translation_diffeo_rigid_trans);
-    rigids.push_back(translation_rigid_diffeo_rigid_trans);
-    rigids.push_back(rigid_diffeo_rigid_trans);
-
-    auto it = std::min_element(vals.begin(), vals.end());
-    int index = std::distance(vals.begin(), it);
-
-    RigidTransformType::Pointer final_trans= rigids[index];
-    initial_corrected_b0= imgs[index];
 
     std::cout <<"Final trans: " << final_trans->GetParameters()<<std::endl;
 
@@ -863,6 +883,8 @@ void DRBUDDI::Step1_RigidRegistration()
     // also generate the kind of corrected b0 image for further registration with the structural images
     RigidTransformType::Pointer down_to_up_rigid_trans=nullptr;
     ImageType3D::Pointer initial_corrected_b0=this->b0_up_quad;
+
+    /*
     if(parser->getDisableInitRigid())
     {
         down_to_up_rigid_trans=RigidTransformType::New();
@@ -873,6 +895,8 @@ void DRBUDDI::Step1_RigidRegistration()
         //down_to_up_rigid_trans = RigidDiffeoRigidRegisterB0DownToB0Up(this->b0_up_quad,this->b0_down,"CC",initial_corrected_b0);
         down_to_up_rigid_trans = RigidDiffeoRigidRegisterB0DownToB0Up(this->b0_up_quad,this->b0_down,"MI",initial_corrected_b0);
     }
+*/
+    down_to_up_rigid_trans = RigidDiffeoRigidRegisterB0DownToB0Up(this->b0_up_quad,this->b0_down,"MI",initial_corrected_b0);
 
     writeImageD<ImageType3D>(initial_corrected_b0,proc_folder+"/b0_str_registration_target.nii");
 

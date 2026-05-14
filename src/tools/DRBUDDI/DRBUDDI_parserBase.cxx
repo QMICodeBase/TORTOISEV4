@@ -186,13 +186,23 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         this->AddOption( option );
     }
     {
+        std::string description = std::string("Turn on rigid registration for HEAVILY distorted data? Computationally more expensive.")  ;
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "DRBUDDI_rigid_for_heavily_distorted");
+        option->SetDescription( description );
+        option->SetModule(6);
+        this->AddOption( option );
+    }
+
+    /*
+    {
         std::string description = std::string("DRBUDDI performs an initial registration between the up and down data. This registration starts with rigid, followed by a quick diffeomorphic and finalized by another rigid. This parameter, when set to 1 disables all these registrations. Default: 0")  ;
         OptionType::Pointer option = OptionType::New();
         option->SetLongName( "DRBUDDI_disable_initial_rigid");
         option->SetDescription( description );
         option->SetModule(6);
         this->AddOption( option );
-    }
+    }    
     {
         std::string description = std::string("DRBUDDI performs an initial registration between the up and down data. This registration starts with rigid, followed by a quick diffeomorphic and finalized by another rigid. This parameter, when set to 1 disables the very initial rigid registration and starts with the quick diffemorphic. This is helpful with VERY DISTORTED data, for which the initial rigid registration is problematic. Default: 0")  ;
         OptionType::Pointer option = OptionType::New();
@@ -201,6 +211,7 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         option->SetModule(6);
         this->AddOption( option );
     }
+*/
     {
         std::string description = std::string("Similarity Metric to be used in rigid registration. Options: MI or CC. Default: MI")  ;
         OptionType::Pointer option = OptionType::New();
@@ -209,6 +220,7 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         option->SetModule(6);
         this->AddOption( option );
     }
+
     {
         std::string description = std::string("Rigid metric learning rate: Default:0.25")  ;
         OptionType::Pointer option = OptionType::New();
@@ -296,6 +308,15 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
     }
 }
 
+
+bool DRBUDDI_PARSERBASE::getRigidForHeavilyDistorted()
+{
+    OptionType::Pointer option = this->GetOption( "DRBUDDI_rigid_for_heavily_distorted");
+    if(option->GetNumberOfFunctions())
+        return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
+    else
+        return false;
+}
 
 bool DRBUDDI_PARSERBASE::getNOGradWarp()
 {
@@ -498,7 +519,7 @@ std::string DRBUDDI_PARSERBASE::GetInitialMINV()
        return std::string("");
 
 }
-
+/*
 bool DRBUDDI_PARSERBASE::getDisableInitRigid()
 {
     OptionType::Pointer option = this->GetOption( "DRBUDDI_disable_initial_rigid");
@@ -517,6 +538,9 @@ bool DRBUDDI_PARSERBASE::getStartWithDiffeo()
     else
         return 0;
 }
+*/
+
+
 bool DRBUDDI_PARSERBASE::getEstimateLRPerIteration()
 {
     OptionType::Pointer option = this->GetOption( "DRBUDDI_estimate_LR_per_iteration");
@@ -531,6 +555,7 @@ bool DRBUDDI_PARSERBASE::getEstimateLRPerIteration()
 #endif
 }
 
+
 std::string  DRBUDDI_PARSERBASE::getRigidMetricType()
 {
     OptionType::Pointer option = this->GetOption( "DRBUDDI_rigid_metric_type");
@@ -539,6 +564,8 @@ std::string  DRBUDDI_PARSERBASE::getRigidMetricType()
     else
         return std::string("CC");
 }
+
+
 float  DRBUDDI_PARSERBASE::getRigidLR()
 {
     OptionType::Pointer option = this->GetOption( "DRBUDDI_rigid_learning_rate");

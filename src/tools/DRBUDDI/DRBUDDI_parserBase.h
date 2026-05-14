@@ -22,14 +22,15 @@ public:
     std::string getDRBUDDIOutput();
     int getDRBUDDIStep();
 
-    std::string getGradNonlinInput();
-  //  void setGradNonlinInput(std::string fname);
+    std::string getGradNonlinInput();  
     bool getGradNonlinIsGE();
     std::string getGradNonlinGradWarpDim();
     bool getNOGradWarp();
 
-    bool getDisableInitRigid();
-    bool getStartWithDiffeo();
+    bool getRigidForHeavilyDistorted();
+
+    //bool getDisableInitRigid();
+    //bool getStartWithDiffeo();
     std::string  getRigidMetricType();
     float  getRigidLR();
     int getDWIBvalue();

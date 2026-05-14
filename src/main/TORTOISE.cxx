@@ -462,8 +462,8 @@ void TORTOISE::UpdateSettingsFromCommandLine()
     RegistrationSettings::get().setValue<std::string>("drift",parser->getDrift());
 
     RegistrationSettings::get().setValue<std::string>("epi",parser->getEPI());
-    RegistrationSettings::get().setValue<bool>("DRBUDDI_disable_initial_rigid",parser->getDisableInitRigid());
-    RegistrationSettings::get().setValue<bool>("DRBUDDI_start_with_diffeomorphic_for_rigid_reg",parser->getStartWithDiffeo());
+    //RegistrationSettings::get().setValue<bool>("DRBUDDI_disable_initial_rigid",parser->getDisableInitRigid());
+    //RegistrationSettings::get().setValue<bool>("DRBUDDI_start_with_diffeomorphic_for_rigid_reg",parser->getStartWithDiffeo());
     RegistrationSettings::get().setValue<std::string>("DRBUDDI_rigid_metric_type",parser->getRigidMetricType());
     RegistrationSettings::get().setValue<float>("DRBUDDI_rigid_metric_learning_rate",parser->getRigidLR());
     RegistrationSettings::get().setValue<int>("DRBUDDI_DWI_bval_tensor_fitting",parser->getDWIBvalue());

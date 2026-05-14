@@ -401,32 +401,20 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
     m->SetNumberOfHistogramBins(40);
     m->SetMaximumNumberOfWorkUnits(NITK);
 
-
-
     typedef itk::CorrelationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType2;
     MetricType2::Pointer m2= MetricType2::New();
     m2->SetMaximumNumberOfWorkUnits(NITK);
-
-    typedef itk::ANTSNeighborhoodCorrelationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType4;
-    MetricType4::Pointer m3= MetricType4::New();
-    MetricType4::RadiusType rad; rad.Fill(4);
-    m3->SetMaximumNumberOfWorkUnits(NITK);
-    m3->SetRadius(rad);
-
 
 
     using MetricType =itk::ImageToImageMetricv4<ImageType3D,ImageType3D> ;
     MetricType::Pointer         metric        = nullptr;
     if(metric_type=="CC")
         metric=m2;
-    else if(metric_type=="CC2")
-        metric=m3;
     else
         metric=m;
 
     RigidTransformType::Pointer initial_transform = RigidTransformType::New();
     initial_transform->SetIdentity();
-
     initial_transform->SetComputeZYX(true);
 
 
@@ -571,6 +559,7 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
     RigidTransformType::Pointer final_trans = const_cast<RigidTransformType *>(rigidRegistration->GetOutput()->Get() );
     return final_trans;
 }
+
 
 
 
