@@ -197,6 +197,12 @@ IF(USECUDA)
              "../src/tools/DRTAMAS/DRTAMAS_create_template_nonsmoothlast.bash"
              "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS/DRTAMAS_create_template_nonsmoothlast.bash"
     )
+    add_custom_command(
+        TARGET DRTAMAS_cuda POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+             "../src/tools/DRTAMAS/DRTAMAS_external_registration_with_constraint.bash"
+             "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS/DRTAMAS_external_registration_with_constraint.bash"
+    )
 
 
 ELSE(USECUDA)

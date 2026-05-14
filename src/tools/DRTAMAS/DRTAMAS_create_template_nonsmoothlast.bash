@@ -764,7 +764,17 @@ do
     if [ $count -lt ${Niter}  ]
     then
         echo "Deleting existing transformations..."
-        rm ${listdir}/*def_MINV.nii ${listdir}/*_diffeo.nii ${listdir}/*_mid2* ${listdir}/*cnstr.nii
+        for (( ns=0; ns<$nsubjects; ns++ ))
+        do
+
+            curr_id=$((ns))
+            subj=${subjects_list[$curr_id]}
+    
+            filename=$(basename "${subj}")
+            extension="${filename##*.}"
+            filename="${filename%.*}"
+            rm ${listdir}/${filename}*def_MINV.nii ${listdir}/${filename}*_diffeo.nii ${listdir}/${filename}*_mid2* ${listdir}/${filename}*cnstr.nii
+        done
     fi
     
  
