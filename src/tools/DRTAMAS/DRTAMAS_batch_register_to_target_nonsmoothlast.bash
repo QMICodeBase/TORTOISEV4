@@ -187,7 +187,7 @@ done
 gcnt=0
 gpuid=0
 
-NGPUs=`nvidia-smi -L | wc -l`
+NGPUs=`nvidia-smi -L | grep -v Display | wc -l`
 echo "Using ${NGPUs} GPUs"
 
 

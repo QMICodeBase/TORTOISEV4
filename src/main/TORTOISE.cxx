@@ -1113,7 +1113,7 @@ void TORTOISE::AlignB0ToReorientation()
         RigidTransformType::Pointer rigid_trans=nullptr;
         (*stream)<<"R1: "<< params1<<std::endl;
         (*stream)<<"R2: "<< params2<<std::endl;
-        (*stream)<<"MI vs CC diff: "<< diff<<std::endl;
+        (*stream)<<"CC vs MI diff: "<< diff<<std::endl;
 
 
         if(diff<0.005)
@@ -1153,17 +1153,52 @@ void TORTOISE::AlignB0ToReorientation()
                 new_metric_type="CC";
             }
 
-            if(diff1<0.001)
+            if(diff1< diff2)
             {
-                b1[0]= (params1[0] - b1[0])/2.;
-                b1[1]= (params1[1] - b1[1])/2.;
-                b1[2]= (params1[2] - b1[2])/2.;
-                b1[3]= (params1[3] );
-                b1[4]= (params1[4] );
-                b1[5]= (params1[5] );
-                rigid_trans1->SetParameters(b1);
+                if(diff1<0.001)
+                {
+                    b1[0]= (params1[0] - b1[0])/2.;
+                    b1[1]= (params1[1] - b1[1])/2.;
+                    b1[2]= (params1[2] - b1[2])/2.;
+                    b1[3]= (params1[3] );
+                    b1[4]= (params1[4] );
+                    b1[5]= (params1[5] );
+                    rigid_trans1->SetParameters(b1);
 
-                b0_to_str_trans= RigidRegisterImagesEuler( target_img,  b0_img, "CC",parser->getRigidLR(),true, rigid_trans1);
+                    b0_to_str_trans= RigidRegisterImagesEuler( target_img,  b0_img, "CC",parser->getRigidLR(),true, rigid_trans1);
+                }
+                else
+                {
+                    if(diff2<0.001)
+                    {
+                        b2[0]= (params2[0] - b2[0])/2.;
+                        b2[1]= (params2[1] - b2[1])/2.;
+                        b2[2]= (params2[2] - b2[2])/2.;
+                        b2[3]= (params2[3] );
+                        b2[4]= (params2[4] );
+                        b2[5]= (params2[5] );
+                        rigid_trans2->SetParameters(b2);
+
+                        b0_to_str_trans= RigidRegisterImagesEuler( target_img,  b0_img, "MI",parser->getRigidLR(),true,rigid_trans2);
+                    }
+                    else
+                    {
+
+                        std::vector<float> new_res; new_res.resize(3);
+                        new_res[0]= b0_img->GetSpacing()[0] * 2;
+                        new_res[1]= b0_img->GetSpacing()[1] * 2;
+                        new_res[2]= b0_img->GetSpacing()[2] * 2;
+                        std::vector<float> dummy;
+                        ImageType3D::Pointer b02= resample_3D_image(b0_img,new_res,dummy,"Linear");
+                        new_res[0]= target_img->GetSpacing()[0] * 2;
+                        new_res[1]= target_img->GetSpacing()[1] * 2;
+                        new_res[2]= target_img->GetSpacing()[2] * 2;
+                        ImageType3D::Pointer str2= resample_3D_image(target_img,new_res,dummy,"Linear");
+
+                        rigid_trans1=MultiStartRigidSearch(str2,b02,new_metric_type);
+                        b0_to_str_trans= RigidRegisterImagesEuler( target_img, b0_img, new_metric_type  ,parser->getRigidLR()/2.,rigid_trans1);
+                    }
+                }
             }
             else
             {
@@ -1181,22 +1216,39 @@ void TORTOISE::AlignB0ToReorientation()
                 }
                 else
                 {
+                    if(diff1<0.001)
+                    {
+                        b1[0]= (params1[0] - b1[0])/2.;
+                        b1[1]= (params1[1] - b1[1])/2.;
+                        b1[2]= (params1[2] - b1[2])/2.;
+                        b1[3]= (params1[3] );
+                        b1[4]= (params1[4] );
+                        b1[5]= (params1[5] );
+                        rigid_trans1->SetParameters(b1);
 
-                    std::vector<float> new_res; new_res.resize(3);
-                    new_res[0]= b0_img->GetSpacing()[0] * 2;
-                    new_res[1]= b0_img->GetSpacing()[1] * 2;
-                    new_res[2]= b0_img->GetSpacing()[2] * 2;
-                    std::vector<float> dummy;
-                    ImageType3D::Pointer b02= resample_3D_image(b0_img,new_res,dummy,"Linear");
-                    new_res[0]= target_img->GetSpacing()[0] * 2;
-                    new_res[1]= target_img->GetSpacing()[1] * 2;
-                    new_res[2]= target_img->GetSpacing()[2] * 2;
-                    ImageType3D::Pointer str2= resample_3D_image(target_img,new_res,dummy,"Linear");
+                        b0_to_str_trans= RigidRegisterImagesEuler( target_img,  b0_img, "CC",parser->getRigidLR(),true, rigid_trans1);
+                    }
 
-                    rigid_trans1=MultiStartRigidSearch(str2,b02,new_metric_type);
-                    b0_to_str_trans= RigidRegisterImagesEuler( target_img, b0_img, new_metric_type  ,parser->getRigidLR()/2.,rigid_trans1);
+                    else
+                    {
+                        std::vector<float> new_res; new_res.resize(3);
+                        new_res[0]= b0_img->GetSpacing()[0] * 2;
+                        new_res[1]= b0_img->GetSpacing()[1] * 2;
+                        new_res[2]= b0_img->GetSpacing()[2] * 2;
+                        std::vector<float> dummy;
+                        ImageType3D::Pointer b02= resample_3D_image(b0_img,new_res,dummy,"Linear");
+                        new_res[0]= target_img->GetSpacing()[0] * 2;
+                        new_res[1]= target_img->GetSpacing()[1] * 2;
+                        new_res[2]= target_img->GetSpacing()[2] * 2;
+                        ImageType3D::Pointer str2= resample_3D_image(target_img,new_res,dummy,"Linear");
+
+                        rigid_trans1=MultiStartRigidSearch(str2,b02,new_metric_type);
+                        b0_to_str_trans= RigidRegisterImagesEuler( target_img, b0_img, new_metric_type  ,parser->getRigidLR()/2.,rigid_trans1);
+                    }
                 }
             }
+
+
         }
         (*stream)<<"Final transformation: " << b0_to_str_trans->GetParameters()<<std::endl;
 

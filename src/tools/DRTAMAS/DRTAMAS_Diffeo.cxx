@@ -346,12 +346,14 @@ void DRTAMAS_Diffeo::SetDefaultStages()
             if(parser->getNoSmoothingLastStage())
             {
                 curr_stage.learning_rate=0.4;
-                curr_stage.update_gaussian_sigma=0.25;                
+                curr_stage.update_gaussian_sigma=0.25;
+                curr_stage.total_gaussian_sigma=0;
             }
             else
             {
                 curr_stage.learning_rate=0.4;
                 curr_stage.update_gaussian_sigma=2.5;
+                curr_stage.total_gaussian_sigma=0;
             }
 
             DRTAMASMetric metric2;
