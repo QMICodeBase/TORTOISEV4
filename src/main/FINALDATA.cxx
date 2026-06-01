@@ -199,6 +199,56 @@ ImageType3D::Pointer FINALDATA::GenerateFirstStructural()
             target_img= read_3D_volume_from_4D(this->data_names[0],0);
     }
 
+    typedef itk::ResampleImageFilter<ImageType3D, ImageType3D> ResamplerType;
+    {
+        ImageType3D::DirectionType dir = target_img->GetDirection();
+        double sm=0;
+        for(int r=0;r<3;r++)
+            for(int c=0;c<3;c++)
+            {
+                if(fabs(dir(r,c))<0.5)
+                {
+                    sm+=fabs(dir(r,c));
+                    dir(r,c)=0;
+                }
+                else
+                {
+                    if(dir(r,c)>0)
+                        dir(r,c)=1;
+                    else
+                        dir(r,c)=-1;
+                }
+            }
+
+
+        if(sm> 1E-4)  //oblique
+        {
+            ImageType3D::Pointer temp_img = ImageType3D::New();
+            temp_img->SetRegions(target_img->GetLargestPossibleRegion());
+            temp_img->SetSpacing(target_img->GetSpacing());
+            temp_img->SetOrigin(target_img->GetOrigin());
+            temp_img->SetDirection(dir);
+
+            typedef itk::BSplineInterpolateImageFunction<ImageType3D, double, double> InterpolatorType;
+            InterpolatorType::Pointer interp = InterpolatorType::New();
+            interp->SetSplineOrder(3);
+
+            typedef itk::IdentityTransform<double, 3> TransformType;
+            TransformType::Pointer id_trans= TransformType::New();
+            id_trans->SetIdentity();
+
+
+            ResamplerType::Pointer resampler= ResamplerType::New();
+            resampler->SetTransform(id_trans);
+            resampler->SetInput(target_img);
+            resampler->SetInterpolator(interp);
+            resampler->SetOutputParametersFromImage(temp_img);
+            resampler->Update();
+            target_img= resampler->GetOutput();
+        }
+    }
+
+
     if(output_orientation!="")
     {
         target_img= ReorientImage3D(target_img, "", output_orientation);
@@ -354,7 +404,7 @@ ImageType3D::Pointer FINALDATA::GenerateFirstStructural()
     InterpolatorType::Pointer interp = InterpolatorType::New();
     interp->SetSplineOrder(3);
 
-    typedef itk::ResampleImageFilter<ImageType3D, ImageType3D> ResamplerType;
+
     ResamplerType::Pointer resampler= ResamplerType::New();
     resampler->SetTransform(id_trans);
     resampler->SetInput(target_img);

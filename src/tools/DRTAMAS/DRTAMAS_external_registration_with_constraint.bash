@@ -208,6 +208,8 @@ do
     cp `dirname ${subj}`/${filename}_orig.nii  ${listdir}/temp_registration/${filename}.${extension}                        
     echo ${filename}.${extension} >> ${listdir}/temp_registration/subjs.txt
 done
+
+template=`realpath ${template}`
 cd ${listdir}/temp_registration
 
 
@@ -217,8 +219,10 @@ cp ${template} ${listdir}/temp_registration/internal_template.nii
 
 
 bash DRTAMAS_create_template_nonsmoothlast.bash -s=${listdir}/temp_registration/subjs.txt -c=1
-DRTAMAS_cuda -f ${listdir}/temp_registration/internal_template.nii -m ${listdir}/temp_registration/average_template_diffeo_6.nii --only_rigid 1
-mv ${listdir}/temp_registration/average_template_diffeo_6_aff.nii ${listdir}/temp_registration/external_template.nii
+mv ${listdir}/temp_registration/average_template_diffeo_6.nii ${listdir}/temp_registration/external_template.nii
+#DRTAMAS_cuda -f ${listdir}/temp_registration/internal_template.nii -m ${listdir}/temp_registration/average_template_diffeo_6.nii --only_rigid 1
+#mv ${listdir}/temp_registration/average_template_diffeo_6_aff.nii ${listdir}/temp_registration/external_template.nii
+#mv ${listdir}/temp_registration/average_template_diffeo_6_aff.txt ${listdir}/temp_registration/external_to_internal_aff.txt
 
 
 echo external_template.nii > templates.txt
@@ -240,9 +244,12 @@ do
    
 
     mv ${listdir}/${filename}_orig.nii ${listdir}/${filename}.nii
+    
+    echo "InvertTransformation ${listdir}/temp_registration/internal_template_aff_def_MINV_cnstr.nii"
+    InvertTransformation ${listdir}/temp_registration/internal_template_aff_def_MINV_cnstr.nii
    
-    echo "CombineTransformationsWithOutputName -out ${listdir}/temp_registration/${filename}_aff_def_MINV_cnstr_final.nii  -trans ${listdir}/temp_registration/${filename}_aff_def_MINV_cnstr.nii ${listdir}/temp_registration/external_template_aff_def_MINV_cnstr.nii" 
-    CombineTransformationsWithOutputName -out ${listdir}/temp_registration/${filename}_aff_def_MINV_cnstr_final.nii  -trans ${listdir}/temp_registration/${filename}_aff_def_MINV_cnstr.nii ${listdir}/temp_registration/external_template_aff_def_MINV_cnstr.nii
+    echo "CombineTransformationsWithOutputName -out ${listdir}/temp_registration/${filename}_aff_def_MINV_cnstr_final.nii  -trans ${listdir}/temp_registration/${filename}_aff_def_MINV_cnstr.nii  ${listdir}/temp_registration/external_template_aff_def_MINV_cnstr.nii ${listdir}/temp_registration/internal_template_aff_def_MINV_cnstr_inv.nii" 
+    CombineTransformationsWithOutputName -out ${listdir}/temp_registration/${filename}_aff_def_MINV_cnstr_final.nii  -trans ${listdir}/temp_registration/${filename}_aff_def_MINV_cnstr.nii  ${listdir}/temp_registration/external_template_aff_def_MINV_cnstr.nii ${listdir}/temp_registration/internal_template_aff_def_MINV_cnstr_inv.nii
     
     echo ApplyTransformationToTensor ${subj} ${listdir}/temp_registration/${filename}_aff_def_MINV_cnstr_final.nii ${listdir}/temp_registration/${filename}_diffeo_final.nii ${template}
     ApplyTransformationToTensor ${subj} ${listdir}/temp_registration/${filename}_aff_def_MINV_cnstr_final.nii ${listdir}/temp_registration/${filename}_diffeo_final.nii ${template}                

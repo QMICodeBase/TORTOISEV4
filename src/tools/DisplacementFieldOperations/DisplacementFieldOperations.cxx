@@ -129,7 +129,7 @@ int main( int argc , char * argv[] )
             }
             else
             {
-                vec1=vec1*val2;
+                vec1=vec1/val2;
             }
         }
 
