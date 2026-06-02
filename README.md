@@ -123,11 +123,12 @@ cd libraries
 Follow the instructions at:  https://developer.nvidia.com/cuda-11.3.0-download-archive
 Install CUDA to default location at /usr/local/cuda
 
-#### 2) FFTW3 installation
+#### 2) FFTW3  and lz installation
 
 For debian systems:
 ```
 sudo apt-get update -y
+sudo apt install zlib1g-dev
 sudo apt-get install libfftw3-dev
 ```
 
