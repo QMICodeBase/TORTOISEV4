@@ -179,9 +179,12 @@ TORTOISE::TORTOISE(int argc, char *argv[])
     }
 
 
-    this->proc_infos.resize(2);
-    {
+    if(parser->getDownInputName()=="")
         this->proc_infos.resize(1);
+    else
+        this->proc_infos.resize(2);
+
+    {        
         std::string up_name = this->parser->getUpInputName();
         fs::path up_path(up_name);
         std::string basename= fs::path(up_path).filename().string();

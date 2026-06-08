@@ -24,7 +24,7 @@
                    main_field->orig,
                    virtual_img->sz,
                    virtual_img->spc,
-                   virtual_img->dir(0,0),main_field->dir(0,1),main_field->dir(0,2),main_field->dir(1,0),main_field->dir(1,1),main_field->dir(1,2),main_field->dir(2,0),main_field->dir(2,1),main_field->dir(2,2),
+                   virtual_img->dir(0,0),virtual_img->dir(0,1),virtual_img->dir(0,2),virtual_img->dir(1,0),virtual_img->dir(1,1),virtual_img->dir(1,2),virtual_img->dir(2,0),virtual_img->dir(2,1),virtual_img->dir(2,2),
                    virtual_img->orig,
                    main_field->components_per_voxel,
                    d_output

@@ -364,6 +364,7 @@ void DRBUDDIStage::PreprocessImagesAndFields()
         resampled_smoothed_down_images[0]=ResampleImage(resampled_smoothed_down_images[0],this->virtual_img);
         resampled_smoothed_str_images[0]= ResampleImage(resampled_smoothed_str_images[0],this->virtual_img);
 
+
         for(int m=1;m<this->settings->metrics.size();m++)
         {
             bool found=false;
@@ -419,7 +420,6 @@ void DRBUDDIStage::PreprocessImagesAndFields()
         }
 
     }
-
 
 }
 
@@ -495,7 +495,42 @@ void DRBUDDIStage::RunDRBUDDIStage()
     CurrentFieldType::Pointer prev_updateFieldF= nullptr,prev_updateFieldM= nullptr;
     CurrentFieldType::Pointer conjugateFieldF= nullptr,conjugateFieldM= nullptr;
 
-    while( iter++ < this->settings->niter && !converged )
+
+
+    ImageType3D::DirectionType D=this->resampled_smoothed_up_images[0]->GetDirection();
+    float new_phase[3];
+
+    PhaseEncodingVectorType phase_xyz;
+    #ifdef USECUDA
+        new_phase[0]= D(0,0)*up_phase_vector.x + D(0,1)*up_phase_vector.y +D(0,2)*up_phase_vector.z ;
+        new_phase[1]= D(1,0)*up_phase_vector.x + D(1,1)*up_phase_vector.y +D(1,2)*up_phase_vector.z ;
+        new_phase[2]= D(2,0)*up_phase_vector.x + D(2,1)*up_phase_vector.y +D(2,2)*up_phase_vector.z ;
+        phase_xyz.x=0;
+        phase_xyz.y=0;
+        phase_xyz.z=0;
+
+        if( (fabs(new_phase[0]) > fabs(new_phase[1]))  && (fabs(new_phase[0]) > fabs(new_phase[2])))
+            phase_xyz.x=1;
+        else if( (fabs(new_phase[1]) > fabs(new_phase[0]))  && (fabs(new_phase[1]) > fabs(new_phase[2])))
+            phase_xyz.y=1;
+        else phase_xyz.z=1;
+    #else
+        new_phase[0]= D(0,0)*up_phase_vector[0] + D(0,1)*up_phase_vector[1] +D(0,2)*up_phase_vector[2] ;
+        new_phase[1]= D(1,0)*up_phase_vector[0] + D(1,1)*up_phase_vector[1] +D(1,2)*up_phase_vector[2] ;
+        new_phase[2]= D(2,0)*up_phase_vector[0] + D(2,1)*up_phase_vector[1] +D(2,2)*up_phase_vector[2] ;
+
+        phase_xyz[0]=0;
+        phase_xyz[1]=0;
+        phase_xyz[2]=0;
+
+        if( (fabs(new_phase[0]) > fabs(new_phase[1]))  && (fabs(new_phase[0]) > fabs(new_phase[2])))
+            phase_xyz[0]=1;
+        else if( (fabs(new_phase[1]) > fabs(new_phase[0]))  && (fabs(new_phase[1]) > fabs(new_phase[2])))
+            phase_xyz[1]=1;
+        phase_xyz[2]=1;
+    #endif
+
+        while( iter++ < this->settings->niter && !converged )
     {
         CurrentFieldType::Pointer updateFieldF= nullptr,updateFieldM= nullptr;
 
@@ -560,7 +595,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
             CurrentImageType::Pointer warped_up_img = WarpImage(this->resampled_smoothed_up_images[met],tot_finv);
             CurrentImageType::Pointer warped_down_img = WarpImage(this->resampled_smoothed_down_images[met],tot_minv);
 
-            float metric_value=0;            
+            float metric_value=0;
             CurrentFieldType::Pointer  updateFieldF_temp=nullptr,updateFieldM_temp=nullptr;
 
             if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCSK)
@@ -590,8 +625,6 @@ void DRBUDDIStage::RunDRBUDDIStage()
                                                    updateFieldF_temp,  updateFieldM_temp,
                                                    this->up_phase_vector,
                                                    Goper );
-
-
             }
             if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CC)
             {
@@ -618,14 +651,16 @@ void DRBUDDIStage::RunDRBUDDIStage()
 
         } //metric loop
 
+
         updateFieldF=GaussianSmoothImage(updateFieldF,this->settings->update_gaussian_sigma);
         updateFieldM=GaussianSmoothImage(updateFieldM,this->settings->update_gaussian_sigma);
 
         if(this->settings->restrct)
         {
-            RestrictPhase(updateFieldF,this->up_phase_vector);
-            RestrictPhase(updateFieldM,this->down_phase_vector);
+            RestrictPhase(updateFieldF,phase_xyz);
+            RestrictPhase(updateFieldM,phase_xyz);
         }
+
 
         float best_lr=this->settings->learning_rate;
         float beta_f=0,beta_m=0;
@@ -742,6 +777,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
         ScaleUpdateField(conjugateFieldF,best_lr);
         ScaleUpdateField(conjugateFieldM,best_lr);
 
+
         {
             CurrentFieldType::Pointer f2midtmp=nullptr,f2midtmp_inv=nullptr;
             CurrentFieldType::Pointer m2midtmp=nullptr,m2midtmp_inv=nullptr;
@@ -816,7 +852,6 @@ void DRBUDDIStage::RunDRBUDDIStage()
         this->settings->output_finv= ComposeFields(settings->init_finv_const,this->def_FINV);
         this->settings->output_minv= ComposeFields(settings->init_minv_const,this->def_MINV);
     }
-
 }
 
 

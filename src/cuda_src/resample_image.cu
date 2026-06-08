@@ -43,14 +43,39 @@ ResampleImage_kernel(cudaPitchedPtr data, cudaPitchedPtr output ,int Ncomponents
 		char *o_ptr= (char *)(output.ptr);
 		char * slice_o= o_ptr+  oslicePitch;
 		float * row_out= (float *)(slice_o+ ocolPitch);
+
+        float D00=d_dir[0];float D01=d_dir[1];float D02=d_dir[2];
+        float D10=d_dir[3];float D11=d_dir[4];float D12=d_dir[5];
+        float D20=d_dir[6];float D21=d_dir[7];float D22=d_dir[8];
+
+        float V00=v_dir[0];float V01=v_dir[1];float V02=v_dir[2];
+        float V10=v_dir[3];float V11=v_dir[4];float V12=v_dir[5];
+        float V20=v_dir[6];float V21=v_dir[7];float V22=v_dir[8];
+
+        float V_orig_x=v_orig[0];float V_orig_y=v_orig[1];float V_orig_z=v_orig[2];
+        float D_orig_x=d_orig[0];float D_orig_y=d_orig[1];float D_orig_z=d_orig[2];
+
+        float V_spc_x=v_spc[0];float V_spc_y=v_spc[1];float V_spc_z=v_spc[2];
+        float D_spc_x=d_spc[0];float D_spc_y=d_spc[1];float D_spc_z=d_spc[2];
+
 		
-                float x= (v_dir[0]*i  + v_dir[1]*j + v_dir[2]*k)* v_spc[0] + v_orig[0] -d_orig[0];
-                float y= (v_dir[3]*i  + v_dir[4]*j + v_dir[5]*k)* v_spc[1] + v_orig[1] -d_orig[1];
-                float z= (v_dir[6]*i  + v_dir[7]*j + v_dir[8]*k)* v_spc[2] + v_orig[2] -d_orig[2];
+               // float x= (v_dir[0]*i  + v_dir[1]*j + v_dir[2]*k)* v_spc[0] + v_orig[0] -d_orig[0];
+              //  float y= (v_dir[3]*i  + v_dir[4]*j + v_dir[5]*k)* v_spc[1] + v_orig[1] -d_orig[1];
+              //  float z= (v_dir[6]*i  + v_dir[7]*j + v_dir[8]*k)* v_spc[2] + v_orig[2] -d_orig[2];
 	
-                float iw = (d_dir[0]*x  + d_dir[3]*y  + d_dir[6]*z)/ d_spc[0] ;
-                float jw = (d_dir[1]*x  + d_dir[4]*y  + d_dir[7]*z)/ d_spc[1] ;
-                float kw = (d_dir[2]*x  + d_dir[5]*y  + d_dir[8]*z)/ d_spc[2] ;
+             //   float iw = (d_dir[0]*x  + d_dir[3]*y  + d_dir[6]*z)/ d_spc[0] ;
+             //   float jw = (d_dir[1]*x  + d_dir[4]*y  + d_dir[7]*z)/ d_spc[1] ;
+             //   float kw = (d_dir[2]*x  + d_dir[5]*y  + d_dir[8]*z)/ d_spc[2] ;
+
+
+        float iw = (D00*(V_orig_x - D_orig_x + V00*V_spc_x*i + V01*V_spc_y*j + V02*V_spc_z*k))/D_spc_x + (D10*(V_orig_y - D_orig_y + V10*V_spc_x*i + V11*V_spc_y*j + V12*V_spc_z*k))/D_spc_x + (D20*(V_orig_z - D_orig_z + V20*V_spc_x*i + V21*V_spc_y*j + V22*V_spc_z*k))/D_spc_x;
+        float jw = (D01*(V_orig_x - D_orig_x + V00*V_spc_x*i + V01*V_spc_y*j + V02*V_spc_z*k))/D_spc_y + (D11*(V_orig_y - D_orig_y + V10*V_spc_x*i + V11*V_spc_y*j + V12*V_spc_z*k))/D_spc_y + (D21*(V_orig_z - D_orig_z + V20*V_spc_x*i + V21*V_spc_y*j + V22*V_spc_z*k))/D_spc_y;
+        float kw = (D02*(V_orig_x - D_orig_x + V00*V_spc_x*i + V01*V_spc_y*j + V02*V_spc_z*k))/D_spc_z + (D12*(V_orig_y - D_orig_y + V10*V_spc_x*i + V11*V_spc_y*j + V12*V_spc_z*k))/D_spc_z + (D22*(V_orig_z - D_orig_z + V20*V_spc_x*i + V21*V_spc_y*j + V22*V_spc_z*k))/D_spc_z;
+
+
+
+
+
 
 
                 if(iw<0 || iw> d_sz[0]-1 || jw<0 || jw> d_sz[1]-1 || kw<0 || kw> d_sz[2]-1)

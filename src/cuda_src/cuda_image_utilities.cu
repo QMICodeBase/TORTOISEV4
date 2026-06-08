@@ -581,10 +581,13 @@ ComposeFields_kernel(cudaPitchedPtr main_field,cudaPitchedPtr update_field,  cud
                 float * row_o= (float *)(slice_o+ mcolPitch);
 
                 float x[3];
-                x[0]= (d_dir[0]*i  + d_dir[1]*j + d_dir[2]*k)* d_spc[0] ;
-                x[1]= (d_dir[3]*i  + d_dir[4]*j + d_dir[5]*k)* d_spc[1] ;
-                x[2]= (d_dir[6]*i  + d_dir[7]*j + d_dir[8]*k)* d_spc[2] ;
+                //x[0]= (d_dir[0]*i  + d_dir[1]*j + d_dir[2]*k)* d_spc[0] ;
+                //x[1]= (d_dir[3]*i  + d_dir[4]*j + d_dir[5]*k)* d_spc[1] ;
+                //x[2]= (d_dir[6]*i  + d_dir[7]*j + d_dir[8]*k)* d_spc[2] ;
 
+                x[0]= d_dir[0]*d_spc[0]*i + d_dir[1]*d_spc[1]*j + d_dir[2]*d_spc[2]*k;
+                x[1]= d_dir[3]*d_spc[0]*i + d_dir[4]*d_spc[1]*j + d_dir[5]*d_spc[2]*k;
+                x[2]= d_dir[6]*d_spc[0]*i + d_dir[7]*d_spc[1]*j + d_dir[8]*d_spc[2]*k;
 
                 float xp[3];
                 xp[0]= x[0] + row_m[3*i];

@@ -53,11 +53,9 @@ warp_image_kernel(cudaTextureObject_t tex, int3 sz, float3 res,
             char * slice_f= f_ptr+  fslicePitch;
             float * row_f= (float *)(slice_f+ fcolPitch);
 
-
-            float x= (dir[0]*i  + dir[1]*j + dir[2]*k)* res.x ;
-            float y= (dir[3]*i  + dir[4]*j + dir[5]*k)* res.y ;
-            float z= (dir[6]*i  + dir[7]*j + dir[8]*k)* res.z ;
-
+            float x= dir[0]*res.x*i + dir[1]*res.y*j + dir[2]*res.z*k;
+            float y= dir[3]*res.x*i + dir[4]*res.y*j + dir[5]*res.z*k;
+            float z= dir[6]*res.x*i + dir[7]*res.y*j + dir[8]*res.z*k;
 
             float xw= x + row_f[3*i];
             float yw= y + row_f[3*i+1];
