@@ -45,7 +45,7 @@ DRBUDDI::DRBUDDI(std::string uname,std::string dname,std::vector<std::string> st
 
 
 #ifdef DRBUDDIALONE
-    this->stream= &(std::cout);
+    this->stream= &((*stream));
 #else
     this->stream= TORTOISE::stream;
 #endif
@@ -555,7 +555,7 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
                 diffeo_first_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, diffeo_first_rigid_trans, val_diffeo_first,new_img);
             }
             imgs.push_back(new_img);
-            std::cout<<"Diffeo first similarity: " << val_diffeo_first<<std::endl;
+            (*stream)<<"Diffeo first similarity: " << val_diffeo_first<<std::endl;
         }
 
 
@@ -627,8 +627,8 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
             }
             imgs.push_back(new_img);
 
-            std::cout<<"Translation+Diffeo  similarity: " << val_translation_diffeo<<std::endl;
-            std::cout<<"Translation+Diffeo  trans: " << translation_diffeo_rigid_trans->GetParameters()<<std::endl;
+            (*stream)<<"Translation+Diffeo  similarity: " << val_translation_diffeo<<std::endl;
+            (*stream)<<"Translation+Diffeo  trans: " << translation_diffeo_rigid_trans->GetParameters()<<std::endl;
         }
 
 
@@ -691,8 +691,8 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
             }
             imgs.push_back(new_img);
 
-            std::cout<<"Translation+Rigid+Diffeo  similarity: " << val_translation_rigid_diffeo<<std::endl;
-            std::cout<<"Translation+Rigid+Diffeo  trans: " << translation_rigid_diffeo_rigid_trans->GetParameters()<<std::endl;
+            (*stream)<<"Translation+Rigid+Diffeo  similarity: " << val_translation_rigid_diffeo<<std::endl;
+            (*stream)<<"Translation+Rigid+Diffeo  trans: " << translation_rigid_diffeo_rigid_trans->GetParameters()<<std::endl;
         }
 
 
@@ -756,8 +756,8 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
             }
             imgs.push_back(new_img);
 
-            std::cout<<"Rigid+Diffeo  similarity: " << val_rigid_diffeo<<std::endl;
-            std::cout<<"Rigid+Diffeo  trans: " << rigid_diffeo_rigid_trans->GetParameters()<<std::endl;
+            (*stream)<<"Rigid+Diffeo  similarity: " << val_rigid_diffeo<<std::endl;
+            (*stream)<<"Rigid+Diffeo  trans: " << rigid_diffeo_rigid_trans->GetParameters()<<std::endl;
         }
 
 
@@ -778,6 +778,29 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
         auto it = std::min_element(vals.begin(), vals.end());
         int index = std::distance(vals.begin(), it);
 
+        if(index==0)
+        {
+            (*stream)<< "BEST rigid registration outcome using: DIFFEOMORPHIC FIRST"<<std::endl;
+        }
+        else
+        {
+            if(index==1)
+            {
+                (*stream)<< "BEST rigid registration outcome using: TRANSLATION FIRST"<<std::endl;
+            }
+            else
+            {
+                if(index==2)
+                {
+                    (*stream)<< "BEST rigid registration outcome using: TRANSLATION_RIGID FIRST"<<std::endl;
+                }
+                else
+                {
+                    (*stream)<< "BEST rigid registration outcome using: FULL RIGID FIRST"<<std::endl;
+                }
+            }
+        }
+
         final_trans= rigids[index];
         initial_corrected_b0= imgs[index];
     }
@@ -797,7 +820,7 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
 
 
 
-    std::cout <<"Final trans: " << final_trans->GetParameters()<<std::endl;
+    (*stream) <<"Final trans: " << final_trans->GetParameters()<<std::endl;
 
     return final_trans;
 
@@ -1031,10 +1054,10 @@ void DRBUDDI::Step1_RigidRegistration()
             RigidTransformType::Pointer rigid_trans2a= RigidRegisterImagesEuler( str_img, initial_corrected_b0,  "MI",parser->getRigidLR(),false);
             RigidTransformType::ParametersType b2= rigid_trans2a->GetParameters();
 
-            std::cout<< "Trans CC F" << rigid_trans1->GetParameters()<<std::endl;
-            std::cout<< "Trans CC B" << rigid_trans1a->GetParameters()<<std::endl;
-            std::cout<< "Trans MI F" << rigid_trans2->GetParameters()<<std::endl;
-            std::cout<< "Trans MI B" << rigid_trans2a->GetParameters()<<std::endl;
+            (*stream)<< "Trans CC F" << rigid_trans1->GetParameters()<<std::endl;
+            (*stream)<< "Trans CC B" << rigid_trans1a->GetParameters()<<std::endl;
+            (*stream)<< "Trans MI F" << rigid_trans2->GetParameters()<<std::endl;
+            (*stream)<< "Trans MI B" << rigid_trans2a->GetParameters()<<std::endl;
 
 
             p1[0]= params2[0]+ b2[0];
@@ -1042,7 +1065,7 @@ void DRBUDDI::Step1_RigidRegistration()
             p1[2]= params2[2]+ b2[2];
 
             double diff2= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] ;
-            std::cout<< "diff1 "<<diff1 << " diff2 " <<diff2 <<std::endl;
+            (*stream)<< "diff1 "<<diff1 << " diff2 " <<diff2 <<std::endl;
 
             std::string new_metric_type="MI";
             if(diff1 < diff2)

@@ -838,7 +838,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
             this->stages.push_back(curr_stage);
         }
 
-        if(parser->getDisableLastStage()==0 && Nstr>0 && (this->FA_up_img  && this->FA_down_img) )
+        if(parser->getEnforceFullAntiSymmetry()==0 &&  parser->getDisableLastStage()==0 && Nstr>0 && (this->FA_up_img  && this->FA_down_img) )
         {
             DRBUDDIStageSettings curr_stage;                                   //28
             curr_stage.niter=300;
@@ -1077,11 +1077,13 @@ void DRBUDDI_Diffeo::Process()
             }
             else
             {
-                if(st==stages.size()-1)
-                //if(st>=27)
+                //if(st==stages.size()-1)
+                if(st>=27 && st==stages.size()-1)
                 {
                     stages[st].init_finv_const=prev_finv;
                     stages[st].init_minv_const=prev_minv;
+                    stages[st].init_finv=nullptr;
+                    stages[st].init_minv=nullptr;
                 }
                 else
                 {
@@ -1089,6 +1091,8 @@ void DRBUDDI_Diffeo::Process()
                     {
                         stages[st].init_finv=prev_finv;
                         stages[st].init_minv=prev_minv;
+                        stages[st].init_finv_const=nullptr;
+                        stages[st].init_minv_const=nullptr;
                     }
                 }
 

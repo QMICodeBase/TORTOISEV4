@@ -14,6 +14,7 @@
 #include "itkImageMomentsCalculator.h"
 #include "itkMultiStartOptimizerv4.h"
 #include "itkAmoebaOptimizerv4.h"
+#include "itkMeanSquaresImageToImageMetricv4.h"
 
 
 QuadraticTransformType::Pointer CompositeLinearToQuadratic(const CompositeTransformType * compositeTransform, std::string phase)
@@ -337,7 +338,7 @@ RigidPhaseScaleTransformType::Pointer RigidPhaseRegisterImages(ImageType3D::Poin
 
     //CommandIterationUpdate::Pointer observer = CommandIterationUpdate::New();
 
-    /*
+
     typedef itk::ConjugateGradientLineSearchOptimizerv4Template<double> ConjugateGradientDescentOptimizerType;
     typename ConjugateGradientDescentOptimizerType::Pointer optimizer = ConjugateGradientDescentOptimizerType::New();
     optimizer->SetLowerLimit( 0 );
@@ -353,8 +354,9 @@ RigidPhaseScaleTransformType::Pointer RigidPhaseRegisterImages(ImageType3D::Poin
     optimizer->SetDoEstimateLearningRateOnce( false );
 
     rigidRegistration->SetOptimizer(optimizer);
-*/
 
+
+    /*
     std::cout<<"Doing gradient descent instead of conjugate..."<<std::endl;
     //typedef itk::AmoebaOptimizerv4 OptimizerType;
     typedef itk::GradientDescentOptimizerv4 OptimizerType;
@@ -368,11 +370,9 @@ RigidPhaseScaleTransformType::Pointer RigidPhaseRegisterImages(ImageType3D::Poin
     optimizer->SetDoEstimateLearningRateAtEachIteration( false);
 
     rigidRegistration->SetOptimizer(optimizer);
-
+*/
 
     //optimizer->AddObserver(itk::IterationEvent(), observer );
-
-
 
     try
     {
@@ -391,7 +391,7 @@ RigidPhaseScaleTransformType::Pointer RigidPhaseRegisterImages(ImageType3D::Poin
 
 }
 
-#include "itkMeanSquaresImageToImageMetricv4.h"
+
 RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string metric_type,float lr,bool gd, RigidTransformType::Pointer in_trans)
 {
     int NITK= TORTOISE::GetAvailableITKThreadFor();
@@ -542,8 +542,6 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
     }
 
     //optimizer->AddObserver(itk::IterationEvent(), observer );
-
-
 
     try
     {

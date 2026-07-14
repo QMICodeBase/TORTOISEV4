@@ -343,20 +343,24 @@ int main(int argc, char * argv[])
           std::cout << "  New bb = {[" << bb0 << "], [" << bb1 << "]}; "<<std::endl;
     }
 
-
-
-
-
-
-
     std::string output_name = parser->getOutputName();
     if(output_name=="")
     {
         fs::path NIFTI_path(parser->getInputImageName());
         fs::path proc_folder = NIFTI_path.parent_path();
         fs::path output_proc_path;
-        fs::path basename = NIFTI_path.stem();
-        fs::path new_listname= proc_folder/ (basename.string() + std::string("_reoriented.nii")) ;
+
+        std::string fname = NIFTI_path.filename().string();
+        size_t first_dot = fname.find('.');
+
+        std::string base_name;
+        if (first_dot != std::string::npos) {
+            base_name = fname.substr(0, first_dot);
+        } else {
+            base_name = fname;
+        }
+
+        fs::path new_listname= proc_folder/ (base_name + std::string("_reoriented.nii")) ;
 
         output_name = new_listname.string();
     }

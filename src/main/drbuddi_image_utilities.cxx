@@ -331,12 +331,23 @@ DisplacementFieldType::Pointer InvertField( const DisplacementFieldType * field,
 {
     using InverterType = itk::InvertDisplacementFieldImageFilterOkan<DisplacementFieldType>;
 
+    /*
     typename InverterType::Pointer inverter = InverterType::New();
     inverter->SetInput( field );
     inverter->SetInverseFieldInitialEstimate( inverseFieldEstimate );
     inverter->SetMaximumNumberOfIterations( 20 );
     inverter->SetMeanErrorToleranceThreshold( 0.001 );
     inverter->SetMaxErrorToleranceThreshold( 0.1 );
+    inverter->SetNumberOfWorkUnits(TORTOISE::GetNAvailableCores());
+    inverter->Update();
+*/
+
+    typename InverterType::Pointer inverter = InverterType::New();
+    inverter->SetInput( field );
+    inverter->SetInverseFieldInitialEstimate( inverseFieldEstimate );
+    inverter->SetMaximumNumberOfIterations( 200 );
+    inverter->SetMeanErrorToleranceThreshold( 0.00005 );
+    inverter->SetMaxErrorToleranceThreshold( 0.0005 );
     inverter->SetNumberOfWorkUnits(TORTOISE::GetNAvailableCores());
     inverter->Update();
 
@@ -367,9 +378,11 @@ DisplacementFieldType::Pointer ComposeFields(DisplacementFieldType::Pointer  fie
     return fixedComposer->GetOutput();
 }
 
+#include "itkConstantBoundaryCondition.h"
 
 ImageType3D::Pointer GaussianSmoothImage(ImageType3D::Pointer img,double variance)
 {
+    /*
     if(variance==0)
         return img;
 
@@ -382,16 +395,67 @@ ImageType3D::Pointer GaussianSmoothImage(ImageType3D::Pointer img,double varianc
     smoother->SetVariance(  variance );
     smoother->SetMaximumError( 0.01 );
     smoother->SetInput( img );
-    smoother->SetMaximumKernelWidth(32);
+    smoother->SetMaximumKernelWidth(31);
     smoother->SetNumberOfWorkUnits(TORTOISE::GetNAvailableCores());
     smoother->Update();
     return smoother->GetOutput();
+*/
+
+    if(variance==0)
+        return img;
+
+    if(img==nullptr)
+        return nullptr;
+
+
+    using DuplicatorType = itk::ImageDuplicator<ImageType3D>;
+    DuplicatorType::Pointer duplicator = DuplicatorType::New();
+    duplicator->SetInputImage( img );
+    duplicator->Update();
+    ImageType3D::Pointer smoothImg = duplicator->GetOutput();
+    if( variance <= 0.0 )
+    {
+        return smoothImg;
+    }
+
+    using GaussianSmoothingOperatorType = itk::GaussianOperator<float, 3>;
+    GaussianSmoothingOperatorType gaussianSmoothingOperator;
+
+    using GaussianSmoothingSmootherType = itk::NeighborhoodOperatorImageFilter<ImageType3D,ImageType3D>;
+    typename GaussianSmoothingSmootherType::Pointer smoother = GaussianSmoothingSmootherType::New();
+
+    using BoundaryConditionType = itk::ConstantBoundaryCondition<ImageType3D>;
+    BoundaryConditionType  zeroBoundaryCondition;
+    zeroBoundaryCondition.SetConstant(0);
+    smoother->OverrideBoundaryCondition(&zeroBoundaryCondition);
+
+    for( int d = 0; d < 3; d++ )
+    {
+        // smooth along this dimension
+        gaussianSmoothingOperator.SetDirection( d );
+        gaussianSmoothingOperator.SetVariance( variance );
+        gaussianSmoothingOperator.SetMaximumError( 0.01 );
+        gaussianSmoothingOperator.SetMaximumKernelWidth( 31 );
+        gaussianSmoothingOperator.CreateDirectional();
+
+
+        // todo: make sure we only smooth within the buffered region
+        smoother->SetOperator( gaussianSmoothingOperator );
+        smoother->SetInput( smoothImg);
+        smoother->SetNumberOfWorkUnits(TORTOISE::GetNAvailableCores());
+        smoother->Update();
+        smoothImg= smoother->GetOutput();
+        smoothImg->Update();
+        smoothImg->DisconnectPipeline();
+    }
+
+    return smoothImg;
+
 }
 
 
 DisplacementFieldType::Pointer GaussianSmoothImage(DisplacementFieldType::Pointer field,double variance)
 {
-
     if(variance==0)
         return field;
 
@@ -424,7 +488,7 @@ DisplacementFieldType::Pointer GaussianSmoothImage(DisplacementFieldType::Pointe
     gaussianSmoothingOperator.SetVariance( variance );
     gaussianSmoothingOperator.SetMaximumError( 0.001 );
 //    gaussianSmoothingOperator.SetMaximumKernelWidth( smoothField->GetRequestedRegion().GetSize()[d] );
-    gaussianSmoothingOperator.SetMaximumKernelWidth( 32 );
+    gaussianSmoothingOperator.SetMaximumKernelWidth( 31 );
     gaussianSmoothingOperator.CreateDirectional();
 
 
@@ -478,7 +542,6 @@ DisplacementFieldType::Pointer GaussianSmoothImage(DisplacementFieldType::Pointe
     }
 
   return smoothField;
-
 }
 
 DisplacementFieldType::Pointer ResampleImage(DisplacementFieldType::Pointer field, ImageType3D::Pointer ref_img)

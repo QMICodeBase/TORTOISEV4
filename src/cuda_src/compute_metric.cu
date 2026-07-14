@@ -53,25 +53,25 @@ ComputeMetric_CC_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
 __device__ inline float mf(float det)
 {
-  //  return det;
+    return det;
 
-    float logd = log(det);
-    float ly = logd / (sqrt(1+0.25*logd*logd));
-    float y= exp(ly);
-    return y;
+   // float logd = log(det);
+   // float ly = logd / (sqrt(1+0.25*logd*logd));
+   // float y= exp(ly);
+  //  return y;
 }
 
 
 __device__ inline float dmf(float x)
 {    
     return 1;
-    float y= mf(x);
-    float lx= log(x);
+  //  float y= mf(x);
+  //  float lx= log(x);
 
-    float nom = 1./x * sqrt(1+0.25* lx*lx) - lx *  1./sqrt(1+0.25*lx*lx) *0.25* lx *1./x;
-    float denom = 1+0.25* lx*lx;
+   // float nom = 1./x * sqrt(1+0.25* lx*lx) - lx *  1./sqrt(1+0.25*lx*lx) *0.25* lx *1./x;
+   // float denom = 1+0.25* lx*lx;
 
-    return y*nom/denom;
+   // return y*nom/denom;
 
 
 }
@@ -117,11 +117,13 @@ __device__ float3 ComputeImageGradient(cudaPitchedPtr img,int i, int j, int k)
         float * row= (float *)(slice+ colPitch);
         grad.z= row[i];
 
+
         slicePitch= pitch*d_sz[1]*(k-1);
         slice= ptr+  slicePitch;
         row= (float *)(slice+ colPitch);
         grad.z= 0.5*(grad.z -row[i])/d_spc[2];
     }
+
 
     float3 grad2;
 
@@ -1525,7 +1527,7 @@ ComputeMetric_MSJac_kernel( cudaPitchedPtr up_img, cudaPitchedPtr down_img,
                     float K= valf-valm;
 
 
-                    row_metric[i]= K*K;
+                    row_metric[i]= K*K;                    
 
                     updateF[0]= 2*K*gradI2.x*detf ;
                     updateF[1]= 2*K*gradI2.y*detf ;

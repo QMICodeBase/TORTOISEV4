@@ -177,14 +177,9 @@ ImageType3D::Pointer DRBUDDIBase::JacobianTransformImage(ImageType3D::Pointer im
     while(!it.IsAtEnd())
     {
         ImageType3D::IndexType index = it.GetIndex();
-        InternalMatrixType  A = ComputeJacobianAtIndex(field,index);
-        //double det= vnl_det<double>(A);
-        double det = A(phase_id,phase_id);
+        double det= ComputeJacobianDetAtIndex(field,index,phase_id);
         if(det>0)
         {
-          //  double logd = log(det);
-          //  double ly = logd / (sqrt(1+0.2*logd*logd));
-          //  det=exp(ly);
             it.Set(it.Get()*det);
         }
         else
@@ -201,8 +196,7 @@ ImageType3D::Pointer DRBUDDIBase::JacobianTransformImage(ImageType3D::Pointer im
                     for(int i=-2;i<=2;i++)
                     {
                         tind[0]=index[0]+i;
-                        InternalMatrixType  AA = ComputeJacobianAtIndex(field,tind);
-                        double det2 = AA(phase_id,phase_id);
+                        double det2=  ComputeJacobianDetAtIndex(field,tind,phase_id);
                         if(det2>0)
                         {
                             Ntot++;
@@ -214,9 +208,6 @@ ImageType3D::Pointer DRBUDDIBase::JacobianTransformImage(ImageType3D::Pointer im
             if(Ntot>0)
             {
                 det=tot/Ntot;
-             //   double logd = log(det);
-             //   double ly = logd / (sqrt(1+0.2*logd*logd));
-             //   det=exp(ly);
                 it.Set(it.Get()*det);
             }
             else
@@ -227,7 +218,46 @@ ImageType3D::Pointer DRBUDDIBase::JacobianTransformImage(ImageType3D::Pointer im
     return trans_img;
 }
 
+double  DRBUDDIBase::ComputeJacobianDetAtIndex(DisplacementFieldType::Pointer disp_field, DisplacementFieldType::IndexType index, int phase)
+{
+    const int h=1;
+    if(index[phase]<h || index[phase]> disp_field->GetLargestPossibleRegion().GetSize()[phase]-h-1)
+        return 1.;
 
+    ImageType3D::SpacingType d_spc= disp_field->GetSpacing();
+
+    vnl_vector<double> phase_vec(3,0);
+    phase_vec[phase]=1;
+    vnl_vector<double> new_phase = disp_field->GetDirection().GetVnlMatrix()*phase_vec;
+
+    int phase_xyz;
+    if( (fabs(new_phase[0]) > fabs(new_phase[1]))  && (fabs(new_phase[0]) > fabs(new_phase[2])))
+        phase_xyz=0;
+    else if( (fabs(new_phase[1]) > fabs(new_phase[0]))  && (fabs(new_phase[1]) > fabs(new_phase[2])))
+        phase_xyz=1;
+    else phase_xyz=2;
+
+
+    double grad;
+
+    ImageType3D::IndexType tind3=index;
+    tind3[phase]+=1;
+    double valp=disp_field->GetPixel(tind3)[phase] ;
+    tind3[phase]-=2;
+    double valm=disp_field->GetPixel(tind3)[phase] ;
+
+
+    grad=0.5*(valp-valm)/d_spc[phase]/h;
+
+    vnl_vector<double> temp(3,0);
+    temp[phase]=grad;
+    vnl_vector<double> temp2= disp_field->GetDirection().GetVnlMatrix() * temp;
+
+
+    //return  temp2[phase_xyz];
+     return 1+ temp2[phase_xyz];
+
+}
 
 InternalMatrixType DRBUDDIBase::ComputeJacobianAtIndex(DisplacementFieldType::Pointer disp_field, DisplacementFieldType::IndexType index)
 {

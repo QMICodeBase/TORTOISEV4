@@ -16,6 +16,6 @@
                      float *h_kernel,
                      cudaPitchedPtr output );
 
- void AdjustFieldBoundary(cudaPitchedPtr orig_img,cudaPitchedPtr smooth_img,int3 data_sz, float weight1, float weight2);
+ void AdjustFieldBoundary(cudaPitchedPtr orig_img,cudaPitchedPtr smooth_img,int3 data_sz, int Ncomp,float weight1, float weight2);
 
 #endif

@@ -13,6 +13,9 @@
 
 inline double mf(double det)
 {
+
+    return det;
+
     double logd = log(det);
     double ly = logd / (sqrt(1+0.2*logd*logd));
     double y= exp(ly);
@@ -22,6 +25,8 @@ inline double mf(double det)
 
 inline double dmf(double x)
 {
+    return 1;
+
     double y= mf(x);
     double lx= log(x);
 
@@ -109,6 +114,7 @@ float  ComputeUpdateMSJac(ImageType3D::IndexType index,
 
          double K= (valf-valm);
          val=K*K;
+
 
          updateF[0]=  2 *K*gradI[0]*detf;
          updateF[1]=  2 *K*gradI[1]*detf;
@@ -235,7 +241,7 @@ float ComputeMetric_MSJac(const ImageType3D::Pointer up_img, const ImageType3D::
     else phase_xyz=2;
 
 
-    const int h=1;
+
     ImageType3D::SizeType imsize=up_img->GetLargestPossibleRegion().GetSize();
 
     ImageType3D::Pointer m_MetricImage= ImageType3D::New();
@@ -244,7 +250,7 @@ float ComputeMetric_MSJac(const ImageType3D::Pointer up_img, const ImageType3D::
     m_MetricImage->SetSpacing(up_img->GetSpacing());
     m_MetricImage->SetOrigin(up_img->GetOrigin());
     m_MetricImage->SetDirection(up_img->GetDirection());
-
+    m_MetricImage->FillBuffer(0);
 
 
     #pragma omp parallel for //collapse(2)

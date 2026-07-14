@@ -1238,10 +1238,6 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
         }
     }
 
-
-
-
-
     if(this->nii_name!="")
     {
         // Saving residuals to files for reporting

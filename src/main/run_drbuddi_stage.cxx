@@ -8,6 +8,7 @@
 #include "../tools/ResampleDWIs/resample_dwis.h"
 #include "itkGaussianOperator.h"
 #include "itkMultiplyImageFilter.h"
+#include "itkAddImageFilter.h"
 
 #ifdef USECUDA
     #include "../cuda_src/resample_image.h"
@@ -236,6 +237,15 @@ void DRBUDDIStage::PreprocessImagesAndFields()
         this->def_M= InvertField(this->def_MINV);
     }
 
+#ifdef USECUDA
+    if(this->settings->init_finv_const && this->settings->init_finv_const->sz.x != this->virtual_img->sz.x)
+#else
+    if(this->settings->init_finv_const && this->settings->init_finv_const->GetLargestPossibleRegion().GetSize()[0] != this->virtual_img->GetLargestPossibleRegion().GetSize()[0])
+#endif
+    {
+        this->settings->init_finv_const= ResampleImage(this->settings->init_finv_const, this->virtual_img);
+        this->settings->init_minv_const= ResampleImage(this->settings->init_minv_const, this->virtual_img);
+    }
 
     resampled_smoothed_up_images.resize(this->settings->metrics.size());
     resampled_smoothed_down_images.resize(this->settings->metrics.size());
@@ -363,7 +373,6 @@ void DRBUDDIStage::PreprocessImagesAndFields()
         resampled_smoothed_up_images[0]=ResampleImage(resampled_smoothed_up_images[0],this->virtual_img);
         resampled_smoothed_down_images[0]=ResampleImage(resampled_smoothed_down_images[0],this->virtual_img);
         resampled_smoothed_str_images[0]= ResampleImage(resampled_smoothed_str_images[0],this->virtual_img);
-
 
         for(int m=1;m<this->settings->metrics.size();m++)
         {
@@ -527,10 +536,11 @@ void DRBUDDIStage::RunDRBUDDIStage()
             phase_xyz[0]=1;
         else if( (fabs(new_phase[1]) > fabs(new_phase[0]))  && (fabs(new_phase[1]) > fabs(new_phase[2])))
             phase_xyz[1]=1;
-        phase_xyz[2]=1;
+        else
+            phase_xyz[2]=1;
     #endif
 
-        while( iter++ < this->settings->niter && !converged )
+    while( iter++ < this->settings->niter && !converged )
     {
         CurrentFieldType::Pointer updateFieldF= nullptr,updateFieldM= nullptr;
 
@@ -582,8 +592,8 @@ void DRBUDDIStage::RunDRBUDDIStage()
         CurrentFieldType::Pointer tot_minv= this->def_MINV;
         if(settings->init_finv_const!=nullptr)
         {
-            tot_finv= ComposeFields(settings->init_finv_const,this->def_FINV);
-            tot_minv= ComposeFields(settings->init_minv_const,this->def_MINV);
+            tot_finv= ComposeFields(this->def_FINV,settings->init_finv_const);
+            tot_minv= ComposeFields(this->def_MINV,settings->init_minv_const);
         }
 
 
@@ -633,13 +643,9 @@ void DRBUDDIStage::RunDRBUDDIStage()
             metric_values[met]=metric_value;
             all_ConvergenceMonitoring[met]->AddEnergyValue( metric_value );
 
-
-
             if(Nmetrics>1)
             {
                 float mlt=1;
-              //  if(this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCSK || this->settings->metrics[met].MetricType== DRBUDDIMetricEnumeration::CCJacS)
-                //    mlt*=100;
                 AddToUpdateField(updateFieldF,updateFieldF_temp,this->settings->metrics[met].weight*mlt);
                 AddToUpdateField(updateFieldM,updateFieldM_temp,this->settings->metrics[met].weight*mlt);
             }
@@ -656,14 +662,14 @@ void DRBUDDIStage::RunDRBUDDIStage()
         updateFieldM=GaussianSmoothImage(updateFieldM,this->settings->update_gaussian_sigma);
 
         if(this->settings->restrct)
-        {
+        {            
             RestrictPhase(updateFieldF,phase_xyz);
             RestrictPhase(updateFieldM,phase_xyz);
         }
 
-
         float best_lr=this->settings->learning_rate;
         float beta_f=0,beta_m=0;
+
         #ifdef USECUDA
             ScaleUpdateField(updateFieldF,1);
             ScaleUpdateField(updateFieldM,1);
@@ -679,24 +685,81 @@ void DRBUDDIStage::RunDRBUDDIStage()
                     beta_m=1;
             }
 
-            prev_updateFieldF=CurrentFieldType::New();
-            prev_updateFieldF->DuplicateFromCUDAImage(updateFieldF);
-            prev_updateFieldM=CurrentFieldType::New();
-            prev_updateFieldM->DuplicateFromCUDAImage(updateFieldM);
+            #ifdef USECUDA
+                prev_updateFieldF=CurrentFieldType::New();
+                prev_updateFieldF->DuplicateFromCUDAImage(updateFieldF);
+                prev_updateFieldM=CurrentFieldType::New();
+                prev_updateFieldM->DuplicateFromCUDAImage(updateFieldM);
+            #else
+                using DupperType = itk::ImageDuplicator<DisplacementFieldType>;
+                DupperType::Pointer dup1= DupperType::New();
+                dup1->SetInputImage(updateFieldF);
+                dup1->Update();
+                prev_updateFieldF=dup1->GetOutput();
+                DupperType::Pointer dup2= DupperType::New();
+                dup2->SetInputImage(updateFieldM);
+                dup2->Update();
+                prev_updateFieldM=dup2->GetOutput();
+            #endif
 
             if(conjugateFieldF)
             {
-                conjugateFieldF=MultiplyImage(conjugateFieldF,beta_f);
-                conjugateFieldF=AddImages(conjugateFieldF,updateFieldF);
-                conjugateFieldM=MultiplyImage(conjugateFieldM,beta_m);
-                conjugateFieldM=AddImages(conjugateFieldM,updateFieldM);
+                #ifdef USECUDA
+                    conjugateFieldF=MultiplyImage(conjugateFieldF,beta_f);
+                    conjugateFieldF=AddImages(conjugateFieldF,updateFieldF);
+                    conjugateFieldM=MultiplyImage(conjugateFieldM,beta_m);
+                    conjugateFieldM=AddImages(conjugateFieldM,updateFieldM);
+                #else
+                    {
+                        auto multiplyFilter = itk::MultiplyImageFilter<DisplacementFieldType, DisplacementFieldType, DisplacementFieldType>::New();
+                        multiplyFilter->SetInput(conjugateFieldF);
+                        multiplyFilter->SetConstant(beta_f); // Set the scalar value
+                        multiplyFilter->Update();
+                        conjugateFieldF=multiplyFilter->GetOutput();
+
+                        using AddFilterType = itk::AddImageFilter<DisplacementFieldType, DisplacementFieldType, DisplacementFieldType>;
+                        AddFilterType::Pointer addFilter = AddFilterType::New();
+                        addFilter->SetInput1(conjugateFieldF);
+                        addFilter->SetInput2(updateFieldF);
+                        addFilter->Update();
+                        conjugateFieldF=addFilter->GetOutput();
+                    }
+                    {
+                        auto multiplyFilter = itk::MultiplyImageFilter<DisplacementFieldType, DisplacementFieldType, DisplacementFieldType>::New();
+                        multiplyFilter->SetInput(conjugateFieldM);
+                        multiplyFilter->SetConstant(beta_m); // Set the scalar value
+                        multiplyFilter->Update();
+                        conjugateFieldM=multiplyFilter->GetOutput();
+
+                        using AddFilterType = itk::AddImageFilter<DisplacementFieldType, DisplacementFieldType, DisplacementFieldType>;
+                        AddFilterType::Pointer addFilter = AddFilterType::New();
+                        addFilter->SetInput1(conjugateFieldM);
+                        addFilter->SetInput2(updateFieldM);
+                        addFilter->Update();
+                        conjugateFieldM=addFilter->GetOutput();
+                    }
+
+                #endif
             }
             else
             {
-                conjugateFieldF=CurrentFieldType::New();
-                conjugateFieldF->DuplicateFromCUDAImage(updateFieldF);
-                conjugateFieldM=CurrentFieldType::New();
-                conjugateFieldM->DuplicateFromCUDAImage(updateFieldM);
+                #ifdef USECUDA
+                    conjugateFieldF=CurrentFieldType::New();
+                    conjugateFieldF->DuplicateFromCUDAImage(updateFieldF);
+                    conjugateFieldM=CurrentFieldType::New();
+                    conjugateFieldM->DuplicateFromCUDAImage(updateFieldM);
+                #else
+                    using DupperType = itk::ImageDuplicator<DisplacementFieldType>;
+                    DupperType::Pointer dup1= DupperType::New();
+                    dup1->SetInputImage(updateFieldF);
+                    dup1->Update();
+                    conjugateFieldF=dup1->GetOutput();
+                    DupperType::Pointer dup2= DupperType::New();
+                    dup2->SetInputImage(updateFieldM);
+                    dup2->Update();
+                    conjugateFieldM=dup2->GetOutput();
+                #endif
+
             }
 
             float best_mv1=std::numeric_limits<float>::max();
@@ -773,7 +836,6 @@ void DRBUDDIStage::RunDRBUDDIStage()
             conjugateFieldM=updateFieldM;
         #endif
 
-
         ScaleUpdateField(conjugateFieldF,best_lr);
         ScaleUpdateField(conjugateFieldM,best_lr);
 
@@ -781,7 +843,6 @@ void DRBUDDIStage::RunDRBUDDIStage()
         {
             CurrentFieldType::Pointer f2midtmp=nullptr,f2midtmp_inv=nullptr;
             CurrentFieldType::Pointer m2midtmp=nullptr,m2midtmp_inv=nullptr;
-
 
             f2midtmp  = ComposeFields(this->def_F,conjugateFieldF);
             f2midtmp = GaussianSmoothImage(f2midtmp,this->settings->total_gaussian_sigma);
@@ -795,8 +856,11 @@ void DRBUDDIStage::RunDRBUDDIStage()
             {
                 ContrainDefFields(f2midtotal_inv,m2midtotal_inv);
             }
+
             CurrentFieldType::Pointer f2midtotal = InvertField(f2midtotal_inv, m2midtotal_inv );
             CurrentFieldType::Pointer m2midtotal = InvertField(m2midtotal_inv, f2midtotal_inv );
+
+
 
             this->def_FINV=f2midtotal_inv;
             this->def_F=f2midtotal;

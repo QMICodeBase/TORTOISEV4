@@ -69,7 +69,7 @@
         }
         float weight2 = 1.0 - weight1;
 
-        AdjustFieldBoundary(main_image->getFloatdata(),d_output,main_image->sz,  weight1,weight2);
+        AdjustFieldBoundary(main_image->getFloatdata(),d_output,main_image->sz, main_image->components_per_voxel,  weight1,weight2);
     }
 
 

@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.20)
 PROJECT(TORTOISEV4  )
 
 SET(USEOPENMP 1)
- #  SET(CMAKE_BUILD_TYPE Debug)
- #  SET(ISDEBUG 1)
+  # SET(CMAKE_BUILD_TYPE Debug)
+  # SET(ISDEBUG 1)
 
 if ( NOT DEFINED USECUDA)
     SET(USECUDA  0)
@@ -561,6 +561,11 @@ set_target_properties(ResampleTensor PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAK
 #add_executable(BrukerBmatToTORTOISEBMTXT   ../src/tools/BrukerBmatToTORTOISEBMTXT/BrukerBmatToTORTOISEBMTXT.cxx ${SOURCES})
 #target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
 
+#add_executable(JoanahUpDownB0Transformations  ../src/tools/JoanahUpDownB0Transformations/JoanahUpDownB0Transformations.cxx ../src/tools/JoanahUpDownB0Transformations/JoanahUpDownB0Transformations_parser.cxx ${SOURCES})
+#target_link_libraries(JoanahUpDownB0Transformations ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
+
+#add_executable(RigidPhaseScaleRegister  ../src/tools/RigidPhaseScaleRegister/RigidPhaseScaleRegister.cxx ../src/main/rigid_register_images.cxx  ${SOURCES})
+#target_link_libraries(RigidPhaseScaleRegister ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
 
 
 IF(USE_VTK)

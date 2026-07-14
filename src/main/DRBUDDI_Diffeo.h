@@ -28,7 +28,7 @@ class DRBUDDI_Diffeo
     #else
         using CurrentFieldType = DisplacementFieldType;
         using CurrentImageType = ImageType3D;
-        using PhaseEncodingVectorType = vnl_vector<double>;
+        using PhaseEncodingVectorType = vnl_vector_fixed<double,3>;
     #endif
 
 

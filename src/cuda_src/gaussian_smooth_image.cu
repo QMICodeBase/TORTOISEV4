@@ -232,7 +232,7 @@ void GaussianSmoothImage_cuda(cudaPitchedPtr data,
 
 
 __global__ void
-AdjustFieldBoundary_kernel( cudaPitchedPtr orig_img,cudaPitchedPtr smooth_img, const float weight1, const float weight2)
+AdjustFieldBoundary_kernel( cudaPitchedPtr orig_img,cudaPitchedPtr smooth_img, const float weight1, const float weight2,int Ncomp)
 {
     uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
     uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
@@ -257,15 +257,17 @@ AdjustFieldBoundary_kernel( cudaPitchedPtr orig_img,cudaPitchedPtr smooth_img, c
 
                 if(i==0 || i==d_sz[0]-1 || j==0 || j==d_sz[1]-1 || k==0 || k==d_sz[2]-1 )
                 {
-                    row_smooth[3*i]=0;
-                    row_smooth[3*i+1]=0;
-                    row_smooth[3*i+2]=0;
+                    for(int n=0;n<Ncomp;n++)
+                    {
+                        row_smooth[Ncomp*i+n]=0;
+                    }
                 }
                 else
                 {
-                    row_smooth[3*i]= row_smooth[3*i]*weight1 + row_orig[3*i]*weight2;
-                    row_smooth[3*i+1]= row_smooth[3*i+1]*weight1 + row_orig[3*i+1]*weight2;
-                    row_smooth[3*i+2]= row_smooth[3*i+2]*weight1 + row_orig[3*i+2]*weight2;
+                    for(int n=0;n<Ncomp;n++)
+                    {
+                        row_smooth[Ncomp*i+n]= row_smooth[Ncomp*i+n]*weight1 + row_orig[Ncomp*i+n]*weight2;
+                    }
                 }
            }
     }
@@ -273,7 +275,7 @@ AdjustFieldBoundary_kernel( cudaPitchedPtr orig_img,cudaPitchedPtr smooth_img, c
 
 
 
-void AdjustFieldBoundary(cudaPitchedPtr orig_img,cudaPitchedPtr smooth_img,int3 data_sz, float weight1, float weight2)
+void AdjustFieldBoundary(cudaPitchedPtr orig_img,cudaPitchedPtr smooth_img,int3 data_sz, int Ncomp, float weight1, float weight2)
 {
     int h_d_sz[]= {data_sz.x,data_sz.y,data_sz.z};
     gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
@@ -290,7 +292,7 @@ void AdjustFieldBoundary(cudaPitchedPtr orig_img,cudaPitchedPtr smooth_img,int3 
         gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
     }
 
-    AdjustFieldBoundary_kernel<<< blockSize,gridSize>>>( orig_img, smooth_img,weight1, weight2);
+    AdjustFieldBoundary_kernel<<< blockSize,gridSize>>>( orig_img, smooth_img,weight1, weight2,Ncomp);
 
 
     gpuErrchk(cudaPeekAtLastError());

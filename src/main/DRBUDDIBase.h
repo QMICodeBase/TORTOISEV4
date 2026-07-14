@@ -51,6 +51,7 @@ protected:            //Subfunctions the main processing functions use
 
     ImageType3D::Pointer JacobianTransformImage(ImageType3D::Pointer img,DisplacementFieldType::Pointer field,ImageType3D::Pointer ref_img);
     InternalMatrixType ComputeJacobianAtIndex(DisplacementFieldType::Pointer disp_field, DisplacementFieldType::IndexType index);
+    double  ComputeJacobianDetAtIndex(DisplacementFieldType::Pointer disp_field, DisplacementFieldType::IndexType index, int phase);
 
 
 public:                    //Main processing functions

@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
     std::string output_name= argv[1];
     if(output_name.find(".gz")!=std::string::npos)
     {
-        output_name= output_name.substr(0,output_name.rfind(".gz")) + ".nii";
+        output_name= output_name.substr(0,output_name.rfind(".gz"));
     }   
 
     fs::path output_path(output_name);

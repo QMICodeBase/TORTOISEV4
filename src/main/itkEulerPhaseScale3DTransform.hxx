@@ -28,7 +28,7 @@ EulerPhaseScale3DTransform<TParametersValueType>::EulerPhaseScale3DTransform()
 
 {
   m_AngleX = m_AngleY = m_AngleZ = ScalarType{};
-    m_PhaseScale=1;
+  m_PhaseScale=1;
   m_PhaseAxis=1;
   this->m_FixedParameters.SetSize(SpaceDimension + 1);
   this->m_FixedParameters.Fill(0.0);
@@ -469,6 +469,11 @@ EulerPhaseScale3DTransform<TParametersValueType>::PrintSelf(std::ostream & os, I
   os << indent << "AngleX: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(m_AngleX) << std::endl;
   os << indent << "AngleY: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(m_AngleY) << std::endl;
   os << indent << "AngleZ: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(m_AngleZ) << std::endl;
+  os << indent << "transX: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(this->GetTranslation()[0]) << std::endl;
+  os << indent << "transY: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(this->GetTranslation()[1]) << std::endl;
+  os << indent << "transZ: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(this->GetTranslation()[2]) << std::endl;
+  os << indent << "scalePhase: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(m_PhaseScale) << std::endl;
+
   itkPrintSelfBooleanMacro(ComputeZYX);
 }
 
