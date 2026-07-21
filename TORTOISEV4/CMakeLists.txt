@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.20)
 PROJECT(TORTOISEV4  )
 
 SET(USEOPENMP 1)
-  # SET(CMAKE_BUILD_TYPE Debug)
-  # SET(ISDEBUG 1)
+ #  SET(CMAKE_BUILD_TYPE Debug)
+ #  SET(ISDEBUG 1)
 
 if ( NOT DEFINED USECUDA)
     SET(USECUDA  0)
@@ -566,6 +566,10 @@ set_target_properties(ResampleTensor PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAK
 
 #add_executable(RigidPhaseScaleRegister  ../src/tools/RigidPhaseScaleRegister/RigidPhaseScaleRegister.cxx ../src/main/rigid_register_images.cxx  ${SOURCES})
 #target_link_libraries(RigidPhaseScaleRegister ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
+
+
+add_executable(JoanahRegisterAlongAxes  ../src/tools/JoanahUpDownB0Transformations/JoanahRegisterAlongAxes.cxx ../src/main/register_dwi_to_b0.cxx   ../src/tools/ResampleDWIs/resample_dwis.cxx ${SOURCES})
+target_link_libraries(JoanahRegisterAlongAxes ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
 
 
 IF(USE_VTK)
