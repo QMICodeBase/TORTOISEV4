@@ -15,6 +15,7 @@
 #include "itkMultiStartOptimizerv4.h"
 #include "itkAmoebaOptimizerv4.h"
 #include "itkMeanSquaresImageToImageMetricv4.h"
+#include "itkPowellOptimizerv4.h"
 
 
 QuadraticTransformType::Pointer CompositeLinearToQuadratic(const CompositeTransformType * compositeTransform, std::string phase)
@@ -49,7 +50,7 @@ QuadraticTransformType::Pointer CompositeLinearToQuadratic(const CompositeTransf
 }
 
 #include "itkTranslationTransform.h"
-RigidTransformType::Pointer  TranslationRegisterImages(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string metric_type)
+RigidTransformType::Pointer  TranslationRegisterImages(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string metric_type,bool onlyXZ)
 {
     int NITK= TORTOISE::GetAvailableITKThreadFor();
 
@@ -178,6 +179,14 @@ RigidTransformType::Pointer  TranslationRegisterImages(ImageType3D::Pointer fixe
     optimizer->SetConvergenceWindowSize( 10 );
     optimizer->SetDoEstimateLearningRateAtEachIteration( true);
     optimizer->SetDoEstimateLearningRateOnce( false );
+    if(onlyXZ)
+    {
+        ConjugateGradientDescentOptimizerType::ScalesType weights;
+        weights.set_size(initial_transform->GetParameters().GetSize());
+        weights.fill(1);
+        weights[1]=0;
+        optimizer->SetWeights(weights);
+    }
 
     rigidRegistration->SetOptimizer(optimizer);
 
@@ -207,7 +216,7 @@ RigidTransformType::Pointer  TranslationRegisterImages(ImageType3D::Pointer fixe
 }
 
 
-RigidPhaseScaleTransformType::Pointer RigidPhaseRegisterImages(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,int phase_dim ,std::string metric_type,float lr,RigidTransformType::Pointer in_trans)
+RigidPhaseScaleTransformType::Pointer RigidScaleShearRegisterImages(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,int phase_dim ,std::string metric_type,float lr,RigidTransformType::Pointer in_trans)
 {
     int NITK= TORTOISE::GetAvailableITKThreadFor();
 
@@ -238,9 +247,10 @@ RigidPhaseScaleTransformType::Pointer RigidPhaseRegisterImages(ImageType3D::Poin
         metric=m;
 
     RigidPhaseScaleTransformType::Pointer initial_transform = RigidPhaseScaleTransformType::New();
+    initial_transform->SetPhaseAxis(phase_dim);
     initial_transform->SetIdentity();
     initial_transform->SetComputeZYX(true);
-    initial_transform->SetPhaseAxis(phase_dim);
+
 
 
     itk::ContinuousIndex<double,3> mid_ind;
@@ -279,7 +289,20 @@ RigidPhaseScaleTransformType::Pointer RigidPhaseRegisterImages(ImageType3D::Poin
         p[3]= in_trans->GetParameters()[3];
         p[4]= in_trans->GetParameters()[4];
         p[5]= in_trans->GetParameters()[5];
-        p[6]= 1;
+
+        if(phase_dim==0)
+        {
+            p[6]=1;p[7]=0;p[8]=0;
+        }
+        if(phase_dim==1)
+        {
+            p[6]=0;p[7]=1;p[8]=0;
+        }
+        if(phase_dim==2)
+        {
+            p[6]=0;p[7]=0;p[8]=1;
+        }
+
         initial_transform->SetParameters(p);
     }
 
@@ -356,22 +379,6 @@ RigidPhaseScaleTransformType::Pointer RigidPhaseRegisterImages(ImageType3D::Poin
     rigidRegistration->SetOptimizer(optimizer);
 
 
-    /*
-    std::cout<<"Doing gradient descent instead of conjugate..."<<std::endl;
-    //typedef itk::AmoebaOptimizerv4 OptimizerType;
-    typedef itk::GradientDescentOptimizerv4 OptimizerType;
-    OptimizerType::Pointer optimizer = OptimizerType::New();
-    optimizer->SetLearningRate( learningRate );
-    optimizer->SetMaximumStepSizeInPhysicalUnits( learningRate );
-    optimizer->SetNumberOfIterations( 1000 );
-    optimizer->SetScalesEstimator( scalesEstimator );
-    optimizer->SetMinimumConvergenceValue( 1E-5 );
-    optimizer->SetConvergenceWindowSize( 10 );
-    optimizer->SetDoEstimateLearningRateAtEachIteration( false);
-
-    rigidRegistration->SetOptimizer(optimizer);
-*/
-
     //optimizer->AddObserver(itk::IterationEvent(), observer );
 
     try
@@ -387,8 +394,6 @@ RigidPhaseScaleTransformType::Pointer RigidPhaseRegisterImages(ImageType3D::Poin
 
     RigidPhaseScaleTransformType::Pointer final_trans = const_cast<RigidPhaseScaleTransformType *>(rigidRegistration->GetOutput()->Get() );
     return final_trans;
-
-
 }
 
 
@@ -400,11 +405,29 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
     MetricType3::Pointer m= MetricType3::New();
     m->SetNumberOfHistogramBins(40);
     m->SetMaximumNumberOfWorkUnits(NITK);
+    m->SetFixedImage(fixed_img);
+    m->SetMovingImage(moving_img);
+
+    MetricType3::Pointer m4= MetricType3::New();
+    m4->SetNumberOfHistogramBins(100);
+    m4->SetMaximumNumberOfWorkUnits(NITK);
+    m4->SetFixedImage(fixed_img);
+    m4->SetMovingImage(moving_img);
 
     typedef itk::CorrelationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType2;
     MetricType2::Pointer m2= MetricType2::New();
     m2->SetMaximumNumberOfWorkUnits(NITK);
+    m2->SetFixedImage(fixed_img);
+    m2->SetMovingImage(moving_img);
 
+    using MultiMetricType = itk::ObjectToObjectMultiMetricv4<3, 3,ImageType3D>;
+    auto multiMetric = MultiMetricType::New();
+
+    // Add metrics with respective weights (e.g., balance intensity and mutual information)
+    multiMetric->SetVirtualDomainFromImage(fixed_img);
+    multiMetric->AddMetric(m);
+    multiMetric->AddMetric(m4);
+    multiMetric->AddMetric(m2);
 
     using MetricType =itk::ImageToImageMetricv4<ImageType3D,ImageType3D> ;
     MetricType::Pointer         metric        = nullptr;
@@ -412,6 +435,9 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
         metric=m2;
     else
         metric=m;
+
+
+
 
     RigidTransformType::Pointer initial_transform = RigidTransformType::New();
     initial_transform->SetIdentity();
@@ -457,7 +483,17 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
 
     rigidRegistration->SetFixedImage( 0, fixed_img );
     rigidRegistration->SetMovingImage( 0, moving_img );
-    rigidRegistration->SetMetric( metric );
+    if(metric_type!="multi")
+        rigidRegistration->SetMetric( metric );
+    else
+    {
+        rigidRegistration->SetMetric( multiMetric );
+        rigidRegistration->SetFixedImage( 1, fixed_img );
+        rigidRegistration->SetMovingImage( 1, moving_img );
+        rigidRegistration->SetFixedImage( 2, fixed_img );
+        rigidRegistration->SetMovingImage(2, moving_img );
+    }
+
     rigidRegistration->SetNumberOfWorkUnits(NITK);
     rigidRegistration->GetMultiThreader()->SetMaximumNumberOfThreads(NITK);
     rigidRegistration->GetMultiThreader()->SetNumberOfWorkUnits(NITK);
@@ -526,7 +562,18 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
     }
     else
     {
-        std::cout<<"Doing gradient descent instead of conjugate..."<<std::endl;
+        std::cout<<"Doing powell optimizer instead of conjugate..."<<std::endl;
+
+        using OptimizerType= itk::PowellOptimizerv4<double>;
+        OptimizerType::Pointer optimizer = OptimizerType::New();
+        optimizer->SetStepLength(learningRate);
+        optimizer->SetMaximumIteration(1000);
+        optimizer->SetStepTolerance(0.001);
+        optimizer->SetValueTolerance(0.0001);
+
+
+
+        /*
         //typedef itk::AmoebaOptimizerv4 OptimizerType;
         typedef itk::GradientDescentOptimizerv4 OptimizerType;
         OptimizerType::Pointer optimizer = OptimizerType::New();
@@ -537,6 +584,7 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
         optimizer->SetMinimumConvergenceValue( 1E-5 );
         optimizer->SetConvergenceWindowSize( 10 );
         optimizer->SetDoEstimateLearningRateAtEachIteration( false);
+*/
 
         rigidRegistration->SetOptimizer(optimizer);
 
@@ -827,7 +875,7 @@ RigidTransformType::Pointer MultiStartRigidSearch(ImageType3D::Pointer fixed_img
 
 
 
-
+/*
 
     MetricType3::Pointer m= MetricType3::New();
     m->SetNumberOfHistogramBins(mibins);
@@ -840,24 +888,46 @@ RigidTransformType::Pointer MultiStartRigidSearch(ImageType3D::Pointer fixed_img
         mimetric=m2;
     else
         mimetric=m;
+*/
+
+    typedef itk::MattesMutualInformationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType3;
+    MetricType3::Pointer m= MetricType3::New();
+    m->SetNumberOfHistogramBins(40);
+    m->SetFixedImage(fixed_img);
+    m->SetMovingImage(moving_img);
+
+    MetricType3::Pointer m4= MetricType3::New();
+    m4->SetNumberOfHistogramBins(100);
+    m4->SetFixedImage(fixed_img);
+    m4->SetMovingImage(moving_img);
+
+    typedef itk::CorrelationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType2;
+    MetricType2::Pointer m2= MetricType2::New();
+    m2->SetFixedImage(fixed_img);
+    m2->SetMovingImage(moving_img);
 
 
-    //MetricType::Pointer mimetric = MetricType::New();
-    //mimetric->SetNumberOfHistogramBins( mibins );
-    mimetric->SetFixedImage( image1 );
-    mimetric->SetMovingImage( image2 );
-    mimetric->SetMovingTransform( affinesearch );
-    mimetric->SetParameters( newparams );
-    mimetric->Initialize();
+    using MultiMetricType = itk::ObjectToObjectMultiMetricv4<3, 3,ImageType3D>;
+    auto multiMetric = MultiMetricType::New();
+
+    // Add metrics with respective weights (e.g., balance intensity and mutual information)
+    multiMetric->SetVirtualDomainFromImage(fixed_img);
+    multiMetric->AddMetric(m);
+    multiMetric->AddMetric(m4);
+    multiMetric->AddMetric(m2);
+    multiMetric->SetMovingTransform(affinesearch);
+    multiMetric->Initialize();
+
+
 
 
     RegistrationParameterScalesFromPhysicalShiftType::Pointer shiftScaleEstimator =      RegistrationParameterScalesFromPhysicalShiftType::New();
-    shiftScaleEstimator->SetMetric( mimetric );
+    shiftScaleEstimator->SetMetric( m2 );
     shiftScaleEstimator->SetTransformForward( true ); // by default, scales for the moving transform
     RegistrationParameterScalesFromPhysicalShiftType::ScalesType         movingScales( affinesearch->GetNumberOfParameters() );
     shiftScaleEstimator->EstimateScales( movingScales );
     mstartOptimizer->SetScales( movingScales );
-    mstartOptimizer->SetMetric( mimetric );
+    mstartOptimizer->SetMetric( multiMetric );
     OptimizerType::ParametersListType parametersList = mstartOptimizer->GetParametersList();
 
     affinesearch->SetComputeZYX(true);
@@ -883,7 +953,8 @@ RigidTransformType::Pointer MultiStartRigidSearch(ImageType3D::Pointer fixed_img
 
 
     LocalOptimizerType::Pointer  localoptimizer = LocalOptimizerType::New();
-    localoptimizer->SetMetric( mimetric );
+    //localoptimizer->SetMetric( mimetric );
+    localoptimizer->SetMetric( multiMetric );
     localoptimizer->SetScales( movingScales );
     localoptimizer->SetLearningRate( localoptimizerlearningrate );
     localoptimizer->SetMaximumStepSizeInPhysicalUnits( localoptimizerlearningrate ); // * sqrt( small_step )

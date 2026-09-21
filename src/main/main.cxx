@@ -6,7 +6,8 @@
 int main(int argc, char * argv[])
 {
 
-    itk::MultiThreaderBase::SetGlobalDefaultThreader(itk::MultiThreaderBase::ThreaderTypeFromString("Pool"));
+    //itk::MultiThreaderBase::SetGlobalDefaultThreader(itk::MultiThreaderBase::ThreaderTypeFromString("Pool"));
+  //  itk::MultiThreaderBase::SetGlobalDefaultNumberOfThreads(1);
 
     std::chrono::steady_clock::time_point Tbegin = std::chrono::steady_clock::now();
     TORTOISE(argc,argv);    

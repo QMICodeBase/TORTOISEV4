@@ -568,6 +568,7 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
     std::string correction_mode= RegistrationSettings::get().getValue<std::string>(std::string("correction_mode"));
 
 
+
     ImageType3D::Pointer mask2=ChangeImageHeaderToDP<ImageType3D>(this->b0_mask_img);
     ImageType3D::Pointer target_zero=ChangeImageHeaderToDP<ImageType3D>(target_imgs[0]);
 
@@ -688,6 +689,8 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
 #else
     #pragma omp parallel for
 #endif
+
+
 
     for(int thr=0;thr<n_omp_threads;thr++)
     {
@@ -1350,7 +1353,7 @@ void DIFFPREP::MotionAndEddy()
         iterative=true;
 
   //  if(correction_mode=="off" && !slice_to_volume)
-    //    iterative=false;
+    //    iterative=false;`
 
     if(Nepoch==0)
         iterative=false;

@@ -34,6 +34,7 @@ public:
     using CompositeTransformType= itk::CompositeTransform<CoordType,3>;
     using RigidTransformType= itk::Euler3DTransform<CoordType>;
     using AffineTransformType= itk::AffineTransform<CoordType,3>;
+    using GenericTransformType=itk::Transform<double,3,3>;
 
     using Tee=boost::iostreams::tee_device<std::ostream, std::ofstream>;
     using TeeStream= boost::iostreams::stream<Tee>;

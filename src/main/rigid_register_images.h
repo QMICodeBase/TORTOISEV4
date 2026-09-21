@@ -18,13 +18,13 @@ QuadraticTransformType::Pointer RigidRegisterImages(ImageType3D::Pointer fixed_i
 RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string metric_type="CC",float lr=0.4,bool gd=0, RigidTransformType::Pointer in_trans=nullptr);
 RigidTransformType::Pointer RigidRegisterImagesEulerSmall(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string metric_type="CC");
 
-RigidPhaseScaleTransformType::Pointer RigidPhaseRegisterImages(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,int phase_dim , std::string metric_type="CC",float lr=0.4,RigidTransformType::Pointer in_trans=nullptr);
+RigidPhaseScaleTransformType::Pointer RigidScaleShearRegisterImages(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,int phase_dim , std::string metric_type="CC",float lr=0.4,RigidTransformType::Pointer in_trans=nullptr);
 
 
 
 RigidTransformType::Pointer MultiStartRigidSearch(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string metric_type);
 
-RigidTransformType::Pointer  TranslationRegisterImages(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string metric_type);
+RigidTransformType::Pointer  TranslationRegisterImages(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string metric_type,bool onlyXZ=0);
 
 
 

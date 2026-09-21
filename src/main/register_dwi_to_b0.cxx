@@ -146,10 +146,10 @@ QuadraticTransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img,
         registration->SetMetricSamplingPercentage(1.);        
         registration->SetOptimizer(optimizer);
         registration->SetInitialTransform(initialTransform);
-        registration->InPlaceOn();        
-        registration->SetNumberOfWorkUnits(NITK);
+        registration->InPlaceOn();
+        registration->SetNumberOfWorkUnits(1);
         //registration->SetNumberOfThreads(NITK);
-        metric2->SetMaximumNumberOfWorkUnits(NITK);
+        metric2->SetMaximumNumberOfWorkUnits(1);
         registration->SetMetric(        metric2        );
 
 
@@ -202,9 +202,9 @@ QuadraticTransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img,
             registration->SetOptimizer(optimizer);
             registration->SetInitialTransform(initialTransform);
             registration->InPlaceOn();
-            registration->SetNumberOfWorkUnits(NITK);
+            registration->SetNumberOfWorkUnits(1);
             //registration->SetNumberOfThreads(NITK);
-            metric->SetMaximumNumberOfWorkUnits(NITK);
+            metric->SetMaximumNumberOfWorkUnits(1);
             registration->SetMetric(        metric        );
 
 

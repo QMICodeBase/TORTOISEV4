@@ -532,7 +532,7 @@ void FINALDATA::ReadOrigTransforms()
 
 
 
-    std::string coeffs_file = RegistrationSettings::get().getValue<std::string>("grad_nonlin_coeffs");
+    std::string coeffs_file = RegistrationSettings::get().getValue<std::string>("grad_nonlin");
     if(coeffs_file!="" && parser->getNOGradWarp()==false)
     {
         std::string up_name = this->parser->getUpInputName();
@@ -3505,11 +3505,13 @@ void FINALDATA::GenerateGradNonlinOutput()
             graddev_vbmat_img_up= ComputeVBMatImgFromCoeffs(0);
             if(data_combination_method!="Merge" && data_names[1]!="")
             {
+                (*stream)<<"Generating gradient nonlinearity voxelwise bmatrix file from coefficients..."<<std::endl;
                 graddev_vbmat_img_down= ComputeVBMatImgFromCoeffs(1);
             }
         }
         else
         {
+            (*stream)<<"Generating gradient nonlinearity grad_dev file from coefficients..."<<std::endl;
             graddev_vbmat_img_up= ComputeLImgFromCoeffs();
         }
     }
@@ -3518,6 +3520,7 @@ void FINALDATA::GenerateGradNonlinOutput()
         if(output_gradnonlin_type=="vbmat")
         {
             graddev_vbmat_img_up= ComputeVBMatImgFromField(0);
+            (*stream)<<"Generating gradient nonlinearity voxelwise bmatrix file from field..."<<std::endl;
             if(data_combination_method!="Merge" && data_names[1]!="")
             {
                 graddev_vbmat_img_down= ComputeVBMatImgFromField(1);
@@ -3525,6 +3528,7 @@ void FINALDATA::GenerateGradNonlinOutput()
         }
         else
         {
+            (*stream)<<"Generating gradient nonlinearity grad_dev file from field..."<<std::endl;
             graddev_vbmat_img_up= ComputeLImgFromField();
         }
     }
@@ -3701,9 +3705,10 @@ void FINALDATA::Generate()
 
     std::string coeffs_file = RegistrationSettings::get().getValue<std::string>("grad_nonlin_coeffs");
     std::string output_gradnonlin_type = RegistrationSettings::get().getValue<std::string>("output_gradnonlin_Bmtxt_type");
+    std::string gradnonlin_input= RegistrationSettings::get().getValue<std::string>("grad_nonlin");
 
 
-    if(coeffs_file !="" || (this->s2v_transformations[0].size()) && output_gradnonlin_type =="vbmat")
+    if(coeffs_file !="" || gradnonlin_input!="" || (this->s2v_transformations[0].size()) && output_gradnonlin_type =="vbmat")
     {
         (*stream)<<"Generating gradient nonlinearity information..."<<std::endl;
         GenerateGradNonlinOutput();

@@ -29,6 +29,7 @@ public:
 
     bool getRigidForHeavilyDistorted();
 
+
     //bool getDisableInitRigid();
     //bool getStartWithDiffeo();
     std::string  getRigidMetricType();

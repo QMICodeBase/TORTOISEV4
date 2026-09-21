@@ -28,8 +28,10 @@ EulerPhaseScale3DTransform<TParametersValueType>::EulerPhaseScale3DTransform()
 
 {
   m_AngleX = m_AngleY = m_AngleZ = ScalarType{};
-  m_PhaseScale=1;
+
   m_PhaseAxis=1;
+  m_PhaseScaleShear.fill(0);
+  m_PhaseScaleShear[this->m_PhaseAxis]=1;
   this->m_FixedParameters.SetSize(SpaceDimension + 1);
   this->m_FixedParameters.Fill(0.0);
 }
@@ -56,8 +58,10 @@ EulerPhaseScale3DTransform<TParametersValueType>::EulerPhaseScale3DTransform(uns
 {
 
   m_AngleX = m_AngleY = m_AngleZ = ScalarType{};
-    m_PhaseScale=1;
-    m_PhaseAxis=1;
+  m_PhaseAxis=1;
+  m_PhaseScaleShear.fill(0);
+  m_PhaseScaleShear[this->m_PhaseAxis]=1;
+
   this->m_FixedParameters.SetSize(SpaceDimension + 1);
   this->m_FixedParameters.Fill(0.0);
 }
@@ -88,7 +92,9 @@ EulerPhaseScale3DTransform<TParametersValueType>::SetParameters(const Parameters
   m_AngleY = parameters[1];
   m_AngleZ = parameters[2];
 
-  m_PhaseScale = parameters[6];
+  m_PhaseScaleShear[0] = parameters[6];
+  m_PhaseScaleShear[1] = parameters[7];
+  m_PhaseScaleShear[2] = parameters[8];
 
   this->ComputeMatrix();
 
@@ -117,7 +123,9 @@ EulerPhaseScale3DTransform<TParametersValueType>::GetParameters() const -> const
   this->m_Parameters[3] = this->GetTranslation()[0];
   this->m_Parameters[4] = this->GetTranslation()[1];
   this->m_Parameters[5] = this->GetTranslation()[2];
-  this->m_Parameters[6] = m_PhaseScale;
+  this->m_Parameters[6] = m_PhaseScaleShear[0];
+  this->m_Parameters[7] = m_PhaseScaleShear[1];
+  this->m_Parameters[8] = m_PhaseScaleShear[2];
 
   return this->m_Parameters;
 }
@@ -180,53 +188,82 @@ EulerPhaseScale3DTransform<TParametersValueType>::SetIdentity()
   m_AngleX = 0;
   m_AngleY = 0;
   m_AngleZ = 0;
-  m_PhaseScale=1;
+  m_PhaseScaleShear.fill(0);
+  m_PhaseScaleShear[this->m_PhaseAxis]=1;
 }
 
 template <typename TParametersValueType>
 void
 EulerPhaseScale3DTransform<TParametersValueType>::ComputeMatrixParameters()
 {
+    vnl_matrix_fixed<double,3,3> Rmat, Smat_inv;
+    Smat_inv.set_identity();
+
+    double Kx=m_PhaseScaleShear[0];
+    double Ky=m_PhaseScaleShear[1];
+    double Kz=m_PhaseScaleShear[2];
+
+    if(this->m_PhaseAxis==0)
+    {
+        Smat_inv(0,0)=1./Kx;
+        Smat_inv(0,1)=-Ky/Kx;
+        Smat_inv(0,2)=-Kz/Kx;
+    }
+    if(this->m_PhaseAxis==1)
+    {
+        Smat_inv(1,0)=-Kx/Ky;
+        Smat_inv(1,1)=1./Ky;
+        Smat_inv(1,2)=-Kz/Ky;
+    }
+    if(this->m_PhaseAxis==2)
+    {
+        Smat_inv(2,0)=-Kx/Kz;
+        Smat_inv(2,1)=-Ky/Kz;
+        Smat_inv(2,2)=1./Kz;
+    }
+
+    Rmat= Smat_inv * this->GetMatrix().GetVnlMatrix();
+
   if (m_ComputeZYX)
   {
-    m_AngleY = -std::asin(this->GetMatrix()[2][0]);
+    m_AngleY = -std::asin(Rmat[2][0]);
     const double C = std::cos(m_AngleY);
     if (itk::Math::abs(C) > 0.00005)
     {
-      double x = this->GetMatrix()[2][2] / C;
-      double y = this->GetMatrix()[2][1] / C;
+      double x = Rmat[2][2] / C;
+      double y = Rmat[2][1] / C;
       m_AngleX = std::atan2(y, x);
-      x = this->GetMatrix()[0][0] / C;
-      y = this->GetMatrix()[1][0] / C;
+      x = Rmat[0][0] / C;
+      y = Rmat[1][0] / C;
       m_AngleZ = std::atan2(y, x);
     }
     else
     {
       m_AngleX = ScalarType{};
-      const double x = this->GetMatrix()[1][1];
-      const double y = -this->GetMatrix()[0][1];
+      const double x = Rmat[1][1];
+      const double y = -Rmat[0][1];
       m_AngleZ = std::atan2(y, x);
     }
   }
   else
   {
-    m_AngleX = std::asin(this->GetMatrix()[2][1]);
+    m_AngleX = std::asin(Rmat[2][1]);
     const double A = std::cos(m_AngleX);
     if (itk::Math::abs(A) > 0.00005)
     {
-      double x = this->GetMatrix()[2][2] / A;
-      double y = -this->GetMatrix()[2][0] / A;
+      double x = Rmat[2][2] / A;
+      double y = -Rmat[2][0] / A;
       m_AngleY = std::atan2(y, x);
 
-      x = this->GetMatrix()[1][1] / A;
-      y = -this->GetMatrix()[0][1] / A;
+      x = Rmat[1][1] / A;
+      y = -Rmat[0][1] / A;
       m_AngleZ = std::atan2(y, x);
     }
     else
     {
       m_AngleZ = ScalarType{};
-      const double x = this->GetMatrix()[0][0];
-      const double y = this->GetMatrix()[1][0];
+      const double x = Rmat[0][0];
+      const double y = Rmat[1][0];
       m_AngleY = std::atan2(y, x);
     }
   }
@@ -282,17 +319,19 @@ EulerPhaseScale3DTransform<TParametersValueType>::ComputeMatrix()
 
   Matrix<TParametersValueType, 3, 3> ScaleMatrix;
   ScaleMatrix.SetIdentity();
-  ScaleMatrix[m_PhaseAxis][m_PhaseAxis]=m_PhaseScale;
+  ScaleMatrix[m_PhaseAxis][0]=m_PhaseScaleShear[0];
+  ScaleMatrix[m_PhaseAxis][1]=m_PhaseScaleShear[1];
+  ScaleMatrix[m_PhaseAxis][2]=m_PhaseScaleShear[2];
 
   // Apply the rotation first around Y then X then Z
   if (m_ComputeZYX)
   {
-    this->SetVarMatrix(RotationZ * RotationY * RotationX*ScaleMatrix);
+    this->SetVarMatrix(ScaleMatrix* RotationZ * RotationY * RotationX);
   }
   else
   {
     // Like VTK transformation order
-    this->SetVarMatrix(RotationZ * RotationX * RotationY*ScaleMatrix);
+    this->SetVarMatrix(ScaleMatrix * RotationZ * RotationX * RotationY);
   }
 }
 
@@ -316,120 +355,182 @@ EulerPhaseScale3DTransform<TParametersValueType>::ComputeJacobianWithRespectToPa
   const double py = p[1] - this->GetCenter()[1];
   const double pz = p[2] - this->GetCenter()[2];
 
-  const double S= m_PhaseScale;
+  const double Kx= this->m_PhaseScaleShear[0];
+  const double Ky= this->m_PhaseScaleShear[1];
+  const double Kz= this->m_PhaseScaleShear[2];
+
 
   if (m_ComputeZYX)
   {
       if(m_PhaseAxis==0)
       {
-          jacobian[0][0] = (cz * sy * cx + sz * sx) * py + (-cz * sy * sx + sz * cx) * pz;
-          jacobian[1][0] = (sz * sy * cx - cz * sx) * py + (-sz * sy * sx - cz * cx) * pz;
-          jacobian[2][0] = (cy * cx) * py + (-cy * sx) * pz;
 
-          jacobian[0][1] = (-cz * sy) *  px * S  + (cz * cy * sx) * py + (cz * cy * cx) * pz;
-          jacobian[1][1] = (-sz * sy) * px * S  + (sz * cy * sx) * py + (sz * cy * cx) * pz;
-          jacobian[2][1] = (-cy) * px * S  + (-sy * sx) * py + (-sy * cx) * pz;
 
-          jacobian[0][2] = (-sz * cy) * px * S  + (-sz * sy * sx - cz * cx) * py + (-sz * sy * cx + cz * sx) * pz;
-          jacobian[1][2] = (cz * cy) * px * S  + (cz * sy * sx - sz * cx) * py + (cz * sy * cx + sz * sx) * pz;
-          jacobian[2][2] = 0;
+        jacobian[0][0]= - py*(sx*(Ky*cz - Kx*sz) - cx*(Kz*cy + sy*(Kx*cz + Ky*sz))) - pz*(cx*(Ky*cz - Kx*sz) + sx*(Kz*cy + sy*(Kx*cz + Ky*sz)));
+        jacobian[1][0]= - py*(cz*sx - cx*sy*sz) - pz*(cx*cz + sx*sy*sz);
+        jacobian[2][0]= py*cx*cy - pz*cy*sx;
 
-          jacobian[0][6]= px * cy * cz;
-          jacobian[1][6]= px * cy * sz;
-          jacobian[2][6]= -px * sy ;
+        jacobian[0][1]= - px*(Kz*cy + sy*(Kx*cz + Ky*sz)) - pz*cx*(Kz*sy - cy*(Kx*cz + Ky*sz)) - py*sx*(Kz*sy - cy*(Kx*cz + Ky*sz));
+        jacobian[1][1]= pz*cx*cy*sz - px*sy*sz + py*cy*sx*sz;
+        jacobian[2][1]= - px*cy - pz*cx*sy - py*sx*sy;
+
+        jacobian[0][2]= pz*(sx*(Kx*cz + Ky*sz) + cx*sy*(Ky*cz - Kx*sz)) - py*(cx*(Kx*cz + Ky*sz) - sx*sy*(Ky*cz - Kx*sz)) + px*cy*(Ky*cz - Kx*sz);
+        jacobian[1][2]=pz*(sx*sz + cx*cz*sy) - py*(cx*sz - cz*sx*sy) + px*cy*cz;
+        jacobian[2][2]=0;
+
+
+
+        jacobian[0][6]= pz*(sx*sz + cx*cz*sy) - py*(cx*sz - cz*sx*sy) + px*cy*cz;
+        jacobian[1][6]= 0;
+        jacobian[2][6]= 0;
+
+        jacobian[0][7]= py*(cx*cz + sx*sy*sz) - pz*(cz*sx - cx*sy*sz) + px*cy*sz;
+        jacobian[1][7]=      0;
+        jacobian[2][7]=      0;
+
+        jacobian[0][8]=pz*cx*cy - px*sy + py*cy*sx;
+        jacobian[1][8]=      0;
+        jacobian[2][8]=      0;
       }
       if(m_PhaseAxis==1)
       {
-          jacobian[0][0] = (cz * sy * cx + sz * sx) * py* S  + (-cz * sy * sx + sz * cx) * pz;
-          jacobian[1][0] = (sz * sy * cx - cz * sx) * py* S  + (-sz * sy * sx - cz * cx) * pz;
-          jacobian[2][0] = (cy * cx) * py* S  + (-cy * sx) * pz;
+        jacobian[0][0]=py*(sx*sz + cx*cz*sy) + pz*(cx*sz - cz*sx*sy);
+        jacobian[1][0]=- py*(sx*(Ky*cz - Kx*sz) - cx*(Kz*cy + sy*(Kx*cz + Ky*sz))) - pz*(cx*(Ky*cz - Kx*sz) + sx*(Kz*cy + sy*(Kx*cz + Ky*sz)));
+        jacobian[2][0]=py*cx*cy - pz*cy*sx;
 
-          jacobian[0][1] = (-cz * sy) *  px + (cz * cy * sx) * py* S  + (cz * cy * cx) * pz;
-          jacobian[1][1] = (-sz * sy) * px + (sz * cy * sx) * py* S  + (sz * cy * cx) * pz;
-          jacobian[2][1] = (-cy) * px + (-sy * sx) * py* S  + (-sy * cx) * pz;
+        jacobian[0][1]=  pz*cx*cy*cz - px*cz*sy + py*cy*cz*sx;
+        jacobian[1][1]=  - px*(Kz*cy + sy*(Kx*cz + Ky*sz)) - pz*cx*(Kz*sy - cy*(Kx*cz + Ky*sz)) - py*sx*(Kz*sy - cy*(Kx*cz + Ky*sz));
+        jacobian[2][1]=  - px*cy - pz*cx*sy - py*sx*sy;
 
-          jacobian[0][2] = (-sz * cy) * px + (-sz * sy * sx - cz * cx) * py* S  + (-sz * sy * cx + cz * sx) * pz;
-          jacobian[1][2] = (cz * cy) * px + (cz * sy * sx - sz * cx) * py* S  + (cz * sy * cx + sz * sx) * pz;
-          jacobian[2][2] = 0;
+        jacobian[0][2]=pz*(cz*sx - cx*sy*sz) - py*(cx*cz + sx*sy*sz) - px*cy*sz;
+        jacobian[1][2]=pz*(sx*(Kx*cz + Ky*sz) + cx*sy*(Ky*cz - Kx*sz)) - py*(cx*(Kx*cz + Ky*sz) - sx*sy*(Ky*cz - Kx*sz)) + px*cy*(Ky*cz - Kx*sz);
+        jacobian[2][2]=0;
 
-          jacobian[0][6]= -py * (cx *sz - cz*sx*sy);
-          jacobian[1][6]= py * (cx*cz + sx*sy*sz);
-          jacobian[2][6]= py * cy *sx;
+
+        jacobian[0][6]=0;
+        jacobian[1][6]=pz*(sx*sz + cx*cz*sy) - py*(cx*sz - cz*sx*sy) + px*cy*cz;
+        jacobian[2][6]=0;
+
+        jacobian[0][7]=0;
+        jacobian[1][7]=py*(cx*cz + sx*sy*sz) - pz*(cz*sx - cx*sy*sz) + px*cy*sz;
+        jacobian[2][7]=0;
+
+        jacobian[0][8]=0;
+        jacobian[1][8]=pz*cx*cy - px*sy + py*cy*sx;
+        jacobian[2][8]=0;
       }
       if(m_PhaseAxis==2)
-      {
-          jacobian[0][0] = (cz * sy * cx + sz * sx) * py + (-cz * sy * sx + sz * cx) * pz* S ;
-          jacobian[1][0] = (sz * sy * cx - cz * sx) * py + (-sz * sy * sx - cz * cx) * pz* S ;
-          jacobian[2][0] = (cy * cx) * py + (-cy * sx) * pz* S ;
+      {          
+        jacobian[0][0]=py*(sx*sz + cx*cz*sy) + pz*(cx*sz - cz*sx*sy);
+        jacobian[1][0]=- py*(cz*sx - cx*sy*sz) - pz*(cx*cz + sx*sy*sz);
+        jacobian[2][0]=- py*(sx*(Ky*cz - Kx*sz) - cx*(Kz*cy + sy*(Kx*cz + Ky*sz))) - pz*(cx*(Ky*cz - Kx*sz) + sx*(Kz*cy + sy*(Kx*cz + Ky*sz)));
 
-          jacobian[0][1] = (-cz * sy) *  px + (cz * cy * sx) * py + (cz * cy * cx) * pz* S ;
-          jacobian[1][1] = (-sz * sy) * px + (sz * cy * sx) * py + (sz * cy * cx) * pz* S ;
-          jacobian[2][1] = (-cy) * px + (-sy * sx) * py + (-sy * cx) * pz* S ;
+        jacobian[0][1]=pz*cx*cy*cz - px*cz*sy + py*cy*cz*sx;
+        jacobian[1][1]=pz*cx*cy*sz - px*sy*sz + py*cy*sx*sz;
+        jacobian[2][1]=- px*(Kz*cy + sy*(Kx*cz + Ky*sz)) - pz*cx*(Kz*sy - cy*(Kx*cz + Ky*sz)) - py*sx*(Kz*sy - cy*(Kx*cz + Ky*sz));
 
-          jacobian[0][2] = (-sz * cy) * px + (-sz * sy * sx - cz * cx) * py + (-sz * sy * cx + cz * sx) * pz* S ;
-          jacobian[1][2] = (cz * cy) * px + (cz * sy * sx - sz * cx) * py + (cz * sy * cx + sz * sx) * pz* S ;
-          jacobian[2][2] = 0;
+        jacobian[0][2]=pz*(cz*sx - cx*sy*sz) - py*(cx*cz + sx*sy*sz) - px*cy*sz;
+        jacobian[1][2]=pz*(sx*sz + cx*cz*sy) - py*(cx*sz - cz*sx*sy) + px*cy*cz;
+        jacobian[2][2]=pz*(sx*(Kx*cz + Ky*sz) + cx*sy*(Ky*cz - Kx*sz)) - py*(cx*(Kx*cz + Ky*sz) - sx*sy*(Ky*cz - Kx*sz)) + px*cy*(Ky*cz - Kx*sz);
 
-          jacobian[0][6]= pz* (sx*sz + cx*cz *sy);
-          jacobian[1][6]= -pz* (cz*sx -cx*sy*sz);
-          jacobian[2][6]= pz*cx*cy;
+
+        jacobian[0][6]=0;
+        jacobian[1][6]=0;
+        jacobian[2][6]=pz*(sx*sz + cx*cz*sy) - py*(cx*sz - cz*sx*sy) + px*cy*cz;
+
+        jacobian[0][7]=0;
+        jacobian[1][7]=0;
+        jacobian[2][7]=py*(cx*cz + sx*sy*sz) - pz*(cz*sx - cx*sy*sz) + px*cy*sz;
+
+        jacobian[0][8]=0;
+        jacobian[1][8]=0;
+        jacobian[2][8]=pz*cx*cy - px*sy + py*cy*sx;
       }
   }
   else
   {
       if(m_PhaseAxis==0)
-      {
-          jacobian[0][0] = (-sz * cx * sy) * px* S  + (sz * sx) * py + (sz * cx * cy) * pz;
-          jacobian[1][0] = (cz * cx * sy) * px* S  + (-cz * sx) * py + (-cz * cx * cy) * pz;
-          jacobian[2][0] = (sx * sy) * px* S  + (cx)*py + (-sx * cy) * pz;
+      {                    
+        jacobian[0][0]=py*(Kz*cx - sx*(Ky*cz - Kx*sz)) - pz*cy*(Kz*sx + cx*(Ky*cz - Kx*sz)) + px*sy*(Kz*sx + cx*(Ky*cz - Kx*sz));
+        jacobian[1][0]=px*cx*cz*sy - pz*cx*cy*cz - py*cz*sx;
+        jacobian[2][0]=py*cx - pz*cy*sx + px*sx*sy;
 
-          jacobian[0][1] = (-cz * sy - sz * sx * cy) * px* S  + (cz * cy - sz * sx * sy) * pz;
-          jacobian[1][1] = (-sz * sy + cz * sx * cy) * px* S  + (sz * cy + cz * sx * sy) * pz;
-          jacobian[2][1] = (-cx * cy) * px* S  + (-cx * sy) * pz;
+        jacobian[0][1]=pz*(cy*(Kx*cz + Ky*sz) - sy*(Kz*cx - sx*(Ky*cz - Kx*sz))) - px*(sy*(Kx*cz + Ky*sz) + cy*(Kz*cx - sx*(Ky*cz - Kx*sz)));
+        jacobian[1][1]=pz*(cy*sz + cz*sx*sy) - px*(sy*sz - cy*cz*sx);
+        jacobian[2][1]=- px*cx*cy - pz*cx*sy;
 
-          jacobian[0][2] = (-sz * cy - cz * sx * sy) * px* S  + (-cz * cx) * py + (-sz * sy + cz * sx * cy) * pz;
-          jacobian[1][2] = (cz * cy - sz * sx * sy) * px* S  + (-sz * cx) * py + (cz * sy + sz * sx * cy) * pz;
-          jacobian[2][2] = 0;
+        jacobian[0][2]=px*(cy*(Ky*cz - Kx*sz) - sx*sy*(Kx*cz + Ky*sz)) + pz*(sy*(Ky*cz - Kx*sz) + cy*sx*(Kx*cz + Ky*sz)) - py*cx*(Kx*cz + Ky*sz);
+        jacobian[1][2]=px*(cy*cz - sx*sy*sz) + pz*(cz*sy + cy*sx*sz) - py*cx*sz;
+        jacobian[2][2]=0;
 
-          jacobian[0][6]= px* (cy*cz -sx*sy*sz);
-          jacobian[1][6]= px* (cy*sz + cz*sx*sy);
-          jacobian[2][6]= -px *cx*sy;
+
+        jacobian[0][6]=px*(cy*cz - sx*sy*sz) + pz*(cz*sy + cy*sx*sz) - py*cx*sz;
+        jacobian[1][6]=0;
+        jacobian[2][6]=0;
+
+        jacobian[0][7]=px*(cy*sz + cz*sx*sy) + pz*(sy*sz - cy*cz*sx) + py*cx*cz;
+        jacobian[1][7]=0;
+        jacobian[2][7]=0;
+
+        jacobian[0][8]=py*sx + pz*cx*cy - px*cx*sy;
+        jacobian[1][8]=0;
+        jacobian[2][8]=0;
+
       }
       if(m_PhaseAxis==1)
       {
-          jacobian[0][0] = (-sz * cx * sy) * px + (sz * sx) * py* S  + (sz * cx * cy) * pz;
-          jacobian[1][0] = (cz * cx * sy) * px + (-cz * sx) * py* S  + (-cz * cx * cy) * pz;
-          jacobian[2][0] = (sx * sy) * px + (cx)*py* S  + (-sx * cy) * pz;
+        jacobian[0][0]=py*sx*sz + pz*cos(m_AngleX)*cy*sz - px*cos(m_AngleX)*sy*sz;
+        jacobian[1][0]=py*(Kz*cos(m_AngleX) - sx*(Ky*cz - Kx*sz)) - pz*cy*(Kz*sx + cos(m_AngleX)*(Ky*cz - Kx*sz)) + px*sy*(Kz*sx + cos(m_AngleX)*(Ky*cz - Kx*sz));
+        jacobian[2][0]=py*cos(m_AngleX) - pz*cy*sx + px*sx*sy;
 
-          jacobian[0][1] = (-cz * sy - sz * sx * cy) * px + (cz * cy - sz * sx * sy) * pz;
-          jacobian[1][1] = (-sz * sy + cz * sx * cy) * px + (sz * cy + cz * sx * sy) * pz;
-          jacobian[2][1] = (-cx * cy) * px + (-cx * sy) * pz;
+        jacobian[0][1]=pz*(cy*cz - sx*sy*sz) - px*(cz*sy + cy*sx*sz);
+        jacobian[1][1]=pz*(cy*(Kx*cz + Ky*sz) - sy*(Kz*cos(m_AngleX) - sx*(Ky*cz - Kx*sz))) - px*(sy*(Kx*cz + Ky*sz) + cy*(Kz*cos(m_AngleX) - sx*(Ky*cz - Kx*sz)));
+        jacobian[2][1]=- px*cos(m_AngleX)*cy - pz*cos(m_AngleX)*sy;
 
-          jacobian[0][2] = (-sz * cy - cz * sx * sy) * px + (-cz * cx) * py* S  + (-sz * sy + cz * sx * cy) * pz;
-          jacobian[1][2] = (cz * cy - sz * sx * sy) * px + (-sz * cx) * py* S  + (cz * sy + sz * sx * cy) * pz;
-          jacobian[2][2] = 0;
+        jacobian[0][2]=- px*(cy*sz + cz*sx*sy) - pz*(sy*sz - cy*cz*sx) - py*cos(m_AngleX)*cz;
+        jacobian[1][2]=px*(cy*(Ky*cz - Kx*sz) - sx*sy*(Kx*cz + Ky*sz)) + pz*(sy*(Ky*cz - Kx*sz) + cy*sx*(Kx*cz + Ky*sz)) - py*cos(m_AngleX)*(Kx*cz + Ky*sz);
+        jacobian[2][2]=0;
 
-          jacobian[0][6]= -py*cx*sz;
-          jacobian[1][6]= py*cx*cz;
-          jacobian[2][6]= py*sx;
+
+        jacobian[0][6]=0;
+        jacobian[1][6]=px*(cy*cz - sx*sy*sz) + pz*(cz*sy + cy*sx*sz) - py*cos(m_AngleX)*sz;
+        jacobian[2][6]=0;
+
+        jacobian[0][7]=0;
+        jacobian[1][7]=px*(cy*sz + cz*sx*sy) + pz*(sy*sz - cy*cz*sx) + py*cos(m_AngleX)*cz;
+        jacobian[2][7]=0;
+
+        jacobian[0][8]=0;
+        jacobian[1][8]=py*sx + pz*cos(m_AngleX)*cy - px*cos(m_AngleX)*sy;
+        jacobian[2][8]=0;
       }
       if(m_PhaseAxis==2)
       {
-          jacobian[0][0] = (-sz * cx * sy) * px + (sz * sx) * py + (sz * cx * cy) * pz* S ;
-          jacobian[1][0] = (cz * cx * sy) * px + (-cz * sx) * py + (-cz * cx * cy) * pz* S ;
-          jacobian[2][0] = (sx * sy) * px + (cx)*py + (-sx * cy) * pz* S ;
 
-          jacobian[0][1] = (-cz * sy - sz * sx * cy) * px + (cz * cy - sz * sx * sy) * pz* S ;
-          jacobian[1][1] = (-sz * sy + cz * sx * cy) * px + (sz * cy + cz * sx * sy) * pz* S ;
-          jacobian[2][1] = (-cx * cy) * px + (-cx * sy) * pz* S ;
+        jacobian[0][0]=py*sx*sz + pz*cx*cy*sz - px*cx*sy*sz;
+        jacobian[1][0]=px*cx*cz*sy - pz*cx*cy*cz - py*cz*sx;
+        jacobian[2][0]=py*(Kz*cx - sx*(Ky*cz - Kx*sz)) - pz*cy*(Kz*sx + cx*(Ky*cz - Kx*sz)) + px*sy*(Kz*sx + cx*(Ky*cz - Kx*sz));
 
-          jacobian[0][2] = (-sz * cy - cz * sx * sy) * px + (-cz * cx) * py + (-sz * sy + cz * sx * cy) * pz* S ;
-          jacobian[1][2] = (cz * cy - sz * sx * sy) * px + (-sz * cx) * py + (cz * sy + sz * sx * cy) * pz* S ;
-          jacobian[2][2] = 0;
+        jacobian[0][1]=pz*(cy*cz - sx*sy*sz) - px*(cz*sy + cy*sx*sz);
+        jacobian[1][1]=pz*(cy*sz + cz*sx*sy) - px*(sy*sz - cy*cz*sx);
+        jacobian[2][1]=pz*(cy*(Kx*cz + Ky*sz) - sy*(Kz*cx - sx*(Ky*cz - Kx*sz))) - px*(sy*(Kx*cz + Ky*sz) + cy*(Kz*cx - sx*(Ky*cz - Kx*sz)));
 
-          jacobian[0][6]= pz* (cz*sy + cy*sx*sz);
-          jacobian[1][6]= pz* (sy*sz -cy*cz*sx);
-          jacobian[2][6]= pz*cx*cy;
+        jacobian[0][2]=-px*(cy*sz + cz*sx*sy) - pz*(sy*sz - cy*cz*sx) - py*cx*cz;
+        jacobian[1][2]=px*(cy*cz - sx*sy*sz) + pz*(cz*sy + cy*sx*sz) - py*cx*sz;
+        jacobian[2][2]=px*(cy*(Ky*cz - Kx*sz) - sx*sy*(Kx*cz + Ky*sz)) + pz*(sy*(Ky*cz - Kx*sz) + cy*sx*(Kx*cz + Ky*sz)) - py*cx*(Kx*cz + Ky*sz);
+
+
+        jacobian[0][6]=0;
+        jacobian[1][6]=0;
+        jacobian[2][6]=px*(cy*cz - sx*sy*sz) + pz*(cz*sy + cy*sx*sz) - py*cx*sz;
+
+        jacobian[0][7]=0;
+        jacobian[1][7]=0;
+        jacobian[2][7]=px*(cy*sz + cz*sx*sy) + pz*(sy*sz - cy*cz*sx) + py*cx*cz;
+
+        jacobian[0][8]=0;
+        jacobian[1][8]=0;
+        jacobian[2][8]=py*sx + pz*cx*cy - px*cx*sy;
       }
   }
 
@@ -472,7 +573,9 @@ EulerPhaseScale3DTransform<TParametersValueType>::PrintSelf(std::ostream & os, I
   os << indent << "transX: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(this->GetTranslation()[0]) << std::endl;
   os << indent << "transY: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(this->GetTranslation()[1]) << std::endl;
   os << indent << "transZ: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(this->GetTranslation()[2]) << std::endl;
-  os << indent << "scalePhase: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(m_PhaseScale) << std::endl;
+  os << indent << "scalePhase0: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(m_PhaseScaleShear[0]) << std::endl;
+  os << indent << "scalePhase1: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(m_PhaseScaleShear[1]) << std::endl;
+  os << indent << "scalePhase2: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(m_PhaseScaleShear[2]) << std::endl;
 
   itkPrintSelfBooleanMacro(ComputeZYX);
 }

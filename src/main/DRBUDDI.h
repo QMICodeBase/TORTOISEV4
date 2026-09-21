@@ -12,6 +12,8 @@ class DRBUDDI : public DRBUDDIBase
     using DisplacementFieldTransformType= SuperClass::DisplacementFieldTransformType;
     using DisplacementFieldType=SuperClass::DisplacementFieldType;
     using RigidTransformType = SuperClass::RigidTransformType;
+    using AffineTransformType = SuperClass::AffineTransformType;
+    using GenericTransformType=SuperClass::GenericTransformType;
     using CompositeTransformType= SuperClass::CompositeTransformType;
 
     using RGBPixelType=SuperClass::RGBPixelType;
@@ -27,8 +29,9 @@ private:            //Subfunctions the main processing functions use
     RigidTransformType::Pointer RigidDiffeoRigidRegisterB0DownToB0Up(ImageType3D::Pointer up_image, ImageType3D::Pointer b0_down_image, std::string mtype, ImageType3D::Pointer & initial_corrected_b0);
     std::vector<DisplacementFieldType::Pointer> DRBUDDI_Initial_Register_Up_Down(ImageType3D::Pointer b0_up_img,ImageType3D::Pointer blip_down_img, std::string phase,bool small);
 
-    RigidTransformType::Pointer DiffeoThenRigid(ImageType3D::Pointer b0_up_img, ImageType3D::Pointer b0_down_img,RigidTransformType::Pointer init_trans, double &val,ImageType3D::Pointer &new_b0);
 
+    RigidTransformType::Pointer DiffeoThenRigid(ImageType3D::Pointer b0_up_img, ImageType3D::Pointer b0_down_img,RigidTransformType::Pointer init_trans, double &val,ImageType3D::Pointer &new_b0);
+    RigidTransformType::Pointer DiffeoThenRigid(ImageType3D::Pointer b0_up_img, ImageType3D::Pointer b0_down_img,AffineTransformType::Pointer init_trans, double &val, ImageType3D::Pointer &new_b0);
 
 
 public:                    //Main processing functions

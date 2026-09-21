@@ -66,7 +66,7 @@ public:
   static constexpr unsigned int SpaceDimension = 3;
   static constexpr unsigned int InputSpaceDimension = 3;
   static constexpr unsigned int OutputSpaceDimension = 3;
-  static constexpr unsigned int ParametersDimension = 7;
+  static constexpr unsigned int ParametersDimension = 9;
 
   using typename Superclass::ParametersType;
   using typename Superclass::ParametersValueType;
@@ -90,6 +90,7 @@ public:
   using typename Superclass::TranslationType;
   using typename Superclass::OffsetType;
   using AngleType = typename Superclass::ScalarType;
+  using PhaseVectorType =  vnl_vector_fixed<double,3>;
 
   /** Set/Get the transformation from a container of parameters
    * This is typically used by optimizers.  There are 6 parameters. The first
@@ -116,7 +117,7 @@ public:
   itkGetConstMacro(AngleY, ScalarType);
   itkGetConstMacro(AngleZ, ScalarType);
 
-  itkGetConstMacro(PhaseScale, ScalarType);
+  itkGetConstMacro(PhaseScaleShear, PhaseVectorType );
 
 
   /** This method computes the Jacobian matrix of the transformation.
@@ -138,7 +139,7 @@ public:
   SetComputeZYX(const bool flag);
   itkGetConstMacro(ComputeZYX, bool);
 
-  void SetPhaseScale(double ps){this->m_PhaseScale=ps;}
+  void SetPhaseScaleShear(vnl_vector_fixed<double,3> &ps){this->m_PhaseScaleShear=ps;}
   /** @ITKEndGrouping */
   /** Set the state to the identity.
    *
@@ -177,7 +178,7 @@ private:
   ScalarType m_AngleX{};
   ScalarType m_AngleY{};
   ScalarType m_AngleZ{};
-  ScalarType m_PhaseScale{};
+  vnl_vector_fixed<double,3> m_PhaseScaleShear{};
   int m_PhaseAxis{1};
 
   bool       m_ComputeZYX{};

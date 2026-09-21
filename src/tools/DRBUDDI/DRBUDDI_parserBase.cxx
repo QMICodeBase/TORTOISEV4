@@ -229,6 +229,7 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         option->SetModule(6);
         this->AddOption( option );
     }
+
     {
         std::string description = std::string("Up to which b-value should be used for DRBUDDI's tensor fitting. Default: 0 , meaning use all b-values")  ;
         OptionType::Pointer option = OptionType::New();
@@ -307,6 +308,7 @@ void DRBUDDI_PARSERBASE::InitializeCommandLineOptions()
         this->AddOption( option );
     }
 }
+
 
 
 bool DRBUDDI_PARSERBASE::getRigidForHeavilyDistorted()
@@ -444,7 +446,7 @@ std::string DRBUDDI_PARSERBASE::getGradNonlinInput()
     {
         std::string nm = option->GetFunction(0)->GetName();
         std::string ext= nm.substr(nm.rfind("."));
-        if(ext!=".grad" && ext!=".dat" && ext!=".gc")
+        if(ext!=".grad" && ext!=".dat" && ext!=".gc" && ext!=".nii")
         {
             std::cout<<"WARNING! Gradient nonlinearity file format not recognized. Check the file extension..."<<std::endl;
             std::cout<<"Disabling gradient nonlinearity based processing..."<<std::endl;

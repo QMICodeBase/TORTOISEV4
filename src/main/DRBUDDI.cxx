@@ -415,6 +415,122 @@ DisplacementFieldType::Pointer DRBUDDI::CompositeToDispField(CompositeTransformT
 }
 
 
+DRBUDDI::RigidTransformType::Pointer DRBUDDI::DiffeoThenRigid(ImageType3D::Pointer b0_up_img, ImageType3D::Pointer b0_down_img,AffineTransformType::Pointer init_trans, double &val, ImageType3D::Pointer &new_b0)
+{
+    itk::IdentityTransform<double,3>::Pointer  id=itk::IdentityTransform<double,3>::New();
+    id->SetIdentity();
+
+    AffineTransformType::Pointer affine_trans=AffineTransformType::New();
+    affine_trans->SetIdentity();
+
+    if(init_trans)
+        affine_trans=init_trans;
+
+    ImageType3D::Pointer new_up=nullptr;
+    ImageType3D::Pointer new_down=nullptr;
+
+
+    using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+    ResampleImageFilterType::Pointer resampleFilter2 = ResampleImageFilterType::New();
+    resampleFilter2->SetOutputParametersFromImage(b0_up_img);
+    resampleFilter2->SetInput(b0_down_img);
+    resampleFilter2->SetTransform(affine_trans);
+    resampleFilter2->Update();
+    ImageType3D::Pointer curr_down_quad_image= resampleFilter2->GetOutput();
+
+    std::vector<DisplacementFieldType::Pointer> epi_fields= DRBUDDI_Initial_Register_Up_Down(b0_up_img, curr_down_quad_image, this->PE_string,false);
+
+    ImageType3D::Pointer tnew_up_img=   JacobianTransformImage(b0_up_img,epi_fields[0],b0_up_img);
+    ImageType3D::Pointer tnew_down_img=   JacobianTransformImage(curr_down_quad_image,epi_fields[1],b0_up_img);
+    new_up=tnew_up_img;
+
+
+    using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+    MetricType::Pointer metric = MetricType::New();
+
+
+    metric->SetFixedImage(tnew_up_img);
+    metric->SetMovingImage(tnew_down_img);
+    metric->SetMovingTransform(id);
+    metric->SetFixedTransform(id);
+    metric->Initialize();
+    val= metric->GetValue();
+
+    RigidTransformType::Pointer rigid_CC= RigidRegisterImagesEuler(tnew_up_img,tnew_down_img,"CC",parser->getRigidLR());
+    RigidTransformType::Pointer rigid_MI= RigidRegisterImagesEuler(tnew_up_img,tnew_down_img,"MI",parser->getRigidLR());
+
+
+    float val_CC_diff, val_MI_diff;
+    ImageType3D::Pointer b0_down_on_up_temp=nullptr;
+    {
+        using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+        ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+        resampleFilter->SetOutputParametersFromImage(b0_up_img);
+        resampleFilter->SetInput(tnew_down_img);
+        resampleFilter->SetTransform(rigid_CC);
+        resampleFilter->Update();
+        b0_down_on_up_temp= resampleFilter->GetOutput();
+        new_down=b0_down_on_up_temp;
+
+        using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+        MetricType::Pointer metric = MetricType::New();
+
+
+        metric->SetFixedImage(tnew_up_img);
+        metric->SetMovingImage(b0_down_on_up_temp);
+        metric->SetMovingTransform(id);
+        metric->SetFixedTransform(id);
+        metric->Initialize();
+        val_CC_diff= metric->GetValue();
+    }
+
+    {
+        using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+        ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+        resampleFilter->SetOutputParametersFromImage(b0_up_img);
+        resampleFilter->SetInput(tnew_down_img);
+        resampleFilter->SetTransform(rigid_MI);
+        resampleFilter->Update();
+        b0_down_on_up_temp= resampleFilter->GetOutput();
+
+        using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+        MetricType::Pointer metric = MetricType::New();
+
+        metric->SetFixedImage(tnew_up_img);
+        metric->SetMovingImage(b0_down_on_up_temp);
+        metric->SetMovingTransform(id);
+        metric->SetFixedTransform(id);
+        metric->Initialize();
+        val_MI_diff= metric->GetValue();
+    }
+
+
+    if(val_CC_diff<val_MI_diff)
+    {
+        val = val_CC_diff;
+    }
+    else
+    {
+        val = val_MI_diff;
+        new_down=b0_down_on_up_temp;
+    }
+
+    typedef itk::AddImageFilter<ImageType3D,ImageType3D,ImageType3D> AdderType;
+    AdderType::Pointer adder= AdderType::New();
+    adder->SetInput1(new_up);
+    adder->SetInput2(new_down);
+    adder->Update();
+    new_b0=adder->GetOutput();
+
+    if(val_CC_diff<val_MI_diff)
+        return rigid_CC;
+
+    return rigid_MI;;
+
+}
+
+
+
 DRBUDDI::RigidTransformType::Pointer DRBUDDI::DiffeoThenRigid(ImageType3D::Pointer b0_up_img, ImageType3D::Pointer b0_down_img,RigidTransformType::Pointer init_trans, double &val, ImageType3D::Pointer &new_b0)
 {
     itk::IdentityTransform<double,3>::Pointer  id=itk::IdentityTransform<double,3>::New();
@@ -507,16 +623,14 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::DiffeoThenRigid(ImageType3D::Point
 
     if(val_CC_diff<val_MI_diff)
     {
-        //val = val_CC_diff;
+        val = val_CC_diff;
         rigid_trans->Compose(rigid_CC);
     }
     else
     {
-        //val = val_MI_diff;
+        val = val_MI_diff;
         new_down=b0_down_on_up_temp;
         rigid_trans->Compose(rigid_MI);
-
-
     }
 
     typedef itk::AddImageFilter<ImageType3D,ImageType3D,ImageType3D> AdderType;
@@ -540,35 +654,59 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
 
     RigidTransformType::Pointer final_trans =nullptr;
 
+    int phase_dim;
+    if(this->PE_string=="slice")
+    {
+        phase_dim=2;
+        if(this->PE_string=="horizontal")
+            phase_dim=0;
+        else
+            phase_dim=1;
+    }
+
+
+
     if(parser->getRigidForHeavilyDistorted())
     {
         std::vector<ImageType3D::Pointer> imgs;
-
-        double val_diffeo_first;
-        RigidTransformType::Pointer diffeo_first_rigid_trans=nullptr;
+        std::vector<double> vals;
+        std::vector<RigidTransformType::Pointer> rigids;
 
         const int Niter=2;
+
+
+
+        ///////////////////////////////////////////////////////////////////////////////
+        // First check if doing diffeomorphic FIRST is better than doing rigid first
         {
+            double val_diffeo_first;
+            RigidTransformType::Pointer diffeo_first_rigid_trans=nullptr;
             ImageType3D::Pointer new_img=nullptr;
             for(int iter=0; iter<Niter;iter++)
             {
                 diffeo_first_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, diffeo_first_rigid_trans, val_diffeo_first,new_img);
             }
             imgs.push_back(new_img);
-            (*stream)<<"Diffeo first similarity: " << val_diffeo_first<<std::endl;
+            vals.push_back(val_diffeo_first);
+            rigids.push_back(diffeo_first_rigid_trans);
+
+            (*stream)<<"Diffeo+rigid  similarity: " << val_diffeo_first<<std::endl;
         }
+        ///////////////////////////////////////////////////////////////////////////////
 
 
-        double val_translation_diffeo;
-        RigidTransformType::Pointer translation_diffeo_rigid_trans=nullptr;
-        RigidTransformType::Pointer translation_trans=nullptr;
 
+        ///////////////////////////////////////////////////////////////////////////////
+        // Second, check if translation+diffeo+rigid is better
+
+        RigidTransformType::Pointer translation_first_trans=nullptr, translationXZ_first_trans=nullptr,rigid_first_trans=nullptr;
         {
+            double val_translation_diffeo;
+            RigidTransformType::Pointer translation_diffeo_rigid_trans=nullptr;
             float val_CC_tr, val_MI_tr;
 
             RigidTransformType::Pointer rigid_CC= TranslationRegisterImages(b0_up_img,b0_down_img,"CC");
             RigidTransformType::Pointer rigid_MI= TranslationRegisterImages(b0_up_img,b0_down_img,"MI");
-
             {
 
                 ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
@@ -612,12 +750,12 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
             if(val_CC_tr<val_MI_tr)
             {
                 translation_diffeo_rigid_trans=rigid_CC;
-                translation_trans=rigid_CC;
+                translation_first_trans=rigid_CC;
             }
             else
             {
                 translation_diffeo_rigid_trans=rigid_MI;
-                translation_trans=rigid_MI;
+                translation_first_trans=rigid_MI;
             }
 
             ImageType3D::Pointer new_img=nullptr;
@@ -626,22 +764,28 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
                 translation_diffeo_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, translation_diffeo_rigid_trans, val_translation_diffeo,new_img);
             }
             imgs.push_back(new_img);
+            vals.push_back(val_translation_diffeo);
+            rigids.push_back(translation_diffeo_rigid_trans);
 
-            (*stream)<<"Translation+Diffeo  similarity: " << val_translation_diffeo<<std::endl;
-            (*stream)<<"Translation+Diffeo  trans: " << translation_diffeo_rigid_trans->GetParameters()<<std::endl;
+            (*stream)<<"Translation+Diffeo+Rigid   similarity: " << val_translation_diffeo<<std::endl;
+            (*stream)<<"Translation+Diffeo+Rigid  trans: " << translation_diffeo_rigid_trans->GetParameters()<<std::endl;
         }
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 
-        double val_translation_rigid_diffeo;
-        RigidTransformType::Pointer translation_rigid_diffeo_rigid_trans=nullptr;
+
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //Check if translation+rigid+diffeo+rigid is better
         {
+            double val_translation_rigid_diffeo;
+            RigidTransformType::Pointer translation_rigid_diffeo_rigid_trans=nullptr;
             float val_CC_rigid, val_MI_rigid;
 
-            RigidTransformType::Pointer rigid_CC=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"CC",0.4,0,translation_trans);
-            RigidTransformType::Pointer rigid_MI=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"MI",0.4,0,translation_trans);
+            RigidTransformType::Pointer rigid_CC=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"CC",0.4,0,translation_first_trans);
+            RigidTransformType::Pointer rigid_MI=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"MI",0.4,0,translation_first_trans);
 
             {
-
                 ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
                 resampleFilter->SetOutputParametersFromImage(b0_up_img);
                 resampleFilter->SetInput(b0_down_img);
@@ -690,23 +834,27 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
                 translation_rigid_diffeo_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, translation_rigid_diffeo_rigid_trans, val_translation_rigid_diffeo,new_img);
             }
             imgs.push_back(new_img);
+            vals.push_back(val_translation_rigid_diffeo);
+            rigids.push_back(translation_rigid_diffeo_rigid_trans);
 
-            (*stream)<<"Translation+Rigid+Diffeo  similarity: " << val_translation_rigid_diffeo<<std::endl;
-            (*stream)<<"Translation+Rigid+Diffeo  trans: " << translation_rigid_diffeo_rigid_trans->GetParameters()<<std::endl;
+            (*stream)<<"Translation+Rigid+Diffeo+Rigid  similarity: " << val_translation_rigid_diffeo<<std::endl;
+            (*stream)<<"Translation+Rigid+Diffeo+Rigid  trans: " << translation_rigid_diffeo_rigid_trans->GetParameters()<<std::endl;
         }
+        //////////////////////////////////////////////////////////////////////////////////////////
 
 
 
-        double val_rigid_diffeo;
-        RigidTransformType::Pointer rigid_diffeo_rigid_trans=nullptr;
+        /////////////////////////////////////////////////////////////////////////////////////////
+        //check if the standard rigid+diffeo+rigid is better
         {
+            double val_rigid_diffeo;
+            RigidTransformType::Pointer rigid_diffeo_rigid_trans=nullptr;
             float val_CC_rigid, val_MI_rigid;
 
             RigidTransformType::Pointer rigid_CC=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"CC",0.4);
             RigidTransformType::Pointer rigid_MI=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"MI",0.4);
 
             {
-
                 ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
                 resampleFilter->SetOutputParametersFromImage(b0_up_img);
                 resampleFilter->SetInput(b0_down_img);
@@ -745,9 +893,16 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
             }
 
             if(val_CC_rigid<val_MI_rigid)
+            {
                 rigid_diffeo_rigid_trans=rigid_CC;
+                rigid_first_trans=rigid_CC;
+            }
             else
+            {
                 rigid_diffeo_rigid_trans=rigid_MI;
+                rigid_first_trans=rigid_MI;
+            }
+
 
             ImageType3D::Pointer new_img=nullptr;
             for(int iter=0; iter<Niter;iter++)
@@ -755,54 +910,418 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
                 rigid_diffeo_rigid_trans =  DiffeoThenRigid(b0_up_img,  b0_down_img, rigid_diffeo_rigid_trans, val_rigid_diffeo,new_img);
             }
             imgs.push_back(new_img);
+            vals.push_back(val_rigid_diffeo);
+            rigids.push_back(rigid_diffeo_rigid_trans);
 
-            (*stream)<<"Rigid+Diffeo  similarity: " << val_rigid_diffeo<<std::endl;
-            (*stream)<<"Rigid+Diffeo  trans: " << rigid_diffeo_rigid_trans->GetParameters()<<std::endl;
+            (*stream)<<"Rigid+Diffeo+Rigid  similarity: " << val_rigid_diffeo<<std::endl;
+            (*stream)<<"Rigid+Diffeo+Rigid  trans: " << rigid_diffeo_rigid_trans->GetParameters()<<std::endl;
         }
+        /////////////////////////////////////////////////////////////////////////////////////////
 
 
 
-        std::vector<double> vals;
-        std::vector<RigidTransformType::Pointer> rigids;
 
-        vals.push_back(val_diffeo_first);
-        vals.push_back(val_translation_diffeo);
-        vals.push_back(val_translation_rigid_diffeo);
-        vals.push_back(val_rigid_diffeo);
 
-        rigids.push_back(diffeo_first_rigid_trans);
-        rigids.push_back(translation_diffeo_rigid_trans);
-        rigids.push_back(translation_rigid_diffeo_rigid_trans);
-        rigids.push_back(rigid_diffeo_rigid_trans);
+/*
+         /////////////////////////////////////////////////////////////////////////////////////////
+        //and finally check if phase-encoding affine + diffeo + rigid is the best
+        {
+            float val_CC_affine, val_MI_affine;
+            double val_affine_diffeo;
+            RigidPhaseScaleTransformType::Pointer affine_diffeo_rigid_trans=nullptr;
+            AffineTransformType::Pointer temp_affine=AffineTransformType::New();
+            temp_affine->SetIdentity();
+
+            RigidPhaseScaleTransformType::Pointer affine_CC=RigidScaleShearRegisterImages(b0_up_img,b0_down_img,phase_dim ,"CC",0.25);
+            RigidPhaseScaleTransformType::Pointer affine_MI=RigidScaleShearRegisterImages(b0_up_img,b0_down_img,phase_dim ,"MI",0.25);
+
+            {
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(affine_CC);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_CC_affine= metric->GetValue();
+            }
+            {
+                using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(affine_MI);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_MI_affine= metric->GetValue();
+            }
+
+            if(val_CC_affine<val_MI_affine)
+            {
+                affine_diffeo_rigid_trans=affine_CC;
+            }
+            else
+            {
+                affine_diffeo_rigid_trans=affine_MI;
+            }
+
+            temp_affine->SetTranslation(affine_diffeo_rigid_trans->GetTranslation());
+            temp_affine->SetFixedParameters(affine_diffeo_rigid_trans->GetFixedParameters());
+            temp_affine->SetMatrix(affine_diffeo_rigid_trans->GetMatrix());
+
+            RigidTransformType::Pointer final_rigid=RigidTransformType::New();
+            final_rigid->SetIdentity();
+            final_rigid->SetComputeZYX(true);
+            final_rigid->SetFixedParameters(affine_diffeo_rigid_trans->GetFixedParameters());
+            final_rigid->SetRotation(affine_diffeo_rigid_trans->GetAngleX(),affine_diffeo_rigid_trans->GetAngleY(),affine_diffeo_rigid_trans->GetAngleZ());
+            final_rigid->SetTranslation(affine_diffeo_rigid_trans->GetTranslation());
+
+            ImageType3D::Pointer new_img=nullptr;
+            for(int iter=0; iter<Niter;iter++)
+            {
+                RigidTransformType::Pointer temp_rigid=  DiffeoThenRigid(b0_up_img,  b0_down_img, temp_affine, val_affine_diffeo,new_img);
+                temp_affine->Compose(temp_rigid);
+                final_rigid->Compose(temp_rigid);
+            }
+
+            imgs.push_back(new_img);
+            vals.push_back(val_affine_diffeo);
+            rigids.push_back(final_rigid);
+
+            (*stream)<<"PhaseAffine+Diffeo+Rigid  similarity: " << val_affine_diffeo<<std::endl;
+            (*stream)<<"PhaseAffine+Diffeo+Rigid  trans: " << temp_affine->GetParameters()<<std::endl;
+        }
+        /////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //Check if translationXZ+PhaseAffine+diffeo+rigid is better
+        {
+            double val_translationXZ_affine_diffeo;
+            RigidPhaseScaleTransformType::Pointer translationXZ_affine_diffeo_rigid_trans=nullptr;
+            AffineTransformType::Pointer temp_affine=AffineTransformType::New();
+            temp_affine->SetIdentity();
+
+            float val_CC_transXZ_affine, val_MI_transXZ_affine;
+
+            RigidTransformType::Pointer rigid_CC= TranslationRegisterImages(b0_up_img,b0_down_img,"CC",1);
+            RigidTransformType::Pointer rigid_MI= TranslationRegisterImages(b0_up_img,b0_down_img,"MI",1);
+
+            RigidPhaseScaleTransformType::Pointer affine_CC=RigidScaleShearRegisterImages(b0_up_img,b0_down_img,phase_dim ,"CC",0.25,rigid_CC);
+            RigidPhaseScaleTransformType::Pointer affine_MI=RigidScaleShearRegisterImages(b0_up_img,b0_down_img,phase_dim ,"MI",0.25,rigid_MI);
+
+
+            {
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(affine_CC);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_CC_transXZ_affine= metric->GetValue();
+            }
+            {
+                using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(affine_MI);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_MI_transXZ_affine= metric->GetValue();
+            }
+
+            if(val_CC_transXZ_affine<val_MI_transXZ_affine)
+            {
+                translationXZ_affine_diffeo_rigid_trans=affine_CC;
+                translationXZ_first_trans=rigid_CC;
+            }
+            else
+            {
+                translationXZ_affine_diffeo_rigid_trans=affine_MI;
+                translationXZ_first_trans=rigid_MI;
+            }
+
+            temp_affine->SetTranslation(translationXZ_affine_diffeo_rigid_trans->GetTranslation());
+            temp_affine->SetFixedParameters(translationXZ_affine_diffeo_rigid_trans->GetFixedParameters());
+            temp_affine->SetMatrix(translationXZ_affine_diffeo_rigid_trans->GetMatrix());
+
+
+
+            RigidTransformType::Pointer final_rigid=RigidTransformType::New();
+            final_rigid->SetIdentity();
+            final_rigid->SetComputeZYX(true);
+            final_rigid->SetFixedParameters(translationXZ_affine_diffeo_rigid_trans->GetFixedParameters());
+            final_rigid->SetRotation(translationXZ_affine_diffeo_rigid_trans->GetAngleX(),translationXZ_affine_diffeo_rigid_trans->GetAngleY(),translationXZ_affine_diffeo_rigid_trans->GetAngleZ());
+            final_rigid->SetTranslation(translationXZ_affine_diffeo_rigid_trans->GetTranslation());
+
+            ImageType3D::Pointer new_img=nullptr;
+            for(int iter=0; iter<Niter;iter++)
+            {
+                RigidTransformType::Pointer temp_rigid= DiffeoThenRigid(b0_up_img,  b0_down_img, temp_affine, val_translationXZ_affine_diffeo,new_img);
+                temp_affine->Compose(temp_rigid);
+                final_rigid->Compose(temp_rigid);
+            }
+
+
+            imgs.push_back(new_img);
+            vals.push_back( val_translationXZ_affine_diffeo);
+            rigids.push_back(final_rigid);
+
+            (*stream)<<"TranslationXZ+PhaseAffine+Diffeo+Rigid  similarity: " << val_translationXZ_affine_diffeo<<std::endl;
+            (*stream)<<"TranslationXZ+PhaseAffine+Diffeo+Rigid  trans: " << temp_affine->GetParameters()<<std::endl;
+        }
+        //////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //Check if translationXZ+Rigid+PhaseAffine+diffeo+rigid is better
+
+        {
+            float val_CC_transXZ_rigid_affine, val_MI_transXZ_rigid_affine;
+
+            double val_translationXZ_rigid_affine_diffeo;
+            RigidPhaseScaleTransformType::Pointer translationXZ_rigid_affine_diffeo_rigid_trans=nullptr;
+            AffineTransformType::Pointer temp_affine=AffineTransformType::New();
+            temp_affine->SetIdentity();
+
+            RigidTransformType::Pointer rigid_CC=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"CC",0.4,0,translationXZ_first_trans);
+            RigidTransformType::Pointer rigid_MI=RigidRegisterImagesEuler(b0_up_img,b0_down_img,"MI",0.4,0,translationXZ_first_trans);
+
+            RigidPhaseScaleTransformType::Pointer affine_CC=RigidScaleShearRegisterImages(b0_up_img,b0_down_img,phase_dim ,"CC",0.25,rigid_CC);
+            RigidPhaseScaleTransformType::Pointer affine_MI=RigidScaleShearRegisterImages(b0_up_img,b0_down_img,phase_dim ,"MI",0.25,rigid_MI);
+
+
+            {
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(affine_CC);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_CC_transXZ_rigid_affine= metric->GetValue();
+            }
+            {
+                using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(affine_MI);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_MI_transXZ_rigid_affine= metric->GetValue();
+            }
+
+            if(val_CC_transXZ_rigid_affine<val_MI_transXZ_rigid_affine)
+            {
+                translationXZ_rigid_affine_diffeo_rigid_trans=affine_CC;
+            }
+            else
+            {
+                translationXZ_rigid_affine_diffeo_rigid_trans=affine_MI;
+            }
+
+            temp_affine->SetTranslation(translationXZ_rigid_affine_diffeo_rigid_trans->GetTranslation());
+            temp_affine->SetFixedParameters(translationXZ_rigid_affine_diffeo_rigid_trans->GetFixedParameters());
+            temp_affine->SetMatrix(translationXZ_rigid_affine_diffeo_rigid_trans->GetMatrix());
+
+
+            RigidTransformType::Pointer final_rigid=RigidTransformType::New();
+            final_rigid->SetIdentity();
+            final_rigid->SetComputeZYX(true);
+            final_rigid->SetFixedParameters(translationXZ_rigid_affine_diffeo_rigid_trans->GetFixedParameters());
+            final_rigid->SetRotation(translationXZ_rigid_affine_diffeo_rigid_trans->GetAngleX(),translationXZ_rigid_affine_diffeo_rigid_trans->GetAngleY(),translationXZ_rigid_affine_diffeo_rigid_trans->GetAngleZ());
+            final_rigid->SetTranslation(translationXZ_rigid_affine_diffeo_rigid_trans->GetTranslation());
+
+            ImageType3D::Pointer new_img=nullptr;
+            for(int iter=0; iter<Niter;iter++)
+            {
+                RigidTransformType::Pointer temp_rigid= DiffeoThenRigid(b0_up_img,  b0_down_img, temp_affine, val_translationXZ_rigid_affine_diffeo,new_img);
+                temp_affine->Compose(temp_rigid);
+                final_rigid->Compose(temp_rigid);
+            }
+            imgs.push_back(new_img);
+            vals.push_back( val_translationXZ_rigid_affine_diffeo);
+            rigids.push_back(final_rigid);
+
+
+            (*stream)<<"TranslationXZ+Rigid+PhaseAffine+Diffeo+Rigid  similarity: " << val_translationXZ_rigid_affine_diffeo<<std::endl;
+            (*stream)<<"TranslationXZ+Rigid+PhaseAffine+Diffeo+Rigid  trans: " << temp_affine->GetParameters()<<std::endl;
+        }
+        //////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////
+        //Check if Rigid+PhaseAffine+diffeo+rigid is better
+
+        {
+            double val_rigid_affine_diffeo;
+            RigidPhaseScaleTransformType::Pointer rigid_affine_diffeo_rigid_trans=nullptr;
+            AffineTransformType::Pointer temp_affine=AffineTransformType::New();
+            temp_affine->SetIdentity();
+
+            float val_CC_rigid_affine, val_MI_rigid_affine;
+
+            RigidPhaseScaleTransformType::Pointer affine_CC=RigidScaleShearRegisterImages(b0_up_img,b0_down_img,phase_dim ,"CC",0.25,rigid_first_trans);
+            RigidPhaseScaleTransformType::Pointer affine_MI=RigidScaleShearRegisterImages(b0_up_img,b0_down_img,phase_dim ,"MI",0.25,rigid_first_trans);
+
+            {
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(affine_CC);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_CC_rigid_affine= metric->GetValue();
+            }
+            {
+                using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+                ResampleImageFilterType::Pointer resampleFilter = ResampleImageFilterType::New();
+                resampleFilter->SetOutputParametersFromImage(b0_up_img);
+                resampleFilter->SetInput(b0_down_img);
+                resampleFilter->SetTransform(affine_MI);
+                resampleFilter->Update();
+                ImageType3D::Pointer b0_down_on_up_temp= resampleFilter->GetOutput();
+
+                using MetricType = itk::MeanSquaresImageToImageMetricv4<ImageType3D, ImageType3D>;
+                MetricType::Pointer metric = MetricType::New();
+
+                metric->SetFixedImage(b0_up_img);
+                metric->SetMovingImage(b0_down_on_up_temp);
+                metric->SetMovingTransform(id);
+                metric->SetFixedTransform(id);
+                metric->Initialize();
+                val_MI_rigid_affine= metric->GetValue();
+            }
+
+            if(val_CC_rigid_affine<val_MI_rigid_affine)
+            {
+                rigid_affine_diffeo_rigid_trans=affine_CC;
+            }
+            else
+            {
+                rigid_affine_diffeo_rigid_trans=affine_MI;
+            }
+
+            temp_affine->SetTranslation(rigid_affine_diffeo_rigid_trans->GetTranslation());
+            temp_affine->SetFixedParameters(rigid_affine_diffeo_rigid_trans->GetFixedParameters());
+            temp_affine->SetMatrix(rigid_affine_diffeo_rigid_trans->GetMatrix());
+
+            RigidTransformType::Pointer final_rigid=RigidTransformType::New();
+            final_rigid->SetIdentity();
+            final_rigid->SetComputeZYX(true);
+            final_rigid->SetFixedParameters(rigid_affine_diffeo_rigid_trans->GetFixedParameters());
+            final_rigid->SetRotation(rigid_affine_diffeo_rigid_trans->GetAngleX(),rigid_affine_diffeo_rigid_trans->GetAngleY(),rigid_affine_diffeo_rigid_trans->GetAngleZ());
+            final_rigid->SetTranslation(rigid_affine_diffeo_rigid_trans->GetTranslation());
+
+            ImageType3D::Pointer new_img=nullptr;
+            for(int iter=0; iter<Niter;iter++)
+            {
+                RigidTransformType::Pointer temp_rigid= DiffeoThenRigid(b0_up_img,  b0_down_img, temp_affine, val_rigid_affine_diffeo,new_img);
+                temp_affine->Compose(temp_rigid);
+                final_rigid->Compose(temp_rigid);
+            }
+            imgs.push_back(new_img);
+            vals.push_back( val_rigid_affine_diffeo);
+            rigids.push_back(final_rigid);
+
+            (*stream)<<"Rigid+PhaseAffine+Diffeo+Rigid  similarity: " << val_rigid_affine_diffeo<<std::endl;
+            (*stream)<<"Rigid+PhaseAffine+Diffeo+Rigid  trans: " << temp_affine->GetParameters()<<std::endl;
+        }
+        //////////////////////////////////////////////////////////////////////////////////////
+*/
+
+
+        //Then pick the best approach
 
         auto it = std::min_element(vals.begin(), vals.end());
         int index = std::distance(vals.begin(), it);
 
-        if(index==0)
+        switch(index)
         {
-            (*stream)<< "BEST rigid registration outcome using: DIFFEOMORPHIC FIRST"<<std::endl;
-        }
-        else
-        {
-            if(index==1)
-            {
-                (*stream)<< "BEST rigid registration outcome using: TRANSLATION FIRST"<<std::endl;
-            }
-            else
-            {
-                if(index==2)
-                {
-                    (*stream)<< "BEST rigid registration outcome using: TRANSLATION_RIGID FIRST"<<std::endl;
-                }
-                else
-                {
-                    (*stream)<< "BEST rigid registration outcome using: FULL RIGID FIRST"<<std::endl;
-                }
-            }
+            case 0: (*stream)<< "BEST rigid registration using: DIFFEOMORPHIC + RIGID "<<std::endl; break;
+            case 1: (*stream)<< "BEST rigid registration using: TRANSLATION + DIFFEOMORPHIC + RIGID"<<std::endl; break;
+            case 2: (*stream)<< "BEST rigid registration using: TRANSLATION + RIGID + DIFFEOMORPHIC + RIGID"<<std::endl; break;
+            case 3: (*stream)<< "BEST rigid registration using: RIGID + DIFFEOMORPHIC + RIGID"<<std::endl; break;
+            case 4: (*stream)<< "BEST rigid registration using: PHASEAFFINE + DIFFEOMORPHIC + RIGID"<<std::endl; break;
+            case 5: (*stream)<< "BEST rigid registration using: TRANSLATIONXZ + PHASEAFFINE + DIFFEOMORPHIC + RIGID"<<std::endl; break;
+            case 6: (*stream)<< "BEST rigid registration using: TRANSLATIONXZ + RIGID + PHASEAFFINE + DIFFEOMORPHIC + RIGID"<<std::endl; break;
+            case 7: (*stream)<< "BEST rigid registration using: RIGID + PHASEAFFINE + DIFFEOMORPHIC + RIGID"<<std::endl; break;
         }
 
         final_trans= rigids[index];
         initial_corrected_b0= imgs[index];
+        (*stream) <<"Final trans: " << final_trans->GetParameters()<<std::endl;
     }
     else
     {
@@ -820,12 +1339,9 @@ DRBUDDI::RigidTransformType::Pointer DRBUDDI::RigidDiffeoRigidRegisterB0DownToB0
 
 
 
-    (*stream) <<"Final trans: " << final_trans->GetParameters()<<std::endl;
+
 
     return final_trans;
-
-
-
 }
 
 
@@ -907,18 +1423,6 @@ void DRBUDDI::Step1_RigidRegistration()
     RigidTransformType::Pointer down_to_up_rigid_trans=nullptr;
     ImageType3D::Pointer initial_corrected_b0=this->b0_up_quad;
 
-    /*
-    if(parser->getDisableInitRigid())
-    {
-        down_to_up_rigid_trans=RigidTransformType::New();
-        down_to_up_rigid_trans->SetIdentity();
-    }
-    else
-    {
-        //down_to_up_rigid_trans = RigidDiffeoRigidRegisterB0DownToB0Up(this->b0_up_quad,this->b0_down,"CC",initial_corrected_b0);
-        down_to_up_rigid_trans = RigidDiffeoRigidRegisterB0DownToB0Up(this->b0_up_quad,this->b0_down,"MI",initial_corrected_b0);
-    }
-*/
     down_to_up_rigid_trans = RigidDiffeoRigidRegisterB0DownToB0Up(this->b0_up_quad,this->b0_down,"MI",initial_corrected_b0);
 
     writeImageD<ImageType3D>(initial_corrected_b0,proc_folder+"/b0_str_registration_target.nii");
@@ -996,10 +1500,10 @@ void DRBUDDI::Step1_RigidRegistration()
         }
     }
 
+
     // and finally rigid register all structural images to the kind of corrected b0 image
 
     int Nstr= parser->getNumberOfStructurals();
-
 
 
     for(int str=0;str<Nstr;str++)
@@ -1014,7 +1518,7 @@ void DRBUDDI::Step1_RigidRegistration()
             for(it.GoToBegin();!it.IsAtEnd();++it)
             {
                 ImageType3D::IndexType ind3= it.GetIndex();
-                it.Set(it.Get()* str_img_orig->GetPixel(ind3)*5 + str_img_orig->GetPixel(ind3) );
+                it.Set(it.Get()* str_img_orig->GetPixel(ind3)*4 + str_img_orig->GetPixel(ind3));
             }
         }
         {
@@ -1030,6 +1534,7 @@ void DRBUDDI::Step1_RigidRegistration()
                 it.Set(it.Get()-mn);
             }
         }
+
 
         str_img=PreprocessImage(str_img,0,1,0,1);
         initial_corrected_b0=PreprocessImage(initial_corrected_b0,0,1,0,1);
@@ -1056,80 +1561,21 @@ void DRBUDDI::Step1_RigidRegistration()
             (*stream)<<"Could not compute the rigid transformation from the structural imageto b=0 image... Starting multistart.... This could take a while"<<std::endl;
             (*stream)<<"Better be safe than sorry, right?"<<std::endl;
 
-            RigidTransformType::Pointer rigid_trans1a= RigidRegisterImagesEuler( str_img, initial_corrected_b0,  "CC",parser->getRigidLR(),false);
-            RigidTransformType::ParametersType b1= rigid_trans1a->GetParameters();
+            std::vector<float> new_res; new_res.resize(3);
+            new_res[0]= initial_corrected_b0->GetSpacing()[0] * 2;
+            new_res[1]= initial_corrected_b0->GetSpacing()[1] * 2;
+            new_res[2]= initial_corrected_b0->GetSpacing()[2] * 2;
+            std::vector<float> dummy;
+            ImageType3D::Pointer b02= resample_3D_image(initial_corrected_b0,new_res,dummy,"Linear");
+            new_res[0]= str_img->GetSpacing()[0] * 2;
+            new_res[1]= str_img->GetSpacing()[1] * 2;
+            new_res[2]= str_img->GetSpacing()[2] * 2;
+            ImageType3D::Pointer str2= resample_3D_image(str_img,new_res,dummy,"Linear");
 
-            p1[0]= params1[0]+ b1[0];
-            p1[1]= params1[1]+ b1[1];
-            p1[2]= params1[2]+ b1[2];
-
-            double diff1= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] ;
-            RigidTransformType::Pointer rigid_trans2a= RigidRegisterImagesEuler( str_img, initial_corrected_b0,  "MI",parser->getRigidLR(),false);
-            RigidTransformType::ParametersType b2= rigid_trans2a->GetParameters();
-
-            (*stream)<< "Trans CC F" << rigid_trans1->GetParameters()<<std::endl;
-            (*stream)<< "Trans CC B" << rigid_trans1a->GetParameters()<<std::endl;
-            (*stream)<< "Trans MI F" << rigid_trans2->GetParameters()<<std::endl;
-            (*stream)<< "Trans MI B" << rigid_trans2a->GetParameters()<<std::endl;
-
-
-            p1[0]= params2[0]+ b2[0];
-            p1[1]= params2[1]+ b2[1];
-            p1[2]= params2[2]+ b2[2];
-
-            double diff2= p1[0]*p1[0] + p1[1]*p1[1] +  p1[2]*p1[2] ;
-            (*stream)<< "diff1 "<<diff1 << " diff2 " <<diff2 <<std::endl;
-
-            std::string new_metric_type="MI";
-            if(diff1 < diff2)
-            {
-                (*stream)<< "CC was determined to be more robust than MI. Switching..."<<std::endl;
-                new_metric_type="CC";
-            }
-
-            if(diff1<0.001)
-            {
-                b1[0]= (params1[0] - b1[0])/2.;
-                b1[1]= (params1[1] - b1[1])/2.;
-                b1[2]= (params1[2] - b1[2])/2.;
-                b1[3]= (params1[3] );
-                b1[4]= (params1[4] );
-                b1[5]= (params1[5] );
-                rigid_trans1->SetParameters(b1);
-
-                rigid_trans= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, "CC",parser->getRigidLR(),true, rigid_trans1);
-            }
-            else
-            {
-                if(diff2<0.001)
-                {
-                    b2[0]= (params2[0] - b2[0])/2.;
-                    b2[1]= (params2[1] - b2[1])/2.;
-                    b2[2]= (params2[2] - b2[2])/2.;
-                    b2[3]= (params2[3] );
-                    b2[4]= (params2[4] );
-                    b2[5]= (params2[5] );
-                    rigid_trans2->SetParameters(b2);
-
-                    rigid_trans= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, "MI",parser->getRigidLR(),true,rigid_trans2);
-                }
-                else
-                {
-                    std::vector<float> new_res; new_res.resize(3);
-                    new_res[0]= initial_corrected_b0->GetSpacing()[0] * 2;
-                    new_res[1]= initial_corrected_b0->GetSpacing()[1] * 2;
-                    new_res[2]= initial_corrected_b0->GetSpacing()[2] * 2;
-                    std::vector<float> dummy;
-                    ImageType3D::Pointer b02= resample_3D_image(initial_corrected_b0,new_res,dummy,"Linear");
-                    new_res[0]= str_img->GetSpacing()[0] * 2;
-                    new_res[1]= str_img->GetSpacing()[1] * 2;
-                    new_res[2]= str_img->GetSpacing()[2] * 2;
-                    ImageType3D::Pointer str2= resample_3D_image(str_img,new_res,dummy,"Linear");
-
-                    rigid_trans1=MultiStartRigidSearch(b02,  str2,new_metric_type);
-                    rigid_trans= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, new_metric_type,parser->getRigidLR(),rigid_trans1);
-                }
-            }
+            std::cout<<"Doing multi start..."<<std::endl;
+            rigid_trans1=MultiStartRigidSearch(b02,  str2,"multi");
+            //rigid_trans= RigidRegisterImagesEuler( initial_corrected_b0,  str_img, new_metric_type,parser->getRigidLR(),rigid_trans1);
+            rigid_trans= RigidRegisterImagesEuler( initial_corrected_b0,  str_img,"multi" ,parser->getRigidLR(),1,rigid_trans1);
 
         }
 
