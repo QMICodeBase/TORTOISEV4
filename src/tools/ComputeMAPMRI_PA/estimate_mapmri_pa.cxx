@@ -1,3 +1,4 @@
+#include <cmath>
 #include "defines.h"
 
 #include "vnl/vnl_gamma.h"
@@ -389,7 +390,7 @@ bool compute_ooo(VecImageType::PixelType &coeff, VecImageType::PixelType &coeff_
             S0value+=coeff_iso[i]*s0mtrx_ishore[kks[i]];
         }
     }
-    if(!finite(S0value))
+    if(!std::isfinite(S0value))
     {
         coeff_iso.Fill(0);
         coeff.Fill(0);

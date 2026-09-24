@@ -1,0 +1,114 @@
+# ---------------------------------------------------------------------------
+# Benchmark data (large DWI datasets, not source)
+# ---------------------------------------------------------------------------
+# Benchmark datasets and run outputs are large binary data - excluded.
+# Git will not descend into an excluded DIRECTORY, so exclude its contents with
+# `benchmark/*` instead; that lets the negations below re-include the harness,
+# which is source and must not be dropped from a normal commit.
+benchmark/*
+# ALL of benchmark/ is excluded (owner's call, 2026-08-21). The datasets are ~114 GB
+# and the harness travels with them rather than through git - it is useless without
+# the data it drives. Copy the whole tree between machines. Previously scripts/,
+# README.md, MANIFEST.json, LAST_REVALIDATE.json and END_TO_END_VARIABILITY.md were
+# re-included; those negations are removed.
+# benchmark/milestones/ is deliberately NOT re-included: the close-out documents are
+# internal working evidence (M1-M6), like plan_*.md and audit_*.md below.
+
+# EXCEPTION, added 2026-08-22: the harness IS re-included. The 2026-08-21 call assumed
+# it was useless without the data; instead the Metal backend cases sat undelivered on
+# one machine while another reported the harness could not drive Metal at all. The
+# scripts are 236 KB of source and are how each backend is invoked - they must travel
+# through git. Datasets and run outputs stay excluded.
+!benchmark/scripts/
+
+# Coding
+plan_*.md
+audit_*.md
+
+# ---------------------------------------------------------------------------
+# Build output directories
+# ---------------------------------------------------------------------------
+bin/
+build/
+build*/
+TORTOISEV4/build*/
+
+# ---------------------------------------------------------------------------
+# CMake artifacts (the README uses an in-source build: "cmake ." in TORTOISEV4/)
+# ---------------------------------------------------------------------------
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+Testing/
+compile_commands.json
+CMakeUserPresets.json
+_deps/
+
+# Generated makefiles / ninja files
+Makefile
+!src/**/Makefile
+build.ninja
+rules.ninja
+.ninja_deps
+.ninja_log
+
+# ---------------------------------------------------------------------------
+# Compiled objects, libraries and executables
+# ---------------------------------------------------------------------------
+*.o
+*.obj
+*.lo
+*.slo
+*.ko
+*.gch
+*.pch
+*.so
+*.so.*
+*.dylib
+*.dll
+*.la
+*.lai
+*.exe
+*.out
+*.app
+*.d
+
+# Static libraries are ignored, except the pre-built ones shipped with the repo
+*.a
+*.lib
+!external_libraries/**/*.a
+!src/external_src/**/*.a
+
+# CUDA intermediates
+*.cubin
+*.fatbin
+*.ptx
+*.cu.o
+*.cudafe*
+*.gpu
+
+# ---------------------------------------------------------------------------
+# Editor / OS cruft
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*~
+.DS_Store
+._*
+
+# Python bytecode. measure_floor.py imports compare_outputs.py's directory, so
+# scripts/ acquires a __pycache__ that the benchmark negations would otherwise
+# re-include.
+__pycache__/
+*.pyc
+
+# per-run metadata trail (small, but data not source)
+benchmark/*/*/history/
+
+# Superseded by cuda_bug_demo/, which is the lean version written for upstream.
+# Kept locally as the longer working write-up; not committed.
+FieldFindMaxLocalNorm/

@@ -4,7 +4,7 @@
 
 #include "defines.h"
 
-#ifdef USECUDA
+#ifdef USEGPU
 #include "cuda_image.h"
 #endif
 
@@ -37,7 +37,7 @@ public:
             metric_name="CC";
     }
 
-    #ifdef USECUDA
+    #ifdef USEGPU
         CUDAIMAGE::Pointer up_img{nullptr};
         CUDAIMAGE::Pointer down_img{nullptr};
         CUDAIMAGE::Pointer str_img{nullptr};
@@ -62,7 +62,7 @@ struct DRBUDDIStageSettings
     float img_smoothing_std{0};
     int downsample_factor{1};
 
-    #ifdef USECUDA
+    #ifdef USEGPU
         CUDAIMAGE::Pointer init_finv{nullptr};
         CUDAIMAGE::Pointer init_minv{nullptr};
         CUDAIMAGE::Pointer init_finv_const{nullptr};

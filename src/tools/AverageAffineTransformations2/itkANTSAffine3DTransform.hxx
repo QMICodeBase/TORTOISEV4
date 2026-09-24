@@ -608,7 +608,7 @@ void ANTSAffine3DTransform<TScalarType>::ComputeMatrixParameters()
 
   TMatrix A, R, Q;
 
-  A = this->GetMatrix().GetVnlMatrix();
+  A = this->GetMatrix().GetVnlMatrix().as_matrix();
   vnl_qr<ScalarType> myqr(A);
 
   Q = myqr.Q();   // Q() is the rotation

@@ -22,9 +22,9 @@
 #include "itkMattesMutualInformationImageToImageMetricv4Okan.h"
 #include "itkOkanQuadraticTransform.h"
 
-#ifdef USECUDA
-    #include "../cuda_src/quadratic_transform_image.h"
-    #include "../cuda_src/compute_mi_cuda.h"
+#ifdef USEGPU
+    #include "../gpu_src/quadratic_transform_image.h"
+    #include "../gpu_src/compute_mi_cuda.h"
 #endif
 
 #define G_R 0.61803399
@@ -86,7 +86,7 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
   grad_params=orig_grad_params;
 
 
-  #ifdef USECUDA
+  #ifdef USEGPU
       if(this->moving_img_cuda)
       {
           ParametersType or_params=this->m_Metric->GetParameters();
@@ -311,7 +311,7 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
 ::ComputeMetric(ParametersType new_params)
 {    
     double val;
-    #ifdef USECUDA
+    #ifdef USEGPU
         if(this->moving_img_cuda)
         {
             TransformType::Pointer tp= TransformType::New();
@@ -426,7 +426,7 @@ DIFFPREPGradientDescentOptimizerv4<TInternalComputationValueType>
                 {
                     this->AdvanceOneStep();
 
-                    #ifdef USECUDA
+                    #ifdef USEGPU
                         if(this->moving_img_cuda)
                         {
                             ParametersType or_params=this->m_Metric->GetParameters();

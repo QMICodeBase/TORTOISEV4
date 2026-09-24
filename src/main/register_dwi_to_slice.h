@@ -230,7 +230,7 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
     else
     {
         sz[2]=MB;
-#ifndef USECUDA
+#ifndef USEGPU
 //  #pragma omp parallel for
 #endif
         for(int e=0;e<Nexc;e++)

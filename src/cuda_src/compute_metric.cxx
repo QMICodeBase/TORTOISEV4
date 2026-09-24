@@ -3,6 +3,7 @@
 
 
 #include "compute_metric.h"
+#include "gpu_capture.h"
 
 
 
@@ -82,6 +83,15 @@ float ComputeMetric_CCJacS(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Poi
 
     float metric_value;
 
+    gpucap::Rec cap("ComputeMetric_CCJacS");
+    if(cap.on())
+    {
+        cap.param("phase_vector",phase_vector);
+        cap.param("kernel",std::vector<double>(h_kernel,h_kernel+kernel_sz));
+        cap.in("up_img",up_img).in("down_img",down_img).in("str_img",str_img);
+        cap.in("def_FINV",def_FINV).in("def_MINV",def_MINV);
+    }
+
     ComputeMetric_CCJacS_cuda(up_img->getFloatdata(), down_img->getFloatdata(), str_img->getFloatdata(),
                               up_img->sz, up_img->spc,
                               up_img->dir(0,0),up_img->dir(0,1),up_img->dir(0,2),up_img->dir(1,0),up_img->dir(1,1),up_img->dir(1,2),up_img->dir(2,0),up_img->dir(2,1),up_img->dir(2,2),
@@ -89,6 +99,12 @@ float ComputeMetric_CCJacS(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Poi
                               updateFieldF->getFloatdata(), updateFieldM->getFloatdata(),
                               phase_vector, kernel_sz,h_kernel, metric_value
                               );
+
+    if(cap.on())
+    {
+        cap.out("updateFieldF",updateFieldF).out("updateFieldM",updateFieldM);
+        cap.scalar("metric_value",metric_value).save();
+    }
 
     delete[] h_kernel;
 
@@ -173,6 +189,15 @@ float ComputeMetric_MSJac(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Poin
     
     float metric_value;
     
+    gpucap::Rec cap("ComputeMetric_MSJac");
+    if(cap.on())
+    {
+        cap.param("phase_vector",phase_vector);
+        cap.param("kernel",std::vector<double>(h_kernel,h_kernel+kernel_sz));
+        cap.in("up_img",up_img).in("down_img",down_img);
+        cap.in("def_FINV",def_FINV).in("def_MINV",def_MINV);
+    }
+
     ComputeMetric_MSJac_cuda(up_img->getFloatdata(), down_img->getFloatdata(),
                              up_img->sz, up_img->spc,
                              up_img->dir(0,0),up_img->dir(0,1),up_img->dir(0,2),up_img->dir(1,0),up_img->dir(1,1),up_img->dir(1,2),up_img->dir(2,0),up_img->dir(2,1),up_img->dir(2,2),
@@ -180,6 +205,12 @@ float ComputeMetric_MSJac(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Poin
                              updateFieldF->getFloatdata(), updateFieldM->getFloatdata(),
                              phase_vector, kernel_sz,h_kernel, metric_value
                              );
+
+    if(cap.on())
+    {
+        cap.out("updateFieldF",updateFieldF).out("updateFieldM",updateFieldM);
+        cap.scalar("metric_value",metric_value).save();
+    }
 
     delete[] h_kernel;
 
@@ -216,12 +247,25 @@ float ComputeMetric_CCSK(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Point
 
     float metric_value;
 
+    gpucap::Rec cap("ComputeMetric_CCSK");
+    if(cap.on())
+    {
+        cap.param("t",t);
+        cap.in("up_img",up_img).in("down_img",down_img).in("str_img",str_img);
+    }
+
     ComputeMetric_CCSK_cuda(up_img->getFloatdata(), down_img->getFloatdata(), str_img->getFloatdata(),
      up_img->sz, up_img->spc,
      up_img->dir(0,0),up_img->dir(0,1),up_img->dir(0,2),up_img->dir(1,0),up_img->dir(1,1),up_img->dir(1,2),up_img->dir(2,0),up_img->dir(2,1),up_img->dir(2,2),
      updateFieldF->getFloatdata(), updateFieldM->getFloatdata(),
      metric_value,t
      );
+
+    if(cap.on())
+    {
+        cap.out("updateFieldF",updateFieldF).out("updateFieldM",updateFieldM);
+        cap.scalar("metric_value",metric_value).save();
+    }
 
     return metric_value;
 
@@ -287,12 +331,24 @@ float ComputeMetric_CC(const CUDAIMAGE::Pointer up_img, const CUDAIMAGE::Pointer
 
     float metric_value;
 
+    gpucap::Rec cap("ComputeMetric_CC");
+    if(cap.on())
+    {
+        cap.in("up_img",up_img).in("down_img",down_img);
+    }
+
     ComputeMetric_CC_cuda(up_img->getFloatdata(), down_img->getFloatdata(),
      up_img->sz, up_img->spc,
      up_img->dir(0,0),up_img->dir(0,1),up_img->dir(0,2),up_img->dir(1,0),up_img->dir(1,1),up_img->dir(1,2),up_img->dir(2,0),up_img->dir(2,1),up_img->dir(2,2),
      updateFieldF->getFloatdata(), updateFieldM->getFloatdata(),
      metric_value
      );
+
+    if(cap.on())
+    {
+        cap.out("updateFieldF",updateFieldF).out("updateFieldM",updateFieldM);
+        cap.scalar("metric_value",metric_value).save();
+    }
 
     return metric_value;
 
@@ -304,7 +360,7 @@ CUDAIMAGE::Pointer ComputeDetImgMain(CUDAIMAGE::Pointer img, CUDAIMAGE::Pointer 
     cudaPitchedPtr d_output={0};
     cudaExtent extent =  make_cudaExtent(sizeof(float)*img->sz.x,img->sz.y,img->sz.z);
     cudaMalloc3D(&d_output, extent);
-    cudaMemset3D(d_output,0,extent);
+    cudaMemset(d_output.ptr,0,d_output.pitch*extent.height*extent.depth);
 
     ComputeDetImg_cuda(img->getFloatdata(), field->getFloatdata(),
                        img->sz, img->spc,
@@ -329,7 +385,11 @@ CUDAIMAGE::Pointer ComputeDetImgMain(CUDAIMAGE::Pointer img, CUDAIMAGE::Pointer 
 
 float SumImage(CUDAIMAGE::Pointer im1)
 {
-    return SumImage_cuda(im1->getFloatdata(), im1->sz,im1->components_per_voxel);
+    gpucap::Rec cap("SumImage");
+    cap.in("im1",im1);
+    float v = SumImage_cuda(im1->getFloatdata(), im1->sz,im1->components_per_voxel);
+    cap.scalar("sum",v).save();
+    return v;
 }
 
 #endif

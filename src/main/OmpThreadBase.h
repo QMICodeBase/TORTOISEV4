@@ -27,7 +27,7 @@ public:
     }
     OMPTHREADBASE()
     {
-#ifdef USECUDA
+#ifdef USEGPU
         for(int i=0;i<8;i++)
             gpu_available[i]=1;
 #endif
@@ -35,7 +35,7 @@ public:
 
 
 
-#ifdef USECUDA
+#ifdef USEGPU
     void static ReserveGPU(int id)
     {                                
         if(id==0)
@@ -112,6 +112,30 @@ public:
 
     static int GetAvailableITKThreadFor()
     {
+#ifdef TORTOISE_DETERMINISTIC_GPU
+        // VALIDATION BUILD ONLY. The value below is normally derived from how many
+        // OMP threads happen to be active at this instant, so the SAME volume can
+        // be given a different ITK work-unit count on different runs. That count
+        // decides how ITK splits the image for its metric's per-thread partial
+        // sums, and float addition is not associative - so the metric value, and
+        // hence the registration result, varies run to run.
+        //
+        // There is no RNG involved and nothing to seed: registration uses 100%
+        // dense sampling (SetMetricSamplingPercentage(1.), no sampling strategy),
+        // so this reduction-order effect is the whole mechanism.
+        //
+        // Routing DIFFPREP's volumes to the GPU (see DIFFPREP.cxx) removes this for
+        // motion/eddy registration, but DRBUDDI's structural alignment
+        // (DRBUDDI.cxx:1129-1130, MultiStartRigidSearch + RigidRegisterImagesEuler)
+        // is ITK CPU code and was still varying - it was the first divergent
+        // artefact (structural_used.nii) once DIFFPREP was made deterministic.
+        //
+        // A fixed count keeps full parallelism; it is only less adaptive to what
+        // other threads are doing.
+        if(NAvailableCores==0)
+            NAvailableCores=getNCores();
+        return (int)NAvailableCores;
+#else
         int ma=0;
 
        // std::this_thread::sleep_for(std::chrono::milliseconds(5*id));
@@ -148,6 +172,7 @@ public:
         }
 
         return ma;
+#endif
     }
     static void ReleaseITKThreadFor()
     {
@@ -160,7 +185,7 @@ private:
     static std::atomic_uint NAvailableCores;
     static std::vector<uint> Nthreads_per_OMP_thread;
 
-#ifdef USECUDA
+#ifdef USEGPU
     static std::array< std::atomic_bool,8 > gpu_available;
 #endif
 

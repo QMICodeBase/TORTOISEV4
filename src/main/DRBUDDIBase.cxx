@@ -322,12 +322,18 @@ InternalMatrixType DRBUDDIBase::ComputeJacobianAtIndex(DisplacementFieldType::Po
         }
     }
 
+    // .as_vector() is required, not cosmetic: A is a vnl_matrix_fixed, so get_row()
+    // and the product are vnl_vector_fixed, and VXL declares
+    // `explicit operator vnl_vector<T>()` (vnl_vector_fixed.h:332). The implicit
+    // conversion this line relied on does not exist in this VXL, so it does not
+    // compile on macOS. .as_vector() is exactly what that operator returns - same
+    // values, no behaviour change.
     vnl_vector<double> phys_vec(3);
-    phys_vec= disp_field->GetDirection().GetVnlMatrix()*A.get_row(0);
+    phys_vec= (disp_field->GetDirection().GetVnlMatrix()*A.get_row(0)).as_vector();
     A.set_row(0,phys_vec);
-    phys_vec= disp_field->GetDirection().GetVnlMatrix()*A.get_row(1);
+    phys_vec= (disp_field->GetDirection().GetVnlMatrix()*A.get_row(1)).as_vector();
     A.set_row(1,phys_vec);
-    phys_vec= disp_field->GetDirection().GetVnlMatrix()*A.get_row(2);
+    phys_vec= (disp_field->GetDirection().GetVnlMatrix()*A.get_row(2)).as_vector();
     A.set_row(2,phys_vec);
     A(0,0)+=1;
     A(1,1)+=1;

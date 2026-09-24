@@ -4,6 +4,7 @@
 #include <omp.h>
 
 #include "TORTOISE.h"
+#include "tortoise_profile.h"
 
 #include "registration_settings.h"
 #include "../utilities/read_3Dvolume_from_4D.h"
@@ -509,8 +510,11 @@ void TORTOISE::entryPoint()
 
 void TORTOISE::Process()
 {   
+    TORTOISE_PROFILE("TOTAL");
+
     if(ConvertStringToStep(parser->getStartStep())== STEPS::Import)  //these are self explanatory :)
     {
+        TORTOISE_PROFILE("Import");
         (*stream)<<"Importing and copying data..."<<std::endl;
         this->curr_step=STEPS::Import;
         CheckAndCopyInputData();
@@ -667,7 +671,7 @@ void TORTOISE::Process()
         }
 
         std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
-        std::cout << "Total denoising time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
+        fprintf(stderr,"[PROFILE] Denoising %.3f\n", std::chrono::duration<double>(Tend - Tbegin).count()); fflush(stderr);
     }
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::Gibbs)
@@ -680,7 +684,7 @@ void TORTOISE::Process()
                 GibbsUnringData(this->proc_infos[PE].nii_name,this->my_jsons[PE]["PartialFourier"],this->my_jsons[PE]["PhaseEncodingDirection"] );
         }
         std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
-        std::cout << "Total gibbs time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
+        fprintf(stderr,"[PROFILE] Gibbs %.3f\n", std::chrono::duration<double>(Tend - Tbegin).count()); fflush(stderr);
     }
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::MotionEddy)
@@ -696,7 +700,7 @@ void TORTOISE::Process()
             }
         }
         std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
-        std::cout << "Total DIFFPREP time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
+        fprintf(stderr,"[PROFILE] DIFFPREP %.3f\n", std::chrono::duration<double>(Tend - Tbegin).count()); fflush(stderr);
     }
 
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::Drift)
@@ -719,7 +723,7 @@ void TORTOISE::Process()
                 }
             }
             std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
-            std::cout << "Total gibbs time: " << std::chrono::duration_cast<std::chrono::seconds> (Tend - Tbegin).count() << "sec" << std::endl;
+            fprintf(stderr,"[PROFILE] Drift %.3f\n", std::chrono::duration<double>(Tend - Tbegin).count()); fflush(stderr);
         }
     }
     //re read jsons after DIFFPREP changes it.
@@ -782,7 +786,7 @@ void TORTOISE::Process()
         EPICorrectData();
 
         std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
-        (*stream) << "TOTAL EPI time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
+        fprintf(stderr,"[PROFILE] EPI_DRBUDDI %.3f\n", std::chrono::duration<double>(Tend - Tbegin).count()); fflush(stderr);
     }
 /*
     if(ConvertStringToStep(parser->getStartStep())<= STEPS::ExtraOutlier)
@@ -810,7 +814,7 @@ void TORTOISE::Process()
         AlignB0ToReorientation();
 
         std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
-        (*stream) << "TOTAL Rigid to Str time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
+        fprintf(stderr,"[PROFILE] RigidToStructural %.3f\n", std::chrono::duration<double>(Tend - Tbegin).count()); fflush(stderr);
     }
 
 
@@ -858,7 +862,7 @@ void TORTOISE::Process()
         my_final_data_generator.Generate();
 
         std::chrono::steady_clock::time_point Tend = std::chrono::steady_clock::now();
-        std::cout << "TOTAL Final data generation time: " << std::chrono::duration_cast<std::chrono::minutes> (Tend - Tbegin).count() << "mins" << std::endl;
+        fprintf(stderr,"[PROFILE] FinalData %.3f\n", std::chrono::duration<double>(Tend - Tbegin).count()); fflush(stderr);
     }
 
     if(parser->getRemoveTempFolder())

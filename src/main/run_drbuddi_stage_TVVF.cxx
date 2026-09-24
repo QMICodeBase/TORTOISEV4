@@ -9,11 +9,11 @@
 #include "itkGaussianOperator.h"
 
 
-#include "../cuda_src/resample_image.h"
-#include "../cuda_src/gaussian_smooth_image.h"
-#include "../cuda_src/warp_image.h"
-#include "../cuda_src/cuda_image_utilities.h"
-#include "../cuda_src/compute_metric.h"
+#include "../gpu_src/resample_image.h"
+#include "../gpu_src/gaussian_smooth_image.h"
+#include "../gpu_src/warp_image.h"
+#include "../gpu_src/cuda_image_utilities.h"
+#include "../gpu_src/compute_metric.h"
 
 //#include "itkTimeVaryingVelocityFieldIntegrationImageFilter.h"
 

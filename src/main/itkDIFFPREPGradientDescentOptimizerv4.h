@@ -21,9 +21,9 @@
 #include "itkGradientDescentOptimizerBasev4.h"
 #include "itkOkanQuadraticTransform.h"
 
-#ifdef USECUDA
+#ifdef USEGPU
     #include "cuda_image.h"
-    #include "../cuda_src/compute_entropy.h"
+    #include "../gpu_src/compute_entropy.h"
 #endif  
 
 namespace itk
@@ -145,7 +145,7 @@ public:
   void SetBrkEps(double brk){brk_eps=brk;};
 
 
-  #ifdef USECUDA
+  #ifdef USEGPU
       void SetFixedCudaImage(CUDAIMAGE::Pointer nimg)
       {
           fixed_img_cuda=nimg;
@@ -211,7 +211,7 @@ private:
   double m_BracketParams[8];
 
   
-  #ifdef USECUDA
+  #ifdef USEGPU
       CUDAIMAGE::Pointer fixed_img_cuda{nullptr};
       CUDAIMAGE::Pointer moving_img_cuda{nullptr};
       std::vector<float> lim_arr;

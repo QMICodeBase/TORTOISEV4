@@ -1,0 +1,26 @@
+{
+  "derived_utc": "2026-08-20",
+  "dataset": "fast",
+  "pairs": 6,
+  "max_diff_p99": {
+    "min": 3.483,
+    "max": 5.846,
+    "mean": 5.161,
+    "sd": 0.926,
+    "gate": 7.939
+  },
+  "pearson_r": {
+    "min": 0.999485,
+    "max": 0.999715,
+    "mean": 0.999579,
+    "sd": 0.000105,
+    "gate": 0.999264
+  },
+  "runs": {
+    "CUDA": "e692f7d4f6695abaae929ccdd2dc7814b1814557c108b7b0471012faa3bfe3b4",
+    "CUDA_C": "e692f7d4f6695abaae929ccdd2dc7814b1814557c108b7b0471012faa3bfe3b4",
+    "CUDA_D": "e692f7d4f6695abaae929ccdd2dc7814b1814557c108b7b0471012faa3bfe3b4",
+    "CUDA_E": "e692f7d4f6695abaae929ccdd2dc7814b1814557c108b7b0471012faa3bfe3b4"
+  },
+  "note": "All four runs must share one exe_sha256; measure_floor.py refuses a mixed set. Re-derive if any run is replaced."
+}

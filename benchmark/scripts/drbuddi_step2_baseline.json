@@ -1,0 +1,24 @@
+{
+  "reference_run": "DRB_C1",
+  "baseline_run": "DRB_N1",
+  "note": "NOFMA = same CUDA source, -fmad=false only. CUDA-only control.",
+  "reference_exe_sha256": "e692f7d4f6695abaae929ccdd2dc7814b1814557c108b7b0471012faa3bfe3b4",
+  "baseline_exe_sha256": "6cecce755959a44ea5ce1fbf0dc6d3cd19c8bf3513f711ef6b063e8f4803a2ce",
+  "stats": {
+    "blip_up_b0_corrected.nii": {
+      "rel": 0.5881744321955574,
+      "r": 0.9995309729446329,
+      "diff_pct": 86.53594509426908
+    },
+    "blip_down_b0_corrected.nii": {
+      "rel": 1.0947237279366098,
+      "r": 0.9993282530577666,
+      "diff_pct": 85.90812436575335
+    },
+    "b0_corrected_final.nii": {
+      "rel": 0.335354582268532,
+      "r": 0.9998728854797915,
+      "diff_pct": 85.41021292883975
+    }
+  }
+}

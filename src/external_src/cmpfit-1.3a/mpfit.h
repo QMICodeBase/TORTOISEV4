@@ -187,7 +187,11 @@ extern int mpfit(mp_func funct, int m, int npar,
 
 /* Default is to assume that compiler/library has finite() function */
 #else
+#if defined(__APPLE__)
+#define mpfinite(x) isfinite(x)   /* POSIX finite() removed from modern libc */
+#else
 #define mpfinite(x) finite(x)
+#endif
 
 #endif
 

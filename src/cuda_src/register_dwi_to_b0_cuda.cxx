@@ -2,11 +2,11 @@
 #define _RegisterDWIToB0CUDA_CXX
 
 #include "register_dwi_to_b0_cuda.h"
-#include "cuda_image.h"
+#include "../gpu_src/cuda_image.h"
 #include "itkMattesMutualInformationImageToImageMetricv4Okan.h"
 #include "itkOkanImageRegistrationMethodv4.h"
-#include "gaussian_smooth_image.h"
-#include "resample_image.h"
+#include "../gpu_src/gaussian_smooth_image.h"
+#include "../gpu_src/resample_image.h"
 
 
 CUDAIMAGE::Pointer  CreateVirtualImg(CUDAIMAGE::Pointer img, int downsample_factor )
