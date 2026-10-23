@@ -159,6 +159,7 @@
           HARDI bval (int). In case non in-vivo human brain data, or to overwrite the default value of 2000 s/mm2, what is the bval for higher order regime? Default:2000 
 
 The transformation file description for motioneddy_transformations.txt and s2v_transformations.txt
+
     Parameters 0-2 :  Translation in mm
     Parameters 3-5 :  Rotation in radians in ZYX rotation framework
     Parameters 6-8 :  Linear scaling/shear terms.  Assuming y is the phase-encoding direction,  $ y' = p[6].x + p[7].y + p[8].z   +  $
