@@ -10,12 +10,12 @@
 #include "itkMultiplyImageFilter.h"
 #include "itkAddImageFilter.h"
 
-#ifdef USECUDA
-    #include "../cuda_src/resample_image.h"
-    #include "../cuda_src/gaussian_smooth_image.h"
-    #include "../cuda_src/warp_image.h"
-    #include "../cuda_src/cuda_image_utilities.h"
-    #include "../cuda_src/compute_metric.h"
+#ifdef USEGPU
+    #include "../gpu_src/resample_image.h"
+    #include "../gpu_src/gaussian_smooth_image.h"
+    #include "../gpu_src/warp_image.h"
+    #include "../gpu_src/cuda_image_utilities.h"
+    #include "../gpu_src/compute_metric.h"
 #else
     #include "drbuddi_image_utilities.h"
     #include "compute_metrics_msjac.h"
@@ -34,7 +34,7 @@ void DRBUDDIStage::CreateVirtualImage()
     }
     else
     {
-            #ifdef USECUDA
+            #ifdef USEGPU
             this->virtual_img= CurrentImageType::New();
 
             this->virtual_img->dir= this->settings->metrics[0].up_img->dir;
@@ -142,7 +142,7 @@ void DRBUDDIStage::PreprocessImagesAndFields()
 {
     CreateVirtualImage();
 
-    #ifdef USECUDA
+    #ifdef USEGPU
         if(this->def_FINV==nullptr || (this->def_FINV && this->def_FINV->getFloatdata().ptr==nullptr) )
         {
             this->def_FINV= CUDAIMAGE::New();
@@ -222,7 +222,7 @@ void DRBUDDIStage::PreprocessImagesAndFields()
     #endif
 
 
-    #ifdef USECUDA
+    #ifdef USEGPU
     if(this->def_FINV && this->def_FINV->sz.x != this->virtual_img->sz.x)
     #else
     if(this->def_FINV && this->def_FINV->GetLargestPossibleRegion().GetSize()[0] != this->virtual_img->GetLargestPossibleRegion().GetSize()[0])
@@ -237,7 +237,7 @@ void DRBUDDIStage::PreprocessImagesAndFields()
         this->def_M= InvertField(this->def_MINV);
     }
 
-#ifdef USECUDA
+#ifdef USEGPU
     if(this->settings->init_finv_const && this->settings->init_finv_const->sz.x != this->virtual_img->sz.x)
 #else
     if(this->settings->init_finv_const && this->settings->init_finv_const->GetLargestPossibleRegion().GetSize()[0] != this->virtual_img->GetLargestPossibleRegion().GetSize()[0])
@@ -321,7 +321,7 @@ void DRBUDDIStage::PreprocessImagesAndFields()
     {
         for(int m=0;m<this->settings->metrics.size();m++)
         {
-            #ifdef USECUDA
+            #ifdef USEGPU
                 resampled_smoothed_up_images[m]=CUDAIMAGE::New();
                 resampled_smoothed_up_images[m]->DuplicateFromCUDAImage(this->settings->metrics[m].up_img);
                 resampled_smoothed_down_images[m]=CUDAIMAGE::New();
@@ -364,7 +364,7 @@ void DRBUDDIStage::PreprocessImagesAndFields()
     }
 
 
-    #ifdef USECUDA
+    #ifdef USEGPU
     if(resampled_smoothed_up_images[0]->sz.x != this->virtual_img->sz.x)
     #else
     if(resampled_smoothed_up_images[0]->GetLargestPossibleRegion().GetSize()[0] != this->virtual_img->GetLargestPossibleRegion().GetSize()[0])
@@ -436,7 +436,7 @@ void DRBUDDIStage::PreprocessImagesAndFields()
 
 float DRBUDDIStage::ComputeBeta(CurrentFieldType::Pointer cfield,CurrentFieldType::Pointer pfield)
 {
-#ifdef USECUDA
+#ifdef USEGPU
     auto pmfield= MultiplyImage(pfield,-1);
     auto diff= AddImages(cfield,pmfield);
     auto nom= SumImage(MultiplyImages(cfield,diff));
@@ -486,7 +486,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
     m_clock.Start();
 
 
-    #ifdef USECUDA
+    #ifdef USEGPU
     for(int m=0;m<this->settings->metrics.size();m++)
     {    
         if(resampled_smoothed_up_images[m]->getFloatdata().ptr !=nullptr)
@@ -510,7 +510,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
     float new_phase[3];
 
     PhaseEncodingVectorType phase_xyz;
-    #ifdef USECUDA
+    #ifdef USEGPU
         new_phase[0]= D(0,0)*up_phase_vector.x + D(0,1)*up_phase_vector.y +D(0,2)*up_phase_vector.z ;
         new_phase[1]= D(1,0)*up_phase_vector.x + D(1,1)*up_phase_vector.y +D(1,2)*up_phase_vector.z ;
         new_phase[2]= D(2,0)*up_phase_vector.x + D(2,1)*up_phase_vector.y +D(2,2)*up_phase_vector.z ;
@@ -548,7 +548,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
         {
             updateFieldF= CurrentFieldType::New();
             updateFieldM= CurrentFieldType::New();
-            #ifdef USECUDA
+            #ifdef USEGPU
                 updateFieldF->sz = this->def_FINV->sz;
                 updateFieldF->dir = this->def_FINV->dir;
                 updateFieldF->orig = this->def_FINV->orig;
@@ -670,7 +670,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
         float best_lr=this->settings->learning_rate;
         float beta_f=0,beta_m=0;
 
-        #ifdef USECUDA
+        #ifdef USEGPU
             ScaleUpdateField(updateFieldF,1);
             ScaleUpdateField(updateFieldM,1);
 
@@ -685,7 +685,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
                     beta_m=1;
             }
 
-            #ifdef USECUDA
+            #ifdef USEGPU
                 prev_updateFieldF=CurrentFieldType::New();
                 prev_updateFieldF->DuplicateFromCUDAImage(updateFieldF);
                 prev_updateFieldM=CurrentFieldType::New();
@@ -704,7 +704,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
 
             if(conjugateFieldF)
             {
-                #ifdef USECUDA
+                #ifdef USEGPU
                     conjugateFieldF=MultiplyImage(conjugateFieldF,beta_f);
                     conjugateFieldF=AddImages(conjugateFieldF,updateFieldF);
                     conjugateFieldM=MultiplyImage(conjugateFieldM,beta_m);
@@ -743,7 +743,7 @@ void DRBUDDIStage::RunDRBUDDIStage()
             }
             else
             {
-                #ifdef USECUDA
+                #ifdef USEGPU
                     conjugateFieldF=CurrentFieldType::New();
                     conjugateFieldF->DuplicateFromCUDAImage(updateFieldF);
                     conjugateFieldM=CurrentFieldType::New();

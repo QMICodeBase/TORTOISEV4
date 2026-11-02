@@ -115,7 +115,16 @@ void CUDAIMAGE::Allocate()
 {
     cudaExtent extent =  make_cudaExtent(this->components_per_voxel*sizeof(float)*this->sz.x,this->sz.y,this->sz.z);
     gpuErrchk(cudaMalloc3D(&PitchedFloatData, extent));
-    cudaMemset3D(PitchedFloatData,0,extent);
+
+    // Zero the WHOLE pitched allocation, row padding included - not just extent.width
+    // per row. Several reductions size themselves as pitch/sizeof(float)*sy*sz and so
+    // read the padding (PERF_NOTES.md 5.5); with only extent.width zeroed, their result
+    // depends on whatever residue the allocator left there, which in turn depends on the
+    // exact sequence of allocations the process happened to make. That made results
+    // change when unrelated allocation traffic was removed - InvertField moved by
+    // rel=0.08 - even though no arithmetic changed. Zeroing the padding makes the
+    // reductions depend only on the data.
+    cudaMemset(PitchedFloatData.ptr, 0, PitchedFloatData.pitch*this->sz.y*this->sz.z);
 }
 
 void CUDAIMAGE::CreateTexture()

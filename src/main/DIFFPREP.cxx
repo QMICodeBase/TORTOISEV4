@@ -13,14 +13,22 @@
 #include "../tools/EstimateMAPMRI/MAPMRIModel.h"
 
 #include <chrono>
+#include "tortoise_profile.h"
+#include <atomic>
+#ifdef USECUDA
+    #include "../cuda_src/reduction_scratch.h"
+#endif
 #include <thread>
 
 #include "boost/filesystem/path.hpp"
 
 
 #include "register_dwi_to_b0.h"
-#ifdef USECUDA
+#ifdef USEGPU
+    #include "../gpu_src/gpu_device.h"
     #include "register_dwi_to_b0_cuda.h"
+#endif
+#ifdef USECUDA
     #include "register_dwi_to_slice_cuda.h"
 #endif
 
@@ -101,13 +109,13 @@ void DIFFPREP::ProcessData()
 {
    // PadAndWriteImage();           //padding image to prevent issues with very narrow FoV data
 
-    SetBoId();            // Set our reference b0 image.
+    { TORTOISE_PROFILE("DIFFPREP.SetBoId");       SetBoId(); }            // Set our reference b0 image.
 
-    DPCreateMask();         // This mask will be used for many purposes
+    { TORTOISE_PROFILE("DIFFPREP.CreateMask");    DPCreateMask(); }       // This mask will be used for many purposes
 
-    MotionAndEddy();      // Main motion & eddy-currents & slice-2-volume and & outlier replacement correction
+    { TORTOISE_PROFILE("DIFFPREP.MotionAndEddy"); MotionAndEddy(); }      // Main motion & eddy-currents & slice-2-volume and & outlier replacement correction
 
-    WriteOutputFiles();  //Write The necessary files for further TORTOISE processing
+    { TORTOISE_PROFILE("DIFFPREP.WriteOutputs");  WriteOutputFiles(); }  //Write The necessary files for further TORTOISE processing
 }
 
 /*
@@ -583,98 +591,54 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
     }
 
 
-    #ifdef USECUDA
-        const int GPU_CPU_ratio=15;    //this should be the ratio of how much GPU is faster than a CPU per volume
-                                 // Ideally, I should check what GPU it is and automatically decide it, but too much work for this.
-        //The volumes in my_threads 1 will be processed by te GPU
-        // the others by the CPU
-        // so we give a bit more volumes to threads1
-        int NGPUs;
-        cudaGetDeviceCount	(&NGPUs);
-
-        std::vector<int> cuda_device_ids;
-        cudaDeviceProp prop;
-        for(int g=0;g<NGPUs;g++)
-        {
-            cudaGetDeviceProperties( & prop,g );
-            std::string gnm =prop.name;
-            if(gnm.find("Display") == std::string::npos)      //This is to prevent DGX system's display adaptor
-            {
-                cuda_device_ids.push_back(g);
-            }
-        }
-        NGPUs=cuda_device_ids.size();
+    #ifdef USEGPU
+        std::vector<int> cuda_device_ids = GPUDeviceIds();
+        int NGPUs = (int)cuda_device_ids.size();
         std::cout<<"NGPUs: " << NGPUs <<std::endl;
 
-
-        int max_t_per_pass= NGPUs * GPU_CPU_ratio + Nt - NGPUs;
-        int npass = (int)std::ceil(1.*Nvols /max_t_per_pass );
-
-        std::vector<int> gpu_ids_per_thread;
-        gpu_ids_per_thread.resize(Nvols);
-
-        for(int pass=0;pass<npass;pass++)
-        {
-            int Nvols_this_pass= Nvols - max_t_per_pass*pass;
-            if(Nvols_this_pass > max_t_per_pass )
-                Nvols_this_pass = max_t_per_pass ;
-
-            int start_vol= max_t_per_pass*pass;
-
-            if(Nvols_this_pass <=GPU_CPU_ratio * NGPUs )
-            {
-                for(int v=start_vol; v < start_vol+Nvols_this_pass; v++)
-                {
-                    gpu_ids_per_thread[v]= v % NGPUs;
-                }
-            }
-            else
-            {
-                for(int v=start_vol; v < start_vol+Nvols_this_pass; v++)
-                {
-                    if( v-start_vol <GPU_CPU_ratio * NGPUs)
-                    {
-                        gpu_ids_per_thread[v]= v % NGPUs;
-                    }
-                    else
-                    {
-                        gpu_ids_per_thread[v]=-1;
-                    }
-                }
-            }
-        }
-
-        int n_omp_threads;
-        if(npass>1)
-            n_omp_threads= Nt;
-        else
-        {
-            if(Nvols <=GPU_CPU_ratio * NGPUs )
-                n_omp_threads= NGPUs;
-            else
-            {
-                n_omp_threads=   Nvols- (GPU_CPU_ratio * NGPUs) + NGPUs;
-            }
-        }
+        // Dynamic GPU/CPU load balancing. There is no GPU_CPU_ratio any more: the split is
+        // discovered at runtime from the per-volume times the threads actually achieve, so
+        // it is correct on any GPU/CPU pairing instead of being tuned for one machine.
+        //
+        // Volumes are pulled from a shared counter. GPU-ness is bound to the THREAD index,
+        // not to the volume (threads 0..NGPUs-1 own a CUDA context each), which is what the
+        // loop body already assumed.
+        //
+        // The one subtlety: a plain work queue is WORSE than a well-tuned static split when
+        // the two paths differ by ~80x, because a CPU thread that picks up a volume near the
+        // end adds its whole runtime as a tail. So a CPU thread takes another volume only if
+        // the GPU could not clear everything left in less time than that one volume costs:
+        //
+        //     remaining * t_gpu > t_cpu
+        //
+        // Below that point the CPU thread retires and lets the GPU finish. Both estimates are
+        // measured in this same loop, so the rule adapts: with a fast GPU the CPU threads stop
+        // early (matching the hand-tuned split), with a slow one they keep helping to the end.
+        // Until both estimates exist every thread takes work, which is the correct bootstrap.
+        int n_omp_threads = std::min(Nt, Nvols);
+#ifdef TORTOISE_DETERMINISTIC_GPU
+        // VALIDATION BUILD ONLY. Running GPU threads only makes the backend assignment fixed
+        // again, so the run is reproducible; see the notes on ITK registration determinism.
+        n_omp_threads = NGPUs;
+        (*stream)<<"DETERMINISTIC_GPU: all "<<Nvols<<" volumes routed to the GPU path"
+                 <<" ("<<NGPUs<<" thread(s)); ITK CPU registration disabled."<<std::endl;
+#endif
         omp_set_num_threads(n_omp_threads);
 
-        my_threads.clear();
-        my_threads.resize(n_omp_threads);
-        int cpu_thread_counter=0;
-        for(int v=0;v<gpu_ids_per_thread.size();v++)
-        {
-            if(gpu_ids_per_thread[v]!=-1)
-            {
-                my_threads[gpu_ids_per_thread[v]].push_back(v);
-            }
-            else
-            {
-                my_threads[NGPUs+cpu_thread_counter].push_back(v);
-                cpu_thread_counter = (cpu_thread_counter+1) %(n_omp_threads -NGPUs);
-            }
-        }
+        std::atomic<int> next_vol(0);
 
-
+        // STATIC, so the per-volume estimates survive across calls. This function runs
+        // several times per pipeline (once per epoch, once per phase-encoding dataset) and
+        // only the very first call has no estimates to steer by. That matters: during
+        // bootstrap every CPU thread takes a volume, which is right for a 138-volume set
+        // (~30 volumes is one round, and near the optimum anyway) but badly wrong for a
+        // small one - the 10-volume down dataset would send 9 volumes down a 57 s path
+        // instead of the 0.7 s GPU path. With the estimates carried over, that call retires
+        // its CPU threads immediately and routes all 10 to the GPU, which is what the tuned
+        // static split did. All volumes in a run share a matrix size, so the estimates stay
+        // applicable.
+        static double gpu_time=0.0, cpu_time=0.0;
+        static int    gpu_n=0,      cpu_n=0;
 
     #else
         int n_omp_threads=newt;
@@ -682,9 +646,10 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
     #endif
 
 
+    TORTOISE_PROFILE("DIFFPREP.Register");
     (*stream)<<"Done registering vol: "<<std::flush;
 
-#ifdef USECUDA
+#ifdef USEGPU
     #pragma omp parallel for schedule(static,1)
 #else
     #pragma omp parallel for
@@ -694,11 +659,41 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
 
     for(int thr=0;thr<n_omp_threads;thr++)
     {
-        for( int vol2=0; vol2<my_threads[thr].size();vol2++)
-        {            
-            TORTOISE::EnableOMPThread();
+        // Per-thread wall time, so the split the queue actually chose is visible in the log.
+        std::chrono::steady_clock::time_point thr_t0 = std::chrono::steady_clock::now();
 
-            int vol = my_threads[thr][vol2];
+        int nvols_this_thread=0;
+    #ifdef USEGPU
+        const bool use_gpu = (thr < NGPUs);
+    #else
+        int vol2=0;
+    #endif
+
+        while(true)
+        {
+            int vol;
+    #ifdef USEGPU
+            if(!use_gpu && gpu_n>0 && cpu_n>0)
+            {
+                // Retire rather than start a volume the GPU could absorb faster.
+                int rem = Nvols - next_vol.load();
+                if(rem<=0)
+                    break;
+                if(rem*(gpu_time/gpu_n) <= cpu_time/cpu_n)
+                    break;
+            }
+            vol = next_vol.fetch_add(1);
+            if(vol>=Nvols)
+                break;
+    #else
+            if(vol2 >= (int)my_threads[thr].size())
+                break;
+            vol = my_threads[thr][vol2++];
+    #endif
+            nvols_this_thread++;
+            std::chrono::steady_clock::time_point vol_t0 = std::chrono::steady_clock::now();
+
+            TORTOISE::EnableOMPThread();
 
             if(vol == this->b0_vol_id || correction_mode=="off" )
             {
@@ -720,7 +715,7 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
 
                 OkanQuadraticTransformType::Pointer curr_trans=nullptr;
 
-                #ifdef USECUDA
+                #ifdef USEGPU
                     if(thr>= NGPUs)
                     {
                         curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol );
@@ -728,7 +723,7 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
                     else
                     {
                     //    TORTOISE::ReserveGPU(gpu_ids_per_thread[vol]);
-                        cudaSetDevice(cuda_device_ids[gpu_ids_per_thread[vol]]);
+                        GPUSetDevice(cuda_device_ids[thr]);
                         curr_trans=  RegisterDWIToB0_cuda(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
                    //     TORTOISE::ReleaseGPU(gpu_ids_per_thread[vol]);
                     }
@@ -766,14 +761,54 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
                 (*stream)<<", "<<vol<<std::flush;
             }
             TORTOISE::DisableOMPThread();
+
+    #ifdef USEGPU
+            {
+                double dt = std::chrono::duration<double>(std::chrono::steady_clock::now()-vol_t0).count();
+                if(use_gpu)
+                {
+                    #pragma omp atomic
+                    gpu_time += dt;
+                    #pragma omp atomic
+                    gpu_n    += 1;
+                }
+                else
+                {
+                    #pragma omp atomic
+                    cpu_time += dt;
+                    #pragma omp atomic
+                    cpu_n    += 1;
+                }
+            }
+    #endif
         } //for vol
+
+    #ifdef USECUDA
+        CudaScratchRelease();
+    #endif
+
+        fprintf(stderr,"[PROFILE] DIFFPREP.RegisterThread %d nvols %d %.3f\n",
+                thr,nvols_this_thread,
+                std::chrono::duration<double>(std::chrono::steady_clock::now()-thr_t0).count());
+        fflush(stderr);
     } //for thr
 
-        #ifdef USECUDA
-            cudaSetDevice(0);
+        #ifdef USEGPU
+            GPUSetDevice(0);
         #endif
 
     (*stream)<<std::endl<<std::endl;
+
+#ifdef USEGPU
+    // The split is now an OUTCOME, not an input. Reported so a regression in either path
+    // shows up as a changed balance rather than only as a slower run.
+    fprintf(stderr,"[PROFILE] DIFFPREP.RegisterSplit gpu_vols %d cpu_vols %d threads %d"
+                   " t_gpu %.3f t_cpu %.3f\n",
+            gpu_n, cpu_n, n_omp_threads,
+            gpu_n ? gpu_time/gpu_n : 0.0, cpu_n ? cpu_time/cpu_n : 0.0);
+    fflush(stderr);
+#endif
+
     omp_set_num_threads(Nt);
 }
 

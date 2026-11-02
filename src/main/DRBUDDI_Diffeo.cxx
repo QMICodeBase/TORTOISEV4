@@ -5,12 +5,16 @@
 
 
 #include "DRBUDDI_Diffeo.h"
+#include <iostream>
 #include "run_drbuddi_stage.h"
+#include "tortoise_profile.h"
 
 
-#ifdef USECUDA
+#ifdef USEGPU
     #include "cuda_image_utilities.h"
-    #include "run_drbuddi_stage_TVVF.h"
+    #ifdef USECUDA
+        #include "run_drbuddi_stage_TVVF.h"   // TVVF is CUDA-only (CLAUDE.md 1.1)
+    #endif
 #else
     #include "drbuddi_image_utilities.h"
 #endif
@@ -79,7 +83,7 @@ void DRBUDDI_Diffeo::SetDefaultStages()
 
     float str_weight=parser->getStructuralWeight();
 
-    #ifndef USECUDA
+    #ifndef USEGPU
     if(this->b0_up_img->GetLargestPossibleRegion().GetSize()[2]/8.>7)
     #else
     if(this->b0_up_img->sz.z/8.>7)
@@ -1010,7 +1014,7 @@ void DRBUDDI_Diffeo::Process()
     if(parser->GetInitialFINV()!="")
     {
         DisplacementFieldType::Pointer init_finv= readImageD<DisplacementFieldType>(parser->GetInitialFINV());
-        #ifdef USECUDA
+        #ifdef USEGPU
             prev_finv=CurrentFieldType::New();
             prev_finv->SetImageFromITK(init_finv);
         #else
@@ -1020,7 +1024,7 @@ void DRBUDDI_Diffeo::Process()
     if(parser->GetInitialMINV()!="")
     {
         DisplacementFieldType::Pointer init_minv= readImageD<DisplacementFieldType>(parser->GetInitialMINV());
-        #ifdef USECUDA
+        #ifdef USEGPU
             prev_minv=CurrentFieldType::New();
             prev_minv->SetImageFromITK(init_minv);
         #else
@@ -1037,6 +1041,7 @@ void DRBUDDI_Diffeo::Process()
 
     for(int st=0;st< stages.size();st++)
     {
+        TORTOISE_PROFILE("DRBUDDI.Stage" + std::to_string(st+1));
         (*stream)<<"Stage number: "<<st+1<< " / " << stages.size() << std::endl;
         (*stream)<<"Current learning rate: "<<stages[st].learning_rate<<std::endl;
         (*stream)<<"Number of iterations: "<<stages[st].niter<<std::endl;
@@ -1054,6 +1059,16 @@ void DRBUDDI_Diffeo::Process()
         (*stream)<<std::endl;
 
 
+        #ifdef USEWEBGPU
+            if(this->GetRegistrationMethodType()=="TVVF")
+            {
+                // TVVF is out of scope for the WebGPU port (CLAUDE.md 1.1). Accepting the
+                // flag and silently running SyN instead would be worse than refusing.
+                std::cerr << "DRBUDDI: --DRBUDDI_transformation_type TVVF is not supported "
+                             "by the WebGPU build; use the CUDA build or SyN." << std::endl;
+                std::exit(1);
+            }
+        #endif
         #ifdef USECUDA
             if(this->GetRegistrationMethodType()=="TVVF")
             {
@@ -1168,7 +1183,7 @@ DisplacementFieldType::Pointer DRBUDDI_Diffeo::getUp2DownINV()
     auto disp2= InvertField(disp2a);
 
 
-#ifdef USECUDA
+#ifdef USEGPU
     DisplacementFieldType::Pointer disp=disp2->CudaImageToITKField();
 #else
     DisplacementFieldType::Pointer disp=disp2;

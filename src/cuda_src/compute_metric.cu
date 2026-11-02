@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "cuda_utils.h"
+#include "reduction_scratch.h"
 
 
 #define LIMCCSK (1E-5)
@@ -28,6 +29,54 @@
 
 #define BLOCKSIZE 32
 #define PER_GROUP 1
+
+// ---------------------------------------------------------------------------
+// Launch geometry for ELEMENTWISE metric kernels. See the equivalent note in
+// cuda_image_utilities.cu: the historical `kernel<<< blockSize, gridSize >>>` form
+// passes the grid-shaped values as BLOCK dimensions, which on a 100x100x58 volume
+// gives blockDim=(4,4,2) - a warp then spans 4 voxels across 8 pitch-separated rows.
+// Every kernel launched this way here computes one output element per thread with no
+// reduction, so results are unchanged; only coalescing improves.
+//
+// 128 threads rather than 256: these metric kernels are register-heavy (hence the
+// original clamp at 450, lower than the 1024 used elsewhere), and 32 threads in x is
+// already a full coalesced run along a row.
+//
+// The reduction launches in this file use gSize/bSize and MUST keep their geometry -
+// block size there sets summation order (PERF_NOTES.md 6).
+// Register blocking for computeFiniteDiffStructs, the largest single kernel (~22 % of
+// GPU time). It evaluates a 19x19x9 correlation window per output voxel and saturates
+// neither bandwidth (~8 % of peak) nor compute (~1 %), which points at latency on the
+// serial nested loop. Giving each thread FD_GROUP consecutive outputs along x provides
+// that many independent accumulator chains, and adjacent windows overlap in 18 of 19
+// columns so the loads amortise too.
+//
+// NOT a global PER_GROUP change: 5 of the 12 kernels launched with this geometry
+// (AddToUpdateField2, ComputeMetric_CC, ComputeMetric_CCJacSSingle,
+// ComputeMetric_MSJacSingle, NegateImage2) have NO `PER_GROUP*ii` loop, so raising
+// PER_GROUP would leave them covering only 1/N of the x range. Hence a separate factor
+// and a separate launch helper, used only at the four computeFiniteDiffStructs sites.
+//
+// Bit-exact: identical operands summed in identical order; only the thread-to-voxel
+// mapping changes.
+#define FD_GROUP 1   // MEASURED: 4 is 59% SLOWER (22.1 -> 35.1 ms). See PERF_NOTES 20.
+
+static inline void FiniteDiffLaunch(const int3 sz, dim3 &grd, dim3 &blk)
+{
+    blk = dim3(32, 4, 1);
+    grd = dim3((sz.x + blk.x*FD_GROUP - 1) / (blk.x*FD_GROUP),
+               (sz.y + blk.y - 1) / blk.y,
+               (sz.z + blk.z - 1) / blk.z);
+}
+
+static inline void ElementwiseLaunchM(const int3 sz, dim3 &grd, dim3 &blk)
+{
+    blk = dim3(32, 4, 1);
+    grd = dim3((sz.x + blk.x*PER_GROUP - 1) / (blk.x*PER_GROUP),
+               (sz.y + blk.y - 1) / blk.y,
+               (sz.z + blk.z - 1) / blk.z);
+}
+// ---------------------------------------------------------------------------
 #define PER_SLICE 1
 
 extern __constant__ int d_sz[3];
@@ -244,7 +293,7 @@ computeFiniteDiffStructs( cudaPitchedPtr det_img,cudaPitchedPtr str_img,
     uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
     uint k = __umul24(blockIdx.z, blockDim.z) + threadIdx.z;
 
-    for(int i=PER_GROUP*ii;i<PER_GROUP*ii+PER_GROUP;i++)
+    for(int i=FD_GROUP*ii;i<FD_GROUP*ii+FD_GROUP;i++)
     {
         if(i<d_sz[0] && j <d_sz[1] && k<d_sz[2])
         {
@@ -833,7 +882,8 @@ void ComputeMetric_CCJacSSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_
     cudaPitchedPtr metric_image={0};
     cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
-    cudaMemset3D(metric_image,1,extent);
+    cudaMemset(metric_image.ptr,0,metric_image.pitch*extent.height*extent.depth);  // padding deterministic (PERF_NOTES 2.3)
+        cudaMemset3D(metric_image,1,extent);
 
 
     float new_phase[3];
@@ -857,43 +907,37 @@ void ComputeMetric_CCJacSSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_
 
 
 
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >450)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunchM(data_sz, gridSize, blockSize);
 
     cudaPitchedPtr sSS={0};
-    cudaMalloc3D(&sSS, extent);    cudaMemset3D(sSS,0,extent);
+    cudaMalloc3D(&sSS, extent);    cudaMemset(sSS.ptr,0,sSS.pitch*extent.height*extent.depth);
     cudaPitchedPtr valS={0};
-    cudaMalloc3D(&valS, extent);    cudaMemset3D(valS,0,extent);
+    cudaMalloc3D(&valS, extent);    cudaMemset(valS.ptr,0,valS.pitch*extent.height*extent.depth);
 
 
     {
         cudaPitchedPtr sKS={0};
-        cudaMalloc3D(&sKS, extent);    cudaMemset3D(sKS,0,extent);
+        cudaMalloc3D(&sKS, extent);    cudaMemset(sKS.ptr,0,sKS.pitch*extent.height*extent.depth);
         cudaPitchedPtr sKK={0};
-        cudaMalloc3D(&sKK, extent);    cudaMemset3D(sKK,0,extent);
+        cudaMalloc3D(&sKK, extent);    cudaMemset(sKK.ptr,0,sKK.pitch*extent.height*extent.depth);
         cudaPitchedPtr valK={0};
-        cudaMalloc3D(&valK, extent);    cudaMemset3D(valK,0,extent);
+        cudaMalloc3D(&valK, extent);    cudaMemset(valK.ptr,0,valK.pitch*extent.height*extent.depth);
 
         cudaPitchedPtr detimg={0};
-        cudaMalloc3D(&detimg, extent);    cudaMemset3D(detimg,0,extent);
-        computeDetImg<<< blockSize,gridSize>>>( up_img,def_FINV,detimg,phase,phase_xyz);
+        cudaMalloc3D(&detimg, extent);    cudaMemset(detimg.ptr,0,detimg.pitch*extent.height*extent.depth);
+        computeDetImg<<< gridSize,blockSize>>>( up_img,def_FINV,detimg,phase,phase_xyz);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
 
-        computeFiniteDiffStructs<<< blockSize,gridSize>>>( detimg, str_img, sKS,sSS,sKK,valS,valK);
+        { dim3 fdG, fdB; FiniteDiffLaunch(data_sz, fdG, fdB);
+        computeFiniteDiffStructs<<< fdG,fdB>>>( detimg, str_img, sKS,sSS,sKK,valS,valK); }
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
 
-        ComputeMetric_CCJacSSingle_kernel<<< blockSize,gridSize>>>( up_img, str_img, up_grad_img_x,up_grad_img_y,up_grad_img_z,def_FINV, updateFieldFINV, metric_image, phase, phase_xyz, kernel_sz ,sKS,sSS,sKK,valS,valK);
+        ComputeMetric_CCJacSSingle_kernel<<< gridSize,blockSize>>>( up_img, str_img, up_grad_img_x,up_grad_img_y,up_grad_img_z,def_FINV, updateFieldFINV, metric_image, phase, phase_xyz, kernel_sz ,sKS,sSS,sKK,valS,valK);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
@@ -905,22 +949,23 @@ void ComputeMetric_CCJacSSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_
 
     {
         cudaPitchedPtr sKS={0};
-        cudaMalloc3D(&sKS, extent);    cudaMemset3D(sKS,0,extent);
+        cudaMalloc3D(&sKS, extent);    cudaMemset(sKS.ptr,0,sKS.pitch*extent.height*extent.depth);
         cudaPitchedPtr sKK={0};
-        cudaMalloc3D(&sKK, extent);    cudaMemset3D(sKK,0,extent);
+        cudaMalloc3D(&sKK, extent);    cudaMemset(sKK.ptr,0,sKK.pitch*extent.height*extent.depth);
         cudaPitchedPtr valK={0};
-        cudaMalloc3D(&valK, extent);    cudaMemset3D(valK,0,extent);
-        cudaMemset3D(valS,0,extent);
-        cudaMemset3D(sSS,0,extent);
+        cudaMalloc3D(&valK, extent);    cudaMemset(valK.ptr,0,valK.pitch*extent.height*extent.depth);
+        cudaMemset(valS.ptr,0,valS.pitch*extent.height*extent.depth);
+        cudaMemset(sSS.ptr,0,sSS.pitch*extent.height*extent.depth);
 
 
         cudaPitchedPtr def_MINV={0};
         cudaExtent extentF =  make_cudaExtent(3*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
         cudaMalloc3D(&def_MINV, extentF);
+        cudaMemset(def_MINV.ptr,0,def_MINV.pitch*extentF.height*extentF.depth);   // deterministic row padding (PERF_NOTES 2.3/12)
 
         cudaPitchedPtr updateFieldMINV={0};
         cudaMalloc3D(&updateFieldMINV, extentF);
-        cudaMemset3D(updateFieldMINV,0,extentF);
+        cudaMemset(updateFieldMINV.ptr,0,updateFieldMINV.pitch*extentF.height*extentF.depth);
 
 
         cudaMemcpy3DParms copyParams = {0};
@@ -931,27 +976,28 @@ void ComputeMetric_CCJacSSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_
         cudaMemcpy3D(&copyParams);
 
 
-        NegateImage2_kernel<<< blockSize,gridSize>>>(def_MINV,data_sz,3);
+        NegateImage2_kernel<<< gridSize,blockSize>>>(def_MINV,data_sz,3);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
 
         cudaPitchedPtr detimg={0};
-        cudaMalloc3D(&detimg, extent);    cudaMemset3D(detimg,0,extent);
-        computeDetImg<<< blockSize,gridSize>>>( down_img,def_MINV,detimg,phase,phase_xyz);
+        cudaMalloc3D(&detimg, extent);    cudaMemset(detimg.ptr,0,detimg.pitch*extent.height*extent.depth);
+        computeDetImg<<< gridSize,blockSize>>>( down_img,def_MINV,detimg,phase,phase_xyz);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
-        computeFiniteDiffStructs<<< blockSize,gridSize>>>( detimg, str_img,  sKS,sSS,sKK,valS,valK);
+        { dim3 fdG, fdB; FiniteDiffLaunch(data_sz, fdG, fdB);
+        computeFiniteDiffStructs<<< fdG,fdB>>>( detimg, str_img,  sKS,sSS,sKK,valS,valK); }
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
-        ComputeMetric_CCJacSSingle_kernel<<< blockSize,gridSize>>>( down_img, str_img, down_grad_img_x,down_grad_img_y,down_grad_img_z, def_MINV, updateFieldMINV, metric_image, phase, phase_xyz, kernel_sz ,sKS,sSS,sKK,valS,valK);
+        ComputeMetric_CCJacSSingle_kernel<<< gridSize,blockSize>>>( down_img, str_img, down_grad_img_x,down_grad_img_y,down_grad_img_z, def_MINV, updateFieldMINV, metric_image, phase, phase_xyz, kernel_sz ,sKS,sSS,sKK,valS,valK);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
 
-        AddToUpdateField2_kernel<<< blockSize,gridSize>>>(  updateFieldFINV,updateFieldMINV,-1,data_sz,3);
+        AddToUpdateField2_kernel<<< gridSize,blockSize>>>(  updateFieldFINV,updateFieldMINV,-1,data_sz,3);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
@@ -971,7 +1017,7 @@ void ComputeMetric_CCJacSSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_
 
     float* dev_out;
     float out;
-    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+    dev_out = ReductionScratch(gSize);
 
     ScalarFindSum<<<gSize, bSize>>>((float *)metric_image.ptr, metric_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
     cudaDeviceSynchronize();
@@ -979,7 +1025,6 @@ void ComputeMetric_CCJacSSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_
     cudaDeviceSynchronize();
 
     cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-    cudaFree(dev_out);
     metric_value=out/data_sz.x/data_sz.y/data_sz.z;
 
     cudaFree(metric_image.ptr);
@@ -1323,7 +1368,8 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
     cudaPitchedPtr metric_image={0};
     cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
-    cudaMemset3D(metric_image,1,extent);
+    cudaMemset(metric_image.ptr,0,metric_image.pitch*extent.height*extent.depth);  // padding deterministic (PERF_NOTES 2.3)
+        cudaMemset3D(metric_image,1,extent);
 
 
     float new_phase[3];
@@ -1346,43 +1392,37 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
     else phase_xyz=2;
 
 
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >450)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunchM(data_sz, gridSize, blockSize);
 
     cudaPitchedPtr sSS={0};
-    cudaMalloc3D(&sSS, extent);    cudaMemset3D(sSS,0,extent);
+    cudaMalloc3D(&sSS, extent);    cudaMemset(sSS.ptr,0,sSS.pitch*extent.height*extent.depth);
     cudaPitchedPtr valS={0};
-    cudaMalloc3D(&valS, extent);    cudaMemset3D(valS,0,extent);
+    cudaMalloc3D(&valS, extent);    cudaMemset(valS.ptr,0,valS.pitch*extent.height*extent.depth);
 
 
     {
         cudaPitchedPtr sKS={0};
-        cudaMalloc3D(&sKS, extent);    cudaMemset3D(sKS,0,extent);
+        cudaMalloc3D(&sKS, extent);    cudaMemset(sKS.ptr,0,sKS.pitch*extent.height*extent.depth);
         cudaPitchedPtr sKK={0};
-        cudaMalloc3D(&sKK, extent);    cudaMemset3D(sKK,0,extent);
+        cudaMalloc3D(&sKK, extent);    cudaMemset(sKK.ptr,0,sKK.pitch*extent.height*extent.depth);
         cudaPitchedPtr valK={0};
-        cudaMalloc3D(&valK, extent);    cudaMemset3D(valK,0,extent);
+        cudaMalloc3D(&valK, extent);    cudaMemset(valK.ptr,0,valK.pitch*extent.height*extent.depth);
 
         cudaPitchedPtr detimg={0};
-        cudaMalloc3D(&detimg, extent);    cudaMemset3D(detimg,0,extent);
-        computeDetImg<<< blockSize,gridSize>>>( up_img,def_FINV,detimg,phase,phase_xyz);
+        cudaMalloc3D(&detimg, extent);    cudaMemset(detimg.ptr,0,detimg.pitch*extent.height*extent.depth);
+        computeDetImg<<< gridSize,blockSize>>>( up_img,def_FINV,detimg,phase,phase_xyz);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
 
-        computeFiniteDiffStructs<<< blockSize,gridSize>>>( detimg, str_img, sKS,sSS,sKK,valS,valK);
+        { dim3 fdG, fdB; FiniteDiffLaunch(data_sz, fdG, fdB);
+        computeFiniteDiffStructs<<< fdG,fdB>>>( detimg, str_img, sKS,sSS,sKK,valS,valK); }
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
 
-        ComputeMetric_CCJacS_kernel<<< blockSize,gridSize>>>( up_img, str_img, def_FINV, updateFieldF, metric_image, phase, phase_xyz, kernel_sz ,sKS,sSS,sKK,valS,valK);
+        ComputeMetric_CCJacS_kernel<<< gridSize,blockSize>>>( up_img, str_img, def_FINV, updateFieldF, metric_image, phase, phase_xyz, kernel_sz ,sKS,sSS,sKK,valS,valK);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
@@ -1394,25 +1434,26 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
 
     {
         cudaPitchedPtr sKS={0};
-        cudaMalloc3D(&sKS, extent);    cudaMemset3D(sKS,0,extent);
+        cudaMalloc3D(&sKS, extent);    cudaMemset(sKS.ptr,0,sKS.pitch*extent.height*extent.depth);
         cudaPitchedPtr sKK={0};
-        cudaMalloc3D(&sKK, extent);    cudaMemset3D(sKK,0,extent);
+        cudaMalloc3D(&sKK, extent);    cudaMemset(sKK.ptr,0,sKK.pitch*extent.height*extent.depth);
         cudaPitchedPtr valK={0};
-        cudaMalloc3D(&valK, extent);    cudaMemset3D(valK,0,extent);
-        cudaMemset3D(valS,0,extent);
-        cudaMemset3D(sSS,0,extent);
+        cudaMalloc3D(&valK, extent);    cudaMemset(valK.ptr,0,valK.pitch*extent.height*extent.depth);
+        cudaMemset(valS.ptr,0,valS.pitch*extent.height*extent.depth);
+        cudaMemset(sSS.ptr,0,sSS.pitch*extent.height*extent.depth);
 
         cudaPitchedPtr detimg={0};
-        cudaMalloc3D(&detimg, extent);    cudaMemset3D(detimg,0,extent);
-        computeDetImg<<< blockSize,gridSize>>>( down_img,def_MINV,detimg,phase,phase_xyz);
+        cudaMalloc3D(&detimg, extent);    cudaMemset(detimg.ptr,0,detimg.pitch*extent.height*extent.depth);
+        computeDetImg<<< gridSize,blockSize>>>( down_img,def_MINV,detimg,phase,phase_xyz);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
-        computeFiniteDiffStructs<<< blockSize,gridSize>>>( detimg, str_img,  sKS,sSS,sKK,valS,valK);
+        { dim3 fdG, fdB; FiniteDiffLaunch(data_sz, fdG, fdB);
+        computeFiniteDiffStructs<<< fdG,fdB>>>( detimg, str_img,  sKS,sSS,sKK,valS,valK); }
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
-        ComputeMetric_CCJacS_kernel<<< blockSize,gridSize>>>( down_img, str_img, def_MINV, updateFieldM, metric_image, phase, phase_xyz, kernel_sz ,sKS,sSS,sKK,valS,valK);
+        ComputeMetric_CCJacS_kernel<<< gridSize,blockSize>>>( down_img, str_img, def_MINV, updateFieldM, metric_image, phase, phase_xyz, kernel_sz ,sKS,sSS,sKK,valS,valK);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
@@ -1429,7 +1470,7 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
 
     float* dev_out;
     float out;
-    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+    dev_out = ReductionScratch(gSize);
 
     ScalarFindSum<<<gSize, bSize>>>((float *)metric_image.ptr, metric_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
     cudaDeviceSynchronize();
@@ -1440,7 +1481,6 @@ void ComputeMetric_CCJacS_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, c
 
 
     cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-    cudaFree(dev_out);
     metric_value=out/data_sz.x/data_sz.y/data_sz.z;
     
     cudaFree(metric_image.ptr);
@@ -1716,7 +1756,8 @@ void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     cudaPitchedPtr metric_image={0};
     cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
-    cudaMemset3D(metric_image,1,extent);
+    cudaMemset(metric_image.ptr,0,metric_image.pitch*extent.height*extent.depth);  // padding deterministic (PERF_NOTES 2.3)
+        cudaMemset3D(metric_image,1,extent);
 
 
     float new_phase[3];
@@ -1758,17 +1799,10 @@ void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
 
     
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >450)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunchM(data_sz, gridSize, blockSize);
 
-    ComputeMetric_MSJac_kernel<<< blockSize,gridSize>>>( up_img, down_img, def_FINV,def_MINV, updateFieldF, updateFieldM, metric_image, phase, phase_xyz, kernel_sz );
+    ComputeMetric_MSJac_kernel<<< gridSize,blockSize>>>( up_img, down_img, def_FINV,def_MINV, updateFieldF, updateFieldM, metric_image, phase, phase_xyz, kernel_sz );
 
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
@@ -1776,7 +1810,7 @@ void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
     float* dev_out;
     float out;
-    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+    dev_out = ReductionScratch(gSize);
     ScalarFindSum<<<gSize, bSize>>>((float *)metric_image.ptr, metric_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
     cudaDeviceSynchronize();
     ScalarFindSum<<<1, bSize>>>(dev_out, gSize, dev_out);
@@ -1784,7 +1818,6 @@ void ComputeMetric_MSJac_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
 
 
     cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-    cudaFree(dev_out);
     metric_value=out/data_sz.x/data_sz.y/data_sz.z;
 
     cudaFree(metric_image.ptr);
@@ -2130,7 +2163,8 @@ void ComputeMetric_MSJacSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_i
     cudaPitchedPtr metric_image={0};
     cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
-    cudaMemset3D(metric_image,1,extent);
+    cudaMemset(metric_image.ptr,0,metric_image.pitch*extent.height*extent.depth);  // padding deterministic (PERF_NOTES 2.3)
+        cudaMemset3D(metric_image,1,extent);
 
 
     float new_phase[3];
@@ -2154,17 +2188,10 @@ void ComputeMetric_MSJacSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_i
 
 
 
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >450)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunchM(data_sz, gridSize, blockSize);
 
-    ComputeMetric_MSJacSingle_kernel<<< blockSize,gridSize>>>( up_img, down_img, up_grad_img_x,up_grad_img_y,up_grad_img_z,down_grad_img_x,down_grad_img_y,down_grad_img_z,def_FINV,updateFieldFINV,  metric_image, phase, phase_xyz, kernel_sz );
+    ComputeMetric_MSJacSingle_kernel<<< gridSize,blockSize>>>( up_img, down_img, up_grad_img_x,up_grad_img_y,up_grad_img_z,down_grad_img_x,down_grad_img_y,down_grad_img_z,def_FINV,updateFieldFINV,  metric_image, phase, phase_xyz, kernel_sz );
 
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
@@ -2172,7 +2199,7 @@ void ComputeMetric_MSJacSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_i
 
     float* dev_out;
     float out;
-    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+    dev_out = ReductionScratch(gSize);
 
     ScalarFindSum<<<gSize, bSize>>>((float *)metric_image.ptr, metric_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
     cudaDeviceSynchronize();
@@ -2180,7 +2207,6 @@ void ComputeMetric_MSJacSingle_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_i
     cudaDeviceSynchronize();
 
     cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-    cudaFree(dev_out);
     metric_value=out/data_sz.x/data_sz.y/data_sz.z;
 
     cudaFree(metric_image.ptr);
@@ -2437,35 +2463,29 @@ void ComputeMetric_CCSK_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cud
     //cudaExtent extent =  make_cudaExtent(1*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
     cudaExtent extent =  make_cudaExtent(1*up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
-    cudaMemset3D(metric_image,1,extent);
+    cudaMemset(metric_image.ptr,0,metric_image.pitch*extent.height*extent.depth);  // padding deterministic (PERF_NOTES 2.3)
+        cudaMemset3D(metric_image,1,extent);
 
     cudaPitchedPtr K_image={0};
     cudaMalloc3D(&K_image, extent);
-    cudaMemset3D(K_image,0,extent);
+    cudaMemset(K_image.ptr,0,K_image.pitch*extent.height*extent.depth);
 
 
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >450)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunchM(data_sz, gridSize, blockSize);
 
-    Compute_K_image<<< blockSize,gridSize>>>( up_img, down_img,K_image,t);
+    Compute_K_image<<< gridSize,blockSize>>>( up_img, down_img,K_image,t);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
 
-    ComputeMetric_CCSK_kernel<<< blockSize,gridSize>>>(up_img,down_img, K_image, str_img, updateFieldF, updateFieldM, metric_image,t );
+    ComputeMetric_CCSK_kernel<<< gridSize,blockSize>>>(up_img,down_img, K_image, str_img, updateFieldF, updateFieldM, metric_image,t );
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
     float* dev_out;
     float out;
-    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+    dev_out = ReductionScratch(gSize);
 
     ScalarFindSum<<<gSize, bSize>>>((float *)metric_image.ptr, metric_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
     cudaDeviceSynchronize();
@@ -2473,7 +2493,6 @@ void ComputeMetric_CCSK_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img, cud
     cudaDeviceSynchronize();
 
     cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-    cudaFree(dev_out);
     metric_value=out/data_sz.x/data_sz.y/data_sz.z;
 
 
@@ -2749,27 +2768,20 @@ void ComputeMetric_MSQ_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     cudaPitchedPtr metric_image={0};
     cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
-    cudaMemset3D(metric_image,0,extent);
+    cudaMemset(metric_image.ptr,0,metric_image.pitch*extent.height*extent.depth);
 
 
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >450)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunchM(data_sz, gridSize, blockSize);
 
 
-    ComputeMetric_MSQ_kernel<<< blockSize,gridSize>>>(up_img,down_img, updateFieldF, updateFieldM, metric_image );
+    ComputeMetric_MSQ_kernel<<< gridSize,blockSize>>>(up_img,down_img, updateFieldF, updateFieldM, metric_image );
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
     float* dev_out;
     float out;
-    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+    dev_out = ReductionScratch(gSize);
 
     ScalarFindSum<<<gSize, bSize>>>((float *)metric_image.ptr, metric_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
     cudaDeviceSynchronize();
@@ -2777,7 +2789,6 @@ void ComputeMetric_MSQ_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     cudaDeviceSynchronize();
 
     cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-    cudaFree(dev_out);
     metric_value=out/data_sz.x/data_sz.y/data_sz.z;
     metric_value= sqrt(metric_value);
 
@@ -2812,27 +2823,20 @@ void ComputeMetric_CC_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     cudaPitchedPtr metric_image={0};
     cudaExtent extent =  make_cudaExtent(up_img.pitch,data_sz.y,data_sz.z);
     cudaMalloc3D(&metric_image, extent);
-    cudaMemset3D(metric_image,0,extent);
+    cudaMemset(metric_image.ptr,0,metric_image.pitch*extent.height*extent.depth);
 
 
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >450)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunchM(data_sz, gridSize, blockSize);
 
 
-    ComputeMetric_CC_kernel<<< blockSize,gridSize>>>(up_img,down_img, updateFieldF, updateFieldM, metric_image );
+    ComputeMetric_CC_kernel<<< gridSize,blockSize>>>(up_img,down_img, updateFieldF, updateFieldM, metric_image );
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
     float* dev_out;
     float out;
-    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+    dev_out = ReductionScratch(gSize);
 
     ScalarFindSum<<<gSize, bSize>>>((float *)metric_image.ptr, metric_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
     cudaDeviceSynchronize();
@@ -2840,7 +2844,6 @@ void ComputeMetric_CC_cuda(cudaPitchedPtr up_img, cudaPitchedPtr down_img,
     cudaDeviceSynchronize();
 
     cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-    cudaFree(dev_out);
     metric_value=out/data_sz.x/data_sz.y/data_sz.z;
 
     cudaFree(metric_image.ptr);
@@ -2881,17 +2884,10 @@ void ComputeDetImg_cuda(cudaPitchedPtr img, cudaPitchedPtr field,
     else phase_xyz=2;
 
 
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x/PER_GROUP), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z) );
-    while(gridSize.x *gridSize.y *gridSize.z >450)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunchM(data_sz, gridSize, blockSize);
 
-    computeDetImg<<< blockSize,gridSize>>>( img,field,output,phase,phase_xyz);
+    computeDetImg<<< gridSize,blockSize>>>( img,field,output,phase,phase_xyz);
 
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
@@ -2905,7 +2901,7 @@ float SumImage_cuda(cudaPitchedPtr im1, const int3 data_sz,const int ncomp)
 {
     float* dev_out;
     float out;
-    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+    dev_out = ReductionScratch(gSize);
 
     ScalarFindSum<<<gSize, bSize>>>((float *)im1.ptr, im1.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
     cudaDeviceSynchronize();
@@ -2913,7 +2909,6 @@ float SumImage_cuda(cudaPitchedPtr im1, const int3 data_sz,const int ncomp)
     cudaDeviceSynchronize();
 
     cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-    cudaFree(dev_out);
     return out;
 
 }

@@ -3,6 +3,7 @@
 
 #include "itkGaussianOperator.h"
 #include "gaussian_smooth_image.h"
+#include "gpu_capture.h"
 
 
 
@@ -16,11 +17,14 @@
      if(main_image==nullptr)
          return nullptr;
 
+    gpucap::Rec cap("GaussianSmoothImage", main_image->components_per_voxel);
+    cap.param("std",std).in("main_image",main_image);
+
 
     cudaPitchedPtr d_output={0};
     cudaExtent extent =  make_cudaExtent(main_image->components_per_voxel*sizeof(float)*main_image->sz.x,main_image->sz.y,main_image->sz.z);
     cudaMalloc3D(&d_output, extent);
-    cudaMemset3D(d_output,0,extent);
+    cudaMemset(d_output.ptr,0,d_output.pitch*extent.height*extent.depth);
 
 
     itk::GaussianOperator<float,3 > oper;
@@ -80,6 +84,7 @@
     output->spc=main_image->spc;
     output->components_per_voxel= main_image->components_per_voxel;
     output->SetFloatDataPointer( d_output);
+    cap.out("output",output).save();
     return output;
 
 }

@@ -5,11 +5,42 @@
 #include <iostream>
 
 #include "cuda_utils.h"
+#include "reduction_scratch.h"
 
 
 
 #define BLOCKSIZE 32
 #define PER_SLICE 1
+// ---------------------------------------------------------------------------
+// Launch geometry for ELEMENTWISE volume kernels.
+//
+// The form used throughout src/cuda_src/ is
+//     kernel<<< blockSize, gridSize >>>
+// with blockSize=(32,32,32) and gridSize=ceil(dim/32): the arguments are swapped, so
+// the grid-shaped values are passed as the BLOCK dimensions. The
+// `while(gridSize.x*y*z > 1024)` clamp beside each launch exists only because of
+// that - it keeps the "grid" inside the 1024-threads-per-block limit.
+//
+// Results are identical either way: each of these kernels computes one output element
+// per thread from its own (i,j,k), with no reduction. But on a 100x100x58 volume the
+// swap yields blockDim=(4,4,2), so a warp spans 4 consecutive voxels across 8
+// pitch-separated rows - 8 scattered transactions where one coalesced access would do.
+// Measured with nsys: NegateImage_kernel moved ~14 MB in 171 us, ~16% of achievable
+// bandwidth.
+//
+// 32 threads in x is one coalesced run along a row; 256 threads per block.
+//
+// ELEMENTWISE ONLY. Reductions (ScalarFindSum/FindMax) keep their gSize/bSize
+// geometry: block size there sets summation order, and changing it would break
+// bit-exact replay (PERF_NOTES.md 6).
+static inline void ElementwiseLaunch(const int3 sz, dim3 &grd, dim3 &blk)
+{
+    blk = dim3(32, 8, 1);
+    grd = dim3((sz.x + blk.x - 1) / blk.x,
+               (sz.y + blk.y - 1) / blk.y,
+               (sz.z + PER_SLICE - 1) / PER_SLICE);
+}
+// ---------------------------------------------------------------------------
 
 static const int bSize = 1024;
 static const int gSize = 24;
@@ -24,18 +55,37 @@ extern __constant__ float d_spc[3];
 
 
 __global__ void
-FieldFindMaxLocalNorm(const float *gArr, int arraySize, const float3 spc, float *gOut)
+FieldFindMaxLocalNorm(const float *gArr, const int3 sz, const size_t pitch_f, const float3 spc, float *gOut)
 {
     int thIdx = threadIdx.x;
     int gthIdx = thIdx + blockIdx.x*bSize;
     const int gridSize = bSize*gridDim.x;
+    const int nvox = sz.x*sz.y*sz.z;
     float mx = -1;
 
-    for (int i = gthIdx; i < arraySize; i += gridSize)
+    // Index by VOXEL, honouring the row pitch. The previous version swept
+    // gArr[3*i], gArr[3*i+1], gArr[3*i+2] flat over pitch/sizeof(float)/3*sz.y*sz.z
+    // elements, which is only correct when (pitch/sizeof(float)) % 3 == 0.
+    // cudaMalloc3D returns 512-byte-granular pitches, so that holds for some field
+    // widths and not others: at sz.x=42 the pitch is 512 B, pitch/4 = 128, and
+    // 128 % 3 == 2, so each "voxel" was assembled from components of DIFFERENT
+    // voxels straddling a row boundary - with their axes mis-assigned, dividing a
+    // z component by spc.x and so on. The sweep also ran over the uninitialised
+    // row padding, which CUDAIMAGE::Allocate never clears (it memsets extent.width
+    // bytes per row, not pitch).
+    //
+    // This reduces over the sz.x*sz.y*sz.z REAL voxels only, matching the CPU/ITK
+    // implementation in src/main/drbuddi_image_utilities.cxx (ScaleUpdateField).
+    for (int i = gthIdx; i < nvox; i += gridSize)
     {
-        float sm = (gArr[3*i  ]/spc.x)*(gArr[3*i  ]/spc.x) +
-                   (gArr[3*i+1]/spc.y)*(gArr[3*i+1]/spc.y) +
-                   (gArr[3*i+2]/spc.z)*(gArr[3*i+2]/spc.z) ;
+        const int x =  i % sz.x;
+        const int y = (i / sz.x) % sz.y;
+        const int z =  i / (sz.x*sz.y);
+        const float *v = gArr + ((size_t)z*sz.y + y)*pitch_f + 3*x;
+
+        float sm = (v[0]/spc.x)*(v[0]/spc.x) +
+                   (v[1]/spc.y)*(v[1]/spc.y) +
+                   (v[2]/spc.z)*(v[2]/spc.z) ;
         sm=sqrt(sm);
         if(sm>mx)
             mx=sm;
@@ -301,31 +351,23 @@ void AddToUpdateField_cuda(cudaPitchedPtr total_data, cudaPitchedPtr to_add_data
     if(normalize)
     {
         float* dev_out;
-        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+        dev_out = ReductionScratch(gSize);
 
         ScalarFindSumSq<<<gSize, bSize>>>((float *)to_add_data.ptr, to_add_data.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
         ScalarFindSum<<<1, bSize>>>(dev_out, gSize, dev_out);
         cudaDeviceSynchronize();
 
         cudaMemcpy(&magnitude, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-        cudaFree(dev_out);
         magnitude=sqrt(magnitude);
 
     }
 
     if(magnitude!=0)
     {
-        dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-        dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-        while(gridSize.x *gridSize.y *gridSize.z >1024)
-        {
-            blockSize.x*=2;
-            blockSize.y*=2;
-            blockSize.z*=2;
-            gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-        }
+        dim3 blockSize, gridSize;
+        ElementwiseLaunch(data_sz, gridSize, blockSize);
 
-        AddToUpdateField_kernel<<< blockSize,gridSize>>>(  total_data,to_add_data,weight/magnitude,data_sz,Ncomponents );
+        AddToUpdateField_kernel<<< gridSize,blockSize>>>(  total_data,to_add_data,weight/magnitude,data_sz,Ncomponents );
     }
 
 
@@ -367,14 +409,13 @@ float TotalNorm_cuda(cudaPitchedPtr field, const int3 data_sz)
 {
     float magnitude=1;
     float* dev_out;
-    cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+    dev_out = ReductionScratch(gSize);
 
     ScalarFindSumSq<<<gSize, bSize>>>((float *)field.ptr, field.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
     ScalarFindSum<<<1, bSize>>>(dev_out, gSize, dev_out);
     cudaDeviceSynchronize();
 
     cudaMemcpy(&magnitude, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-    cudaFree(dev_out);
     magnitude=sqrt(magnitude);
 
     return magnitude;
@@ -388,31 +429,23 @@ void ScaleUpdateField_cuda(cudaPitchedPtr field, const int3 data_sz,float3 spc, 
 
     {               
         float* dev_out;
-        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+        dev_out = ReductionScratch(gSize);
 
-        FieldFindMaxLocalNorm<<<gSize, bSize>>>((float *)field.ptr, field.pitch/sizeof(float)/3*data_sz.y*data_sz.z,spc,dev_out);
+        FieldFindMaxLocalNorm<<<gSize, bSize>>>((float *)field.ptr, data_sz, field.pitch/sizeof(float), spc, dev_out);
         ScalarFindMax<<<1, bSize>>>(dev_out, gSize, dev_out);
         cudaDeviceSynchronize();
 
 
         cudaMemcpy(&magnitude, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-        cudaFree(dev_out);                
     }
 
     {
-        dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-        dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-        while(gridSize.x *gridSize.y *gridSize.z >1024)
-        {
-            blockSize.x*=2;
-            blockSize.y*=2;
-            blockSize.z*=2;
-            gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-        }
+        dim3 blockSize, gridSize;
+        ElementwiseLaunch(data_sz, gridSize, blockSize);
 
         if(magnitude>1E-20)
         {
-            ScaleUpdateField_kernel<<< blockSize,gridSize>>>(  field, data_sz, scale_factor/magnitude );
+            ScaleUpdateField_kernel<<< gridSize,blockSize>>>(  field, data_sz, scale_factor/magnitude );
             gpuErrchk(cudaPeekAtLastError());
             gpuErrchk(cudaDeviceSynchronize());
         }
@@ -427,15 +460,14 @@ float ComputeFieldScale_cuda(cudaPitchedPtr field, const int3 data_sz,const floa
     float magnitude=0;
 
         float* dev_out;
-        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+        dev_out = ReductionScratch(gSize);
 
-        FieldFindMaxLocalNorm<<<gSize, bSize>>>((float *)field.ptr, field.pitch/sizeof(float)/3*data_sz.y*data_sz.z,spc,dev_out);
+        FieldFindMaxLocalNorm<<<gSize, bSize>>>((float *)field.ptr, data_sz, field.pitch/sizeof(float), spc, dev_out);
         ScalarFindMax<<<1, bSize>>>(dev_out, gSize, dev_out);
         cudaDeviceSynchronize();
 
 
         cudaMemcpy(&magnitude, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-        cudaFree(dev_out);
 
         return  magnitude;
 
@@ -484,17 +516,10 @@ RestrictPhase_kernel(cudaPitchedPtr field, const int3 d_sz, float3 phase)
 
 void RestrictPhase_cuda(cudaPitchedPtr field, const int3 data_sz,float3 phase )
 {
-        dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-        dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-        while(gridSize.x *gridSize.y *gridSize.z >1024)
-        {
-            blockSize.x*=2;
-            blockSize.y*=2;
-            blockSize.z*=2;
-            gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-        }
+        dim3 blockSize, gridSize;
+        ElementwiseLaunch(data_sz, gridSize, blockSize);
 
-        RestrictPhase_kernel<<< blockSize,gridSize>>>(  field, data_sz, phase );
+        RestrictPhase_kernel<<< gridSize,blockSize>>>(  field, data_sz, phase );
 
 
     gpuErrchk(cudaPeekAtLastError());
@@ -539,17 +564,10 @@ ContrainDefFields_kernel(cudaPitchedPtr ufield, cudaPitchedPtr dfield, const int
 
 void ContrainDefFields_cuda(cudaPitchedPtr ufield, cudaPitchedPtr dfield, const int3 data_sz)
 {
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
 
-    ContrainDefFields_kernel<<< blockSize,gridSize>>>(  ufield, dfield, data_sz );
+    ContrainDefFields_kernel<<< gridSize,blockSize>>>(  ufield, dfield, data_sz );
 
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
@@ -558,7 +576,7 @@ void ContrainDefFields_cuda(cudaPitchedPtr ufield, cudaPitchedPtr dfield, const 
 
 
 __global__ void
-ComposeFields_kernel(cudaPitchedPtr main_field,cudaPitchedPtr update_field,  cudaPitchedPtr output )
+ComposeFields_kernel(cudaPitchedPtr main_field,cudaPitchedPtr update_field,  cudaPitchedPtr output, const int negate )
 {
     uint i = __umul24(blockIdx.x, blockDim.x) + threadIdx.x;
     uint j = __umul24(blockIdx.y, blockDim.y) + threadIdx.y;
@@ -602,7 +620,7 @@ ComposeFields_kernel(cudaPitchedPtr main_field,cudaPitchedPtr update_field,  cud
                 if(iw<0 || iw> d_sz[0]-1 || jw<0 || jw> d_sz[1]-1 || kw<0 || kw> d_sz[2]-1)
                 {
                     for(int mm=0;mm<3;mm++)
-                       row_o[3*i +mm]=row_m[3*i +mm];
+                       row_o[3*i +mm]= negate ? -row_m[3*i +mm] : row_m[3*i +mm];
                 }
                 else
                 {
@@ -680,7 +698,8 @@ ComposeFields_kernel(cudaPitchedPtr main_field,cudaPitchedPtr update_field,  cud
                         float w2= j1*(1-yd) + j2*yd;
 
                         float update= w1*(1-xd) + w2*xd;
-                        row_o[3*i+mm]= xp[mm] +update -  x[mm];
+                        const float v = xp[mm] +update -  x[mm];
+                        row_o[3*i+mm]= negate ? -v : v;
 
                     }
                 }
@@ -692,11 +711,18 @@ ComposeFields_kernel(cudaPitchedPtr main_field,cudaPitchedPtr update_field,  cud
 
 
 
+// `negate` folds what used to be a separate full-field NegateImage_kernel pass into
+// this kernel's write. That pass read and rewrote the entire field purely to flip signs -
+// 257 us x ~22.7k launches, ~14% of DRBUDDI kernel time, for no arithmetic.
+//
+// Bit-exact: unary negation is exact in IEEE (same operator NegateImage_kernel used), and
+// the only consumer between the two, ComputeFieldLocalNormImage, sums SQUARES
+// (v*v/spc/spc), so it is sign-symmetric. Verified by gpu_replay.
 void ComposeFields_cuda(cudaPitchedPtr main_field,cudaPitchedPtr update_field,
              int3 data_sz,float3 data_spc,
              float data_d00,  float data_d01,float data_d02,float data_d10,float data_d11,float data_d12,float data_d20,float data_d21,float data_d22,
              float3 data_orig,
-             cudaPitchedPtr output )
+             cudaPitchedPtr output, const int negate )
 {
 
 
@@ -713,17 +739,10 @@ void ComposeFields_cuda(cudaPitchedPtr main_field,cudaPitchedPtr update_field,
     gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
 
 
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
 
-    ComposeFields_kernel<<< blockSize,gridSize>>>( main_field,update_field,output );
+    ComposeFields_kernel<<< gridSize,blockSize>>>( main_field,update_field,output, negate );
 
 
     gpuErrchk(cudaPeekAtLastError());
@@ -867,17 +886,10 @@ UpdateInvertField_kernel( cudaPitchedPtr composed_field, cudaPitchedPtr scale_im
 
 void  NegateField_cuda(cudaPitchedPtr field, const int3 data_sz)
 {
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
     
-    NegateImage_kernel<<< blockSize,gridSize>>>(field,data_sz,3);
+    NegateImage_kernel<<< gridSize,blockSize>>>(field,data_sz,3);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 }
@@ -926,17 +938,10 @@ AddImages_kernel(cudaPitchedPtr im1, cudaPitchedPtr im2,cudaPitchedPtr output,  
 
 void  AddImages_cuda(cudaPitchedPtr im1, cudaPitchedPtr im2, cudaPitchedPtr output, const int3 data_sz,const int ncomp)
 {
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
 
-    AddImages_kernel<<< blockSize,gridSize>>>(im1,im2,output,data_sz,ncomp);
+    AddImages_kernel<<< gridSize,blockSize>>>(im1,im2,output,data_sz,ncomp);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 }
@@ -976,17 +981,10 @@ MultiplyImage_kernel(cudaPitchedPtr im1, float factor,cudaPitchedPtr output,  co
 
 void  MultiplyImage_cuda(cudaPitchedPtr im1, float factor, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp)
 {
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
 
-    MultiplyImage_kernel<<< blockSize,gridSize>>>(im1,factor,d_output,data_sz,ncomp);
+    MultiplyImage_kernel<<< gridSize,blockSize>>>(im1,factor,d_output,data_sz,ncomp);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 }
@@ -998,26 +996,24 @@ void InvertField_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 data
                       float3 data_orig,
                       cudaPitchedPtr output)
 {
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
 
 
     cudaPitchedPtr scale_image={0};
     cudaExtent extent =  make_cudaExtent(1*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
     cudaMalloc3D(&scale_image, extent);
-    cudaMemset3D(scale_image,0,extent);
+    // Full-pitch zero, padding included: the reductions below sum
+    // scale_image.pitch/sizeof(float)*sy*sz, i.e. they READ the row padding
+    // (PERF_NOTES.md 5.5). cudaMemset3D with `extent` leaves that padding at whatever
+    // the allocator last left there, which makes the result depend on unrelated
+    // allocation traffic elsewhere in the process.
+    cudaMemset(scale_image.ptr,0,scale_image.pitch*data_sz.y*data_sz.z);
 
     cudaPitchedPtr composed_field={0};
     cudaExtent extent2 =  make_cudaExtent(3*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
     cudaMalloc3D(&composed_field, extent2);
-    cudaMemset3D(composed_field,0,extent2);
+    cudaMemset(composed_field.ptr,0,composed_field.pitch*data_sz.y*data_sz.z);
 
 
 
@@ -1044,27 +1040,27 @@ void InvertField_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 data
 
     while (iteration++ < Niter && m_MaxErrorNorm > m_MaxErrorToleranceThreshold &&m_MeanErrorNorm > m_MeanErrorToleranceThreshold)
     {       
+        // negate=1: the separate NegateImage_kernel pass over composed_field is folded in
+        // here. ComputeFieldLocalNormImage below sums squares, so it is unaffected by the
+        // sign, and UpdateInvertField already consumed the negated field.
         ComposeFields_cuda(output,field,
                      data_sz, data_spc,
                      data_d00,  data_d01, data_d02, data_d10, data_d11, data_d12, data_d20, data_d21, data_d22,
                      data_orig,
-                     composed_field );
+                     composed_field, 1 );
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
-        ComputeFieldLocalNormImage<<< blockSize,gridSize>>>(composed_field,data_sz,data_spc,scale_image);
+        ComputeFieldLocalNormImage<<< gridSize,blockSize>>>(composed_field,data_sz,data_spc,scale_image);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
-        NegateImage_kernel<<< blockSize,gridSize>>>(composed_field,data_sz,3);
-        gpuErrchk(cudaPeekAtLastError());
-        gpuErrchk(cudaDeviceSynchronize());
 
 
         {
             float* dev_out;
             float out;
-            cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+            dev_out = ReductionScratch(gSize);
 
             ScalarFindMax<<<gSize, bSize>>>((float *)scale_image.ptr, scale_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
             cudaDeviceSynchronize();
@@ -1072,14 +1068,13 @@ void InvertField_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 data
             cudaDeviceSynchronize();
 
             cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-            cudaFree(dev_out);
             m_MaxErrorNorm=out;
         }
 
         {
             float* dev_out;
             float out;
-            cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+            dev_out = ReductionScratch(gSize);
 
             ScalarFindSum<<<gSize, bSize>>>((float *)scale_image.ptr, scale_image.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
             cudaDeviceSynchronize();
@@ -1087,7 +1082,6 @@ void InvertField_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 data
             cudaDeviceSynchronize();
 
             cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-            cudaFree(dev_out);
             m_MeanErrorNorm=out/numberOfPixelsInRegion;
         }
 
@@ -1098,7 +1092,7 @@ void InvertField_cuda(cudaPitchedPtr field, const int3 data_sz,const float3 data
           m_Epsilon = 0.75;
         }
 
-        UpdateInvertField_kernel<<< blockSize,gridSize>>>(  composed_field, scale_image, output, data_sz, data_spc , m_Epsilon,m_MaxErrorNorm);
+        UpdateInvertField_kernel<<< gridSize,blockSize>>>(  composed_field, scale_image, output, data_sz, data_spc , m_Epsilon,m_MaxErrorNorm);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
@@ -1157,7 +1151,7 @@ void PreprocessImage_cuda(cudaPitchedPtr img,
     {
         float* dev_out;
         float out;
-        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+        dev_out = ReductionScratch(gSize);
 
         ScalarFindMax<<<gSize, bSize>>>((float *)img.ptr, img.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
         cudaDeviceSynchronize();
@@ -1165,13 +1159,12 @@ void PreprocessImage_cuda(cudaPitchedPtr img,
         cudaDeviceSynchronize();
 
         cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-        cudaFree(dev_out);
         max=out;
     }
     {
         float* dev_out;
         float out;
-        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+        dev_out = ReductionScratch(gSize);
 
         ScalarFindMin<<<gSize, bSize>>>((float *)img.ptr, img.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
         cudaDeviceSynchronize();
@@ -1179,23 +1172,13 @@ void PreprocessImage_cuda(cudaPitchedPtr img,
         cudaDeviceSynchronize();
 
         cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-        cudaFree(dev_out);
         min=out;
     }
 
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize.x=std::ceil(1.*data_sz.x / blockSize.x);
-        gridSize.y=std::ceil(1.*data_sz.y / blockSize.y);
-        gridSize.z=std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) ;
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
 
-    PreprocessImage_kernel<<< blockSize,gridSize>>>( img,data_sz,min,max , low_val,up_val,output );
+    PreprocessImage_kernel<<< gridSize,blockSize>>>( img,data_sz,min,max , low_val,up_val,output );
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 }
@@ -1320,17 +1303,10 @@ void ComputeImageGradient_cuda(cudaPitchedPtr img,
     float h_d_dir[]= {data_d00,data_d01,data_d02,data_d10,data_d11,data_d12,data_d20,data_d21,data_d22};
     gpuErrchk(cudaMemcpyToSymbol(d_dir, &h_d_dir, 9 * sizeof(float)));
     
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
 
-    ComputeImageGradient_kernel<<< blockSize,gridSize>>>( img,data_sz,outputx,outputy,outputz );
+    ComputeImageGradient_kernel<<< gridSize,blockSize>>>( img,data_sz,outputx,outputy,outputz );
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 }
@@ -1729,17 +1705,10 @@ void IntegrateVelocityField_cuda(cudaPitchedPtr *velocity_field,
     gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
 
 
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
 
-    IntegrateVelocityField_kernel<<< blockSize,gridSize>>>( velocity_field,output_field, lowt,hight, NT );
+    IntegrateVelocityField_kernel<<< gridSize,blockSize>>>( velocity_field,output_field, lowt,hight, NT );
 
 
     gpuErrchk(cudaPeekAtLastError());
@@ -1899,17 +1868,10 @@ void ContrainVelocityFields_cuda(cudaPitchedPtr *vfield,
 
 
 
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
 
-    ConstrainVelocityFields_kernel<<< blockSize,gridSize>>>( vfield,new_vfield, ufield,  NT );
+    ConstrainVelocityFields_kernel<<< gridSize,blockSize>>>( vfield,new_vfield, ufield,  NT );
 
 
     gpuErrchk(cudaPeekAtLastError());
@@ -1966,17 +1928,10 @@ DivideImages_kernel(cudaPitchedPtr im1, cudaPitchedPtr im2,cudaPitchedPtr output
 
 void  DivideImages_cuda(cudaPitchedPtr im1,cudaPitchedPtr im2, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp)
 {
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
 
-    DivideImages_kernel<<< blockSize,gridSize>>>(im1,im2,d_output,data_sz,ncomp);
+    DivideImages_kernel<<< gridSize,blockSize>>>(im1,im2,d_output,data_sz,ncomp);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
@@ -2029,17 +1984,10 @@ MultiplyImages_kernel(cudaPitchedPtr im1, cudaPitchedPtr im2,cudaPitchedPtr outp
 
 void  MultiplyImages_cuda(cudaPitchedPtr im1,cudaPitchedPtr im2, cudaPitchedPtr d_output, const int3 data_sz,const int ncomp)
 {
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
 
-    MultiplyImages_kernel<<< blockSize,gridSize>>>(im1,im2,d_output,data_sz,ncomp);
+    MultiplyImages_kernel<<< gridSize,blockSize>>>(im1,im2,d_output,data_sz,ncomp);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
@@ -2629,22 +2577,15 @@ void AnisotropicSmoothField_cuda(cudaPitchedPtr field,
     gpuErrchk(cudaMemcpyToSymbol(d_sz, &h_d_sz, 3 * sizeof(int)));
 
 
-    dim3 blockSize(BLOCKSIZE, BLOCKSIZE, BLOCKSIZE);
-    dim3 gridSize(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    while(gridSize.x *gridSize.y *gridSize.z >1024)
-    {
-        blockSize.x*=2;
-        blockSize.y*=2;
-        blockSize.z*=2;
-        gridSize=dim3(std::ceil(1.*data_sz.x / blockSize.x), std::ceil(1.*data_sz.y / blockSize.y), std::ceil(1.*data_sz.z / blockSize.z/PER_SLICE) );
-    }
+    dim3 blockSize, gridSize;
+    ElementwiseLaunch(data_sz, gridSize, blockSize);
 
 
     float max_val_field , min_val_field;
     {
         float* dev_out;
         float out;
-        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+        dev_out = ReductionScratch(gSize);
 
         ScalarFindMax<<<gSize, bSize>>>((float *)field.ptr, field.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
         cudaDeviceSynchronize();
@@ -2652,13 +2593,12 @@ void AnisotropicSmoothField_cuda(cudaPitchedPtr field,
         cudaDeviceSynchronize();
 
         cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-        cudaFree(dev_out);
         max_val_field=out;
     }
     {
         float* dev_out;
         float out;
-        cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
+        dev_out = ReductionScratch(gSize);
 
         ScalarFindMin<<<gSize, bSize>>>((float *)field.ptr, field.pitch/sizeof(float)*data_sz.y*data_sz.z,dev_out);
         cudaDeviceSynchronize();
@@ -2666,24 +2606,23 @@ void AnisotropicSmoothField_cuda(cudaPitchedPtr field,
         cudaDeviceSynchronize();
 
         cudaMemcpy(&out, dev_out, sizeof(float), cudaMemcpyDeviceToHost);
-        cudaFree(dev_out);
         min_val_field=out;
     }
 
-    ScaleImageForAnisotropicSmoothing_kernel<<< blockSize,gridSize>>>( TR_img, (max_val_field -min_val_field)/9000., min_val_field );
-    ScaleImageForAnisotropicSmoothing_kernel<<< blockSize,gridSize>>>( FA_img, (max_val_field -min_val_field), min_val_field );
+    ScaleImageForAnisotropicSmoothing_kernel<<< gridSize,blockSize>>>( TR_img, (max_val_field -min_val_field)/9000., min_val_field );
+    ScaleImageForAnisotropicSmoothing_kernel<<< gridSize,blockSize>>>( FA_img, (max_val_field -min_val_field), min_val_field );
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize())
 
     cudaPitchedPtr concat_img={0};
     cudaExtent extent =  make_cudaExtent(5*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
     cudaMalloc3D(&concat_img, extent);
-    //cudaMemset3D(concat_img, 0,extent);
-    ZeroOut_kernel<<< blockSize,gridSize>>>(concat_img);
+    //cudaMemset(concat_img.ptr,0,concat_img.pitch*extent.height*extent.depth);
+    ZeroOut_kernel<<< gridSize,blockSize>>>(concat_img);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
-    ConcatImagesForAnisotropicSmoothing_kernel<<< blockSize,gridSize>>>( field,TR_img,FA_img, concat_img);
+    ConcatImagesForAnisotropicSmoothing_kernel<<< gridSize,blockSize>>>( field,TR_img,FA_img, concat_img);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
@@ -2706,17 +2645,17 @@ void AnisotropicSmoothField_cuda(cudaPitchedPtr field,
 
     for(int iter=0;iter<Niter;iter++)
     {
-       // cudaMemset3D(grad_sq_img,0,extent2);
-        ZeroOut_kernel<<< blockSize,gridSize>>>(grad_sq_img);
+       // cudaMemset(grad_sq_img.ptr,0,grad_sq_img.pitch*extent2.height*extent2.depth);
+        ZeroOut_kernel<<< gridSize,blockSize>>>(grad_sq_img);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
-       // cudaMemset3D(update_img,0,extent);
-        ZeroOut_kernel<<< blockSize,gridSize>>>(update_img);
+       // cudaMemset(update_img.ptr,0,update_img.pitch*extent.height*extent.depth);
+        ZeroOut_kernel<<< gridSize,blockSize>>>(update_img);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
-        ComputeAverageSquaredGradientImage_kernel<<< blockSize,gridSize>>>(concat_img, grad_sq_img );
+        ComputeAverageSquaredGradientImage_kernel<<< gridSize,blockSize>>>(concat_img, grad_sq_img );
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
@@ -2745,7 +2684,7 @@ void AnisotropicSmoothField_cuda(cudaPitchedPtr field,
         cudaMalloc((void**)&dev_mK, sizeof(double));
         cudaMemcpy(dev_mK, &mK, sizeof(double), cudaMemcpyHostToDevice);
 
-        ComputeAnisotropicFilteringUpdate_kernel<<< blockSize,gridSize>>>(concat_img, dev_mK,dev_deltaT,update_img  );
+        ComputeAnisotropicFilteringUpdate_kernel<<< gridSize,blockSize>>>(concat_img, dev_mK,dev_deltaT,update_img  );
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
@@ -2754,7 +2693,7 @@ void AnisotropicSmoothField_cuda(cudaPitchedPtr field,
     }
 
 
-    CopyNecessary_kernel<<< blockSize,gridSize>>>(concat_img, output );
+    CopyNecessary_kernel<<< gridSize,blockSize>>>(concat_img, output );
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 

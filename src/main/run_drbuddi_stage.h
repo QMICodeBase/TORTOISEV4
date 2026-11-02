@@ -6,7 +6,7 @@
 #include "DRBUDDI_Diffeo.h"
 #include "TORTOISE.h"
 
-#ifdef USECUDA
+#ifdef USEGPU
 #include "cuda_image.h"
 #endif
 
@@ -51,7 +51,7 @@ public:
     {
         up_phase_vector=phase_vector;
         phase_id=0;
-        #ifdef USECUDA
+        #ifdef USEGPU
             if( (fabs(phase_vector.y) > fabs(phase_vector.x)) && (fabs(phase_vector.y) > fabs(phase_vector.z)))
                     phase_id=1;
             if( (fabs(phase_vector.z) > fabs(phase_vector.x)) && (fabs(phase_vector.z) > fabs(phase_vector.y)))

@@ -2,6 +2,7 @@
 #define _QUADRATICTRANSFORMIMAGE_CXX
 
 #include "quadratic_transform_image.h"
+#include "gpu_capture.h"
 
 
 CUDAIMAGE::Pointer QuadraticTransformImageC(CUDAIMAGE::Pointer main_image, TransformType::Pointer tp,CUDAIMAGE::Pointer target_img)
@@ -9,7 +10,7 @@ CUDAIMAGE::Pointer QuadraticTransformImageC(CUDAIMAGE::Pointer main_image, Trans
     cudaPitchedPtr d_output={0};
     cudaExtent extent =  make_cudaExtent(sizeof(float)*target_img->sz.x,target_img->sz.y,target_img->sz.z);
     cudaMalloc3D(&d_output, extent);
-    cudaMemset3D(d_output,0,extent);
+    cudaMemset(d_output.ptr,0,d_output.pitch*extent.height*extent.depth);
 
 
     TransformType::MatrixType mat= tp->GetMatrix();    
@@ -25,6 +26,15 @@ CUDAIMAGE::Pointer QuadraticTransformImageC(CUDAIMAGE::Pointer main_image, Trans
     float main_img_dir[9]={main_image->dir(0,0),main_image->dir(0,1),main_image->dir(0,2),main_image->dir(1,0),main_image->dir(1,1),main_image->dir(1,2),main_image->dir(2,0),main_image->dir(2,1),main_image->dir(2,2)};
     float target_img_dir[9]={target_img->dir(0,0),target_img->dir(0,1),target_img->dir(0,2),target_img->dir(1,0),target_img->dir(1,1),target_img->dir(1,2),target_img->dir(2,0),target_img->dir(2,1),target_img->dir(2,2)};
 
+    gpucap::Rec cap("QuadraticTransformImageC");
+    if(cap.on())
+    {
+        cap.param("matrix",std::vector<double>(mat_arr,mat_arr+9));
+        cap.param("phase",(double)tp->GetPhase());
+        cap.param("params",std::vector<double>(params_arr,params_arr+TransformType::NQUADPARAMS));
+        cap.in("main_image",main_image).geom("target_img",target_img);
+    }
+
     QuadraticTransformImage_cuda(main_image->GetTexture(),
                                  main_image->sz,  main_image->spc, main_image->orig,main_img_dir,
                                  target_img->sz,  target_img->spc, target_img->orig,target_img_dir,
@@ -39,6 +49,7 @@ CUDAIMAGE::Pointer QuadraticTransformImageC(CUDAIMAGE::Pointer main_image, Trans
     output->spc=target_img->spc;
     output->components_per_voxel= target_img->components_per_voxel;
     output->SetFloatDataPointer( d_output);
+    cap.out("output",output).save();
     return output;
 
 }

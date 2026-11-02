@@ -2,16 +2,19 @@
 #define _WARPIMAGE_CXX
 
 #include "warp_image.h"
+#include "gpu_capture.h"
 
 
 
 CUDAIMAGE::Pointer WarpImage(CUDAIMAGE::Pointer main_image, CUDAIMAGE::Pointer field_image)
 {
+    gpucap::Rec cap("WarpImage");
+    cap.in("main_image",main_image).in("field_image",field_image);
 
     cudaPitchedPtr d_output={0};
     cudaExtent extent =  make_cudaExtent(sizeof(float)*main_image->sz.x,main_image->sz.y,main_image->sz.z);
     cudaMalloc3D(&d_output, extent);
-    cudaMemset3D(d_output,0,extent);
+    cudaMemset(d_output.ptr,0,d_output.pitch*extent.height*extent.depth);
 
 
     WarpImage_cuda(main_image->GetTexture(),
@@ -30,6 +33,7 @@ CUDAIMAGE::Pointer WarpImage(CUDAIMAGE::Pointer main_image, CUDAIMAGE::Pointer f
     output->spc=main_image->spc;
     output->components_per_voxel= main_image->components_per_voxel;
     output->SetFloatDataPointer( d_output);
+    cap.out("output",output).save();
     return output;
 
 }

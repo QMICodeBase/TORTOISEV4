@@ -550,7 +550,7 @@ bool DRBUDDI_PARSERBASE::getEstimateLRPerIteration()
     if(option->GetNumberOfFunctions())
          return (bool)(atoi(option->GetFunction(0)->GetName().c_str()));
     else
-#ifdef USECUDA
+#ifdef USEGPU
         return 0;
 #else
         return 0;
@@ -891,7 +891,7 @@ std::string DRBUDDI_PARSERBASE::getStructuralNames(int str_id=0)
 
 std::string DRBUDDI_PARSERBASE::getRegistrationMethodType()
 {
-    #ifdef USECUDA
+    #ifdef USEGPU
         OptionType::Pointer option = this->GetOption( "transformation_type");
         if(option->GetNumberOfFunctions())
              return option->GetFunction(0)->GetName();

@@ -69,6 +69,7 @@ public:
     
 
     cudaTextureObject_t GetTexture(){return texobj;};
+    cudaArray* GetArray(){return CudaArraydata;};     // for golden-vector capture readback
     void CreateTexture();
  
     ImageType3D::DirectionType dir;

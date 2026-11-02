@@ -185,7 +185,9 @@ void GaussianSmoothImage_cuda(cudaPitchedPtr data,
     cudaPitchedPtr buffer1,buffer2;
     cudaExtent extent =  make_cudaExtent(Ncomponents*sizeof(float)*data_sz.x,data_sz.y,data_sz.z);
     gpuErrchk(cudaMalloc3D(&buffer1, extent));
+    cudaMemset(buffer1.ptr,0,buffer1.pitch*extent.height*extent.depth);   // deterministic row padding (PERF_NOTES 2.3/12)
     gpuErrchk(cudaMalloc3D(&buffer2, extent));
+    cudaMemset(buffer2.ptr,0,buffer2.pitch*extent.height*extent.depth);   // deterministic row padding (PERF_NOTES 2.3/12)
 
 
     {

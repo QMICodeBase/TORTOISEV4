@@ -9,7 +9,7 @@
 
 #include "itkDisplacementFieldTransform.h"
 
-#ifdef USECUDA
+#ifdef USEGPU
     #include "cuda_image.h"
 #else
     #include "itkImageDuplicator.h"
@@ -21,7 +21,7 @@ class DRBUDDI_Diffeo
 
     using DisplacementFieldTransformType= TORTOISE::DisplacementFieldTransformType;
 
-    #ifdef USECUDA
+    #ifdef USEGPU
         using CurrentFieldType = CUDAIMAGE;
         using CurrentImageType = CUDAIMAGE;
         using PhaseEncodingVectorType = float3;
@@ -45,7 +45,7 @@ class DRBUDDI_Diffeo
 
     DisplacementFieldType::Pointer getUp2DownINV();
 
-#ifdef USECUDA
+#ifdef USEGPU
 
     DisplacementFieldType::Pointer getDefFINV()
     {
@@ -290,7 +290,7 @@ private:                    //Main processing functions
 
 private:          //class member variables
 
-#ifdef USECUDA
+#ifdef USEGPU
     CUDAIMAGE::Pointer b0_up_img{nullptr},b0_down_img{nullptr};
     CUDAIMAGE::Pointer FA_up_img{nullptr},FA_down_img{nullptr};
     std::vector<CUDAIMAGE::Pointer> structural_imgs;

@@ -17,6 +17,12 @@
 #include "itkDisplacementFieldTransform.h"
 namespace fs = boost::filesystem;
 
+// A GPU backend is present (CUDA or WebGPU). Guards that mean "a GPU exists"
+// use USEGPU; guards around genuinely CUDA-specific code stay on USECUDA.
+#if defined(USECUDA) || defined(USEWEBGPU)
+    #define USEGPU 1
+#endif
+
 #include "../external_src/json_nlohmann/json.hpp"
 using json = nlohmann::json;
 

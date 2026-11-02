@@ -5,6 +5,7 @@
 #include <iostream>
 
 #include "cuda_utils.h"
+#include "reduction_scratch.h"
 
 #define PADDING 2
 
@@ -154,7 +155,7 @@ void ComputeEntropy_cuda(cudaPitchedPtr img, int3 sz, const int Nbins, const flo
     int Nblocks= gridSize.x*gridSize.y*gridSize.z;
 
     unsigned int *d_part_hist;
-    cudaMalloc(&d_part_hist, Nblocks * Nbins * sizeof(unsigned int));
+    d_part_hist = (unsigned int*)CudaScratch(Nblocks * Nbins * sizeof(unsigned int), 0);
     cudaMemset(d_part_hist, 0, Nblocks*Nbins * sizeof(unsigned int));
  
     ComputePartialHistogram_kernel <<< gridSize, blockSize,Nbins*sizeof(unsigned int) >>> (img,sz, Nbins, low_lim,high_lim,d_part_hist);
@@ -163,17 +164,16 @@ void ComputeEntropy_cuda(cudaPitchedPtr img, int3 sz, const int Nbins, const flo
 
     
     float *d_hist;
-    cudaMalloc(&d_hist,  Nbins * sizeof(float));
+    d_hist = (float*)CudaScratch(Nbins * sizeof(float), 1);
     cudaMemset(d_hist, 0, Nbins * sizeof(float));
     const dim3 blockSize2(Nbins);
     AccumulatePartialHistogram_kernel<<< 1, blockSize2 >>> (d_part_hist,Nblocks, Nbins,d_hist);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
-    cudaFree(d_part_hist);
     
     
     float* hist_sum;
-    cudaMalloc((void**)&hist_sum, sizeof(float));
+    hist_sum = (float*)CudaScratch(sizeof(float), 2);
     ScalarFindSum2<<<1, bSize>>>(d_hist, Nbins, hist_sum);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());  
@@ -182,17 +182,14 @@ void ComputeEntropy_cuda(cudaPitchedPtr img, int3 sz, const int Nbins, const flo
     ConvertHistToBinwiseEntropy_kernel<<<1, Nbins>>> (d_hist, Nbins, hist_sum);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());  
-    cudaFree(hist_sum);
     
     float* d_entropy;
-    cudaMalloc((void**)&d_entropy, sizeof(float));
+    d_entropy = (float*)CudaScratch(sizeof(float), 3);
     ScalarFindSum2<<<1, bSize>>>(d_hist, Nbins, d_entropy);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());  
-    cudaFree(d_hist);
     
     cudaMemcpy(&value, d_entropy, sizeof(float), cudaMemcpyDeviceToHost);
-    cudaFree(d_entropy);
 
 }
 
@@ -398,7 +395,7 @@ void ComputeJointEntropy_cuda(cudaPitchedPtr img1, float low_lim1, float high_li
     int Nblocks= gridSize.x*gridSize.y*gridSize.z;
 
     unsigned int *d_part_hist;
-    cudaMalloc(&d_part_hist, Nblocks * Nbins * Nbins * sizeof(unsigned int));
+    d_part_hist = (unsigned int*)CudaScratch(Nblocks * Nbins * Nbins * sizeof(unsigned int), 4);
     cudaMemset(d_part_hist, 0, Nblocks*Nbins * Nbins * sizeof(unsigned int));
 
     ComputeJointPartialHistogram_kernel <<< gridSize, blockSize,Nbins*Nbins*sizeof(unsigned int) >>> (img1, low_lim1, high_lim1, img2, low_lim2, high_lim2, sz, Nbins, d_part_hist);
@@ -407,24 +404,23 @@ void ComputeJointEntropy_cuda(cudaPitchedPtr img1, float low_lim1, float high_li
 
 
     float *d_hist;
-    cudaMalloc(&d_hist,  Nbins*Nbins * sizeof(float));
+    d_hist = (float*)CudaScratch(Nbins*Nbins * sizeof(float), 5);
     cudaMemset(d_hist, 0, Nbins*Nbins * sizeof(float));
     AccumulateJointPartialHistogram_kernel<<< Nbins, Nbins >>> (d_part_hist,Nblocks, Nbins,d_hist);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
-    cudaFree(d_part_hist);
 
 
     {
         float *d_hist_img2;
-        cudaMalloc(&d_hist_img2,  Nbins * sizeof(float));
+        d_hist_img2 = (float*)CudaScratch(Nbins * sizeof(float), 6);
         cudaMemset(d_hist_img2, 0, Nbins * sizeof(float));
         ConvertJointHistogramToMovingHistogram_kernel<<< 1 ,Nbins >>>(d_hist,Nbins,d_hist_img2);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
         float* hist_sum;
-        cudaMalloc((void**)&hist_sum, sizeof(float));
+        hist_sum = (float*)CudaScratch(sizeof(float), 7);
         ScalarFindSum2<<<1, bSize>>>(d_hist_img2, Nbins, hist_sum);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
@@ -432,29 +428,26 @@ void ComputeJointEntropy_cuda(cudaPitchedPtr img1, float low_lim1, float high_li
         ConvertHistToBinwiseEntropy_kernel<<<1, Nbins>>> (d_hist_img2, Nbins, hist_sum);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
-        cudaFree(hist_sum);
 
         float* d_entropy_img2;
-        cudaMalloc((void**)&d_entropy_img2, sizeof(float));
+        d_entropy_img2 = (float*)CudaScratch(sizeof(float), 8);
         ScalarFindSum2<<<1, bSize>>>(d_hist_img2, Nbins, d_entropy_img2);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
-        cudaFree(d_hist_img2);
 
         cudaMemcpy(&value2, d_entropy_img2, sizeof(float), cudaMemcpyDeviceToHost);
-        cudaFree(d_entropy_img2);
     }
    // if(value1==0)
     {
         float *d_hist_img1;
-        cudaMalloc(&d_hist_img1,  Nbins * sizeof(float));
+        d_hist_img1 = (float*)CudaScratch(Nbins * sizeof(float), 9);
         cudaMemset(d_hist_img1, 0, Nbins * sizeof(float));
         ConvertJointHistogramToFixedHistogram_kernel<<< 1 ,Nbins >>>(d_hist,Nbins,d_hist_img1);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
 
         float* hist_sum;
-        cudaMalloc((void**)&hist_sum, sizeof(float));
+        hist_sum = (float*)CudaScratch(sizeof(float), 10);
         ScalarFindSum2<<<1, bSize>>>(d_hist_img1, Nbins, hist_sum);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
@@ -462,21 +455,18 @@ void ComputeJointEntropy_cuda(cudaPitchedPtr img1, float low_lim1, float high_li
         ConvertHistToBinwiseEntropy_kernel<<<1, Nbins>>> (d_hist_img1, Nbins, hist_sum);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
-        cudaFree(hist_sum);
 
         float* d_entropy_img1;
-        cudaMalloc((void**)&d_entropy_img1, sizeof(float));
+        d_entropy_img1 = (float*)CudaScratch(sizeof(float), 11);
         ScalarFindSum2<<<1, bSize>>>(d_hist_img1, Nbins, d_entropy_img1);
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaDeviceSynchronize());
-        cudaFree(d_hist_img1);
 
         cudaMemcpy(&value1, d_entropy_img1, sizeof(float), cudaMemcpyDeviceToHost);
-        cudaFree(d_entropy_img1);
     }
 
     float* hist_sum;
-    cudaMalloc((void**)&hist_sum, sizeof(float));
+    hist_sum = (float*)CudaScratch(sizeof(float), 12);
     ScalarFindSum2<<<1, bSize>>>(d_hist, Nbins*Nbins, hist_sum);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
@@ -485,17 +475,14 @@ void ComputeJointEntropy_cuda(cudaPitchedPtr img1, float low_lim1, float high_li
     ConvertJointHistToBinwiseEntropy_kernel<<<Nbins, Nbins>>> (d_hist, Nbins, hist_sum);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
-    cudaFree(hist_sum);
 
     float* d_entropy;
-    cudaMalloc((void**)&d_entropy, sizeof(float));
+    d_entropy = (float*)CudaScratch(sizeof(float), 13);
     ScalarFindSum2<<<1, bSize>>>(d_hist, Nbins*Nbins, d_entropy);
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
-    cudaFree(d_hist);
 
     cudaMemcpy(&valuec, d_entropy, sizeof(float), cudaMemcpyDeviceToHost);
-    cudaFree(d_entropy);
 
 }
 

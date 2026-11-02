@@ -34,6 +34,8 @@
 
 #include "itkMeanSquaresImageToImageMetricv4.h"
 
+#include <iostream>
+
 
 DRBUDDI::DRBUDDI(std::string uname,std::string dname,std::vector<std::string> str_names,json mjson)
 {
@@ -45,7 +47,7 @@ DRBUDDI::DRBUDDI(std::string uname,std::string dname,std::vector<std::string> st
 
 
 #ifdef DRBUDDIALONE
-    this->stream= &((*stream));
+    this->stream= &std::cout;
 #else
     this->stream= TORTOISE::stream;
 #endif
