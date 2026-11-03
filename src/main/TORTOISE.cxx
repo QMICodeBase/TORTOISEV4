@@ -450,6 +450,7 @@ void TORTOISE::UpdateSettingsFromCommandLine()
     RegistrationSettings::get().setValue<float>("outlier_prob",parser->getOutlierProbabilityThreshold());
     RegistrationSettings::get().setValue<int>("outlier_EM_clusters",parser->getOutlierNumberOfResidualClusters());
     RegistrationSettings::get().setValue<bool>("outlier_replacement_mode",parser->getOutlierReplacementModeAggessive());
+    RegistrationSettings::get().setValue<bool>("disable_MI_mt",parser->getDoDIFFPREPNONMultiThreaded());
 
     RegistrationSettings::get().setValue<int>("is_human_brain",parser->getIsHuman());
     RegistrationSettings::get().setValue<int>("niter",parser->getNiter());

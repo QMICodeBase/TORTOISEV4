@@ -577,7 +577,7 @@ EulerPhaseScale3DTransform<TParametersValueType>::PrintSelf(std::ostream & os, I
   os << indent << "scalePhase1: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(m_PhaseScaleShear[1]) << std::endl;
   os << indent << "scalePhase2: " << static_cast<typename NumericTraits<ScalarType>::PrintType>(m_PhaseScaleShear[2]) << std::endl;
 
-  itkPrintSelfBooleanMacro(ComputeZYX);
+  //itkPrintSelfBooleanMacro(m_ComputeZYX);
 }
 
 } // namespace itk

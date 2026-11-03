@@ -1413,6 +1413,9 @@ ImageType3D::Pointer DRBUDDI::PreprocessImage(  ImageType3D::ConstPointer  input
 
 void DRBUDDI::Step1_RigidRegistration()
 {
+
+    using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+
     //Create and write b0_up quad image
     CreateBlipUpQuadImage();
     writeImageD<ImageType3D>(this->b0_up_quad,proc_folder+"/blip_up_b0_quad.nii");
@@ -1432,8 +1435,7 @@ void DRBUDDI::Step1_RigidRegistration()
     interp->SetSplineOrder(3);
 
 
-    //Create and write b0_down quad image and the rigid transformation
-    using ResampleImageFilterType = itk::ResampleImageFilter<ImageType3D, ImageType3D> ;
+    //Create and write b0_down quad image and the rigid transformation    
     ResampleImageFilterType::Pointer resampleFilter2 = ResampleImageFilterType::New();
     resampleFilter2->SetOutputParametersFromImage(this->b0_up_quad);;
     resampleFilter2->SetInput(this->b0_down);
@@ -1503,8 +1505,7 @@ void DRBUDDI::Step1_RigidRegistration()
 
     // and finally rigid register all structural images to the kind of corrected b0 image
 
-    int Nstr= parser->getNumberOfStructurals();
-
+    int Nstr= parser->getNumberOfStructurals();    
 
     for(int str=0;str<Nstr;str++)
     {

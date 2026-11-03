@@ -404,13 +404,15 @@ RigidTransformType::Pointer RigidRegisterImagesEuler(ImageType3D::Pointer fixed_
     typedef itk::MattesMutualInformationImageToImageMetricv4<ImageType3D,ImageType3D> MetricType3;
     MetricType3::Pointer m= MetricType3::New();
     m->SetNumberOfHistogramBins(40);
-    m->SetMaximumNumberOfWorkUnits(NITK);
+    //m->SetMaximumNumberOfWorkUnits(NITK);
+    m->SetMaximumNumberOfWorkUnits(1);
     m->SetFixedImage(fixed_img);
     m->SetMovingImage(moving_img);
 
     MetricType3::Pointer m4= MetricType3::New();
     m4->SetNumberOfHistogramBins(100);
-    m4->SetMaximumNumberOfWorkUnits(NITK);
+    //m4->SetMaximumNumberOfWorkUnits(NITK);
+    m4->SetMaximumNumberOfWorkUnits(1);
     m4->SetFixedImage(fixed_img);
     m4->SetMovingImage(moving_img);
 

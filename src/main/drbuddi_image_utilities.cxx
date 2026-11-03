@@ -331,6 +331,15 @@ DisplacementFieldType::Pointer InvertField( const DisplacementFieldType * field,
 {
     using InverterType = itk::InvertDisplacementFieldImageFilterOkan<DisplacementFieldType>;
 
+    typename InverterType::Pointer inverter = InverterType::New();
+    inverter->SetInput( field );
+    inverter->SetInverseFieldInitialEstimate( inverseFieldEstimate );
+    inverter->SetMaximumNumberOfIterations( 50 );
+    inverter->SetMeanErrorToleranceThreshold( 0.0001 );
+    inverter->SetMaxErrorToleranceThreshold( 0.01 );
+    inverter->SetNumberOfWorkUnits(TORTOISE::GetNAvailableCores());
+    inverter->Update();
+
     /*
     typename InverterType::Pointer inverter = InverterType::New();
     inverter->SetInput( field );
@@ -341,7 +350,7 @@ DisplacementFieldType::Pointer InvertField( const DisplacementFieldType * field,
     inverter->SetNumberOfWorkUnits(TORTOISE::GetNAvailableCores());
     inverter->Update();
 */
-
+/*
     typename InverterType::Pointer inverter = InverterType::New();
     inverter->SetInput( field );
     inverter->SetInverseFieldInitialEstimate( inverseFieldEstimate );
@@ -350,7 +359,7 @@ DisplacementFieldType::Pointer InvertField( const DisplacementFieldType * field,
     inverter->SetMaxErrorToleranceThreshold( 0.0005 );
     inverter->SetNumberOfWorkUnits(TORTOISE::GetNAvailableCores());
     inverter->Update();
-
+*/
     DisplacementFieldType::Pointer inverseField = inverter->GetOutput();
 
     return inverseField;

@@ -10,6 +10,6 @@
 using  QuadraticTransformType=itk::OkanQuadraticTransform<double,3,3>;
 
 
-QuadraticTransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string phase, MeccSettings *mecc_settings, bool initialize,std::vector<float> lim_arr, int vol,  QuadraticTransformType::Pointer minit_trans=nullptr ) ;
+QuadraticTransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string phase, MeccSettings *mecc_settings, bool initialize,std::vector<float> lim_arr, int vol,  QuadraticTransformType::Pointer minit_trans=nullptr , bool disable_MI_multithreading=0) ;
 
 #endif

@@ -71,6 +71,7 @@ public:
     int getOutlierReplacementModeAggessive();
     int getPOW();
     std::string getB0MaskName();
+    bool getDoDIFFPREPNONMultiThreaded();
 
 
     int getNiter();

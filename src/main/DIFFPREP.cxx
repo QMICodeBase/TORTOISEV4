@@ -566,6 +566,7 @@ std::vector<float> DIFFPREP::choose_range(ImageType3D::Pointer b0_img,ImageType3
 void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> target_imgs, std::vector<ImageType3D::Pointer> source_imgs)
 {
     std::string correction_mode= RegistrationSettings::get().getValue<std::string>(std::string("correction_mode"));
+    bool disable_MI_mt=RegistrationSettings::get().getValue<bool>(std::string("disable_MI_mt"));
 
 
 
@@ -723,7 +724,7 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
                 #ifdef USECUDA
                     if(thr>= NGPUs)
                     {
-                        curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol );
+                        curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol,nullptr,disable_MI_mt );
                     }
                     else
                     {
@@ -733,30 +734,9 @@ void DIFFPREP::SynthMotionEddyCorrectAllDWIs(std::vector<ImageType3D::Pointer> t
                    //     TORTOISE::ReleaseGPU(gpu_ids_per_thread[vol]);
                     }
                 #else
-                        curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol );
+
+                        curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol,nullptr,disable_MI_mt);
                 #endif
-
-
-                /*
-                #ifdef USECUDA
-                    if(nt==1)
-                    {
-                        if(TORTOISE::ReserveGPU())
-                        {
-                            curr_trans=  RegisterDWIToB0_cuda(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges);
-                            TORTOISE::ReleaseGPU();
-                        }
-                        else
-                            curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol );
-                    }
-                    else
-                            curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol );
-
-                #else                        
-                        curr_trans=  RegisterDWIToB0(target_target, curr_vol, this->PE_string, this->mecc_settings,true,signal_ranges,vol );
-                #endif
-                */
-
 
                 dwi_transforms[vol]->ClearTransformQueue();
                 dwi_transforms[vol]->AddTransform(curr_trans);
@@ -962,7 +942,10 @@ void DIFFPREP::EM(std::vector< std::vector<float> >  logRMS_shell, std::vector< 
             for(int kk=0;kk<k;kk++)
             {
                 std::random_device rd;
-                std::mt19937 e2(rd());
+               // std::mt19937 e2(rd());
+                unsigned int seed = 12345;
+                std::mt19937 e2(seed);
+
                 std::normal_distribution<> dist(M[kk],S[kk]);
 
                 int N= std::round(500000*P[kk]);
@@ -1170,9 +1153,6 @@ std::vector<ImageType3D::Pointer> DIFFPREP::ReplaceOutliers( std::vector<ImageTy
         }
     }
 
-
-    //std::cout<<std::endl<<covereds<<std::endl;
-
     // each shell has to have 70% good data for a given slice
     // otherwise fitting synth goes crazy
     for(int sh=0;sh<shells.size();sh++)
@@ -1347,6 +1327,7 @@ void DIFFPREP::MotionAndEddy()
     bool outlier_replacement= RegistrationSettings::get().getValue<bool>(std::string("repol"));
     int Nepoch=RegistrationSettings::get().getValue<int>(std::string("niter"));
     std::string correction_mode= RegistrationSettings::get().getValue<std::string>(std::string("correction_mode"));
+    bool disable_MI_mt=RegistrationSettings::get().getValue<bool>(std::string("disable_MI_mt"));
 
     bool iterative=false;
     if( (is_human_brain && high_bval_present) || slice_to_volume || outlier_replacement)
@@ -1539,7 +1520,6 @@ void DIFFPREP::MotionAndEddy()
 
                  eddy_s2v_replaced_raw_dwis[vol] = QuadratictransformImage<ImageType3D>(curr_vol,dwi_transforms[vol],"Linear",0);
 
-
                  TORTOISE::DisableOMPThread();
              }
              //All this is quite memory intensive. We should clear as soon as we can
@@ -1686,7 +1666,7 @@ void DIFFPREP::MotionAndEddy()
 
                      VolumeToSliceRegistration(target, native_synth_img,slspec,signal_ranges,s2v_transformations[vol],do_eddy,this->PE_string, this->b0_mask_img,vol);
                      #pragma omp critical
-                     {                         
+                     {
                          (*stream)<<vol<<", "<<std::flush;
                      }
                      TORTOISE::DisableOMPThread();
@@ -1747,9 +1727,10 @@ void DIFFPREP::MotionAndEddy()
                                  native_native_synth_dwis[vol]->SetPixel(ind3,interp_val);
                              }
                          }
-                     }                     
+                     }
                      TORTOISE::DisableOMPThread();
                  } //for vol
+
 
                  //Clean memory
                  s2v_replaced_synth_dwis.clear();  s2v_replaced_synth_dwis.resize(Nvols);
@@ -1760,8 +1741,6 @@ void DIFFPREP::MotionAndEddy()
                  // so,  we can now check for outliers by statistical analysis.
                  this->native_weight_img = ReplaceOutliers(native_native_synth_dwis, native_native_raw_dwis,shells,bvals,TR_map);
                  (*stream)<<"Replacing outliers...Done!"<<std::endl;
-
-
 
                  // Now that we have found the outliers in the completely uncorrected space,
                  // we can transform everything to the corrected space
@@ -1776,11 +1755,11 @@ void DIFFPREP::MotionAndEddy()
 
                          #pragma omp critical
                          {
-                             std::cout<<vol<< ", "<<std::flush;
+                             (*stream)<<vol<< ", "<<std::flush;
                          }
                      }
-                     std::cout<<std::endl;
-                     std::cout<<"Done forward transforming..."<<std::endl;
+                     (*stream)<<std::endl;
+                     (*stream)<<"Done forward transforming..."<<std::endl;
                  }
                  else
                  {
@@ -1813,7 +1792,6 @@ void DIFFPREP::MotionAndEddy()
              //We have corrected space synth data now
              // We can use that to improve inter-volume motion and eddy currents distortions.
              SynthMotionEddyCorrectAllDWIs(eddy_s2v_replaced_synth_dwis,s2v_replaced_raw_dwis);
-
 
          } //for epoch
      } //if iterative

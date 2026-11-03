@@ -12,7 +12,7 @@
 
 using OkanQuadraticTransformType=itk::OkanQuadraticTransform<CoordType,3,3>;
 
-void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Pointer dwi_img , vnl_matrix<int> slspec,std::vector<float> lim_arr,std::vector<OkanQuadraticTransformType::Pointer> &s2v_transformations, bool do_eddy,std::string phase, ImageType3D::Pointer mask_img=nullptr,int vol=0)
+void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Pointer dwi_img , vnl_matrix<int> slspec,std::vector<float> lim_arr,std::vector<OkanQuadraticTransformType::Pointer> &s2v_transformations, bool do_eddy,std::string phase, ImageType3D::Pointer mask_img=nullptr,int vol=0,bool disable_MI_mt=0)
 {     
     int Nexc= slspec.rows();
     int MB= slspec.cols();
@@ -147,7 +147,12 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
                 metric->SetFixedMax(lim_arr[1]);
                 metric->SetMovingMin(lim_arr[2]);
                 metric->SetMovingMax(lim_arr[3]);
-                metric->SetMaximumNumberOfWorkUnits(NITK);
+                if(disable_MI_mt)
+                    metric->SetMaximumNumberOfWorkUnits(1);
+                else
+                    metric->SetMaximumNumberOfWorkUnits(NITK);
+
+
 
 
                 using OptimizerType=itk::DIFFPREPGradientDescentOptimizerv4<double>;
@@ -179,7 +184,16 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
                 registration->SetSmoothingSigmasPerLevel( smoothingSigmasPerLevel );
                 registration->SetSmoothingSigmasAreSpecifiedInPhysicalUnits(false);
                 registration->SetShrinkFactorsPerLevel( shrinkFactorsPerLevel );
-                registration->SetNumberOfWorkUnits(NITK);
+                if(disable_MI_mt)
+                {
+                    registration->SetNumberOfWorkUnits(1);
+                    metric->SetMaximumNumberOfWorkUnits(1);
+                }
+                else
+                {
+                    registration->SetNumberOfWorkUnits(NITK);
+                    metric->SetMaximumNumberOfWorkUnits(NITK);
+                }
                 registration->SetMetric(        metric        );
 
                 try
@@ -296,7 +310,16 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
             metric->SetFixedMax(lim_arr[1]);
             metric->SetMovingMin(lim_arr[2]);
             metric->SetMovingMax(lim_arr[3]);
-            metric->SetMaximumNumberOfWorkUnits(NITK);
+            if(disable_MI_mt)
+            {
+                metric->SetMaximumNumberOfWorkUnits(1);
+            }
+            else
+            {
+                metric->SetMaximumNumberOfWorkUnits(NITK);
+            }
+
+
 
 
             using OptimizerType=itk::DIFFPREPGradientDescentOptimizerv4<double>;
@@ -328,7 +351,17 @@ void VolumeToSliceRegistration(ImageType3D::Pointer slice_img, ImageType3D::Poin
             registration->SetSmoothingSigmasPerLevel( smoothingSigmasPerLevel );
             registration->SetSmoothingSigmasAreSpecifiedInPhysicalUnits(false);
             registration->SetShrinkFactorsPerLevel( shrinkFactorsPerLevel );
-            registration->SetNumberOfWorkUnits(NITK);
+            if(disable_MI_mt)
+            {
+                registration->SetNumberOfWorkUnits(1);
+                metric->SetMaximumNumberOfWorkUnits(1);
+            }
+            else
+            {
+                registration->SetNumberOfWorkUnits(NITK);
+                metric->SetMaximumNumberOfWorkUnits(NITK);
+            }
+
             registration->SetMetric(        metric        );
 
             try
@@ -588,7 +621,7 @@ ImageType3D::Pointer ForwardTransformImage2(ImageType3D::Pointer img, std::vecto
     inverter->SetInput( forward_s2v_field );
     inverter->SetMaximumNumberOfIterations( 50 );
     inverter->SetMeanErrorToleranceThreshold( 0.0004 );
-    inverter->SetMaxErrorToleranceThreshold( 0.04 );
+    inverter->SetMaxErrorToleranceThreshold( 0.04 );    
     //inverter->SetNumberOfWorkUnits(NITK);
     inverter->SetNumberOfWorkUnits(1);
     inverter->Update();

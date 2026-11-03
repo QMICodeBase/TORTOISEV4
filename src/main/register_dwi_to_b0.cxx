@@ -12,7 +12,7 @@
 
 
 
-QuadraticTransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string phase, MeccSettings *mecc_settings, bool initialize,std::vector<float> lim_arr, int vol,  QuadraticTransformType::Pointer minit_trans)
+QuadraticTransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img, ImageType3D::Pointer moving_img,std::string phase, MeccSettings *mecc_settings, bool initialize,std::vector<float> lim_arr, int vol,  QuadraticTransformType::Pointer minit_trans, bool disable_MI_multithreading)
 {    
     int NITK= TORTOISE::GetAvailableITKThreadFor();
 
@@ -147,9 +147,16 @@ QuadraticTransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img,
         registration->SetOptimizer(optimizer);
         registration->SetInitialTransform(initialTransform);
         registration->InPlaceOn();
-        registration->SetNumberOfWorkUnits(1);
-        //registration->SetNumberOfThreads(NITK);
-        metric2->SetMaximumNumberOfWorkUnits(1);
+        if(disable_MI_multithreading)
+        {
+            registration->SetNumberOfWorkUnits(1);
+            metric2->SetMaximumNumberOfWorkUnits(1);
+        }
+        else
+        {
+            registration->SetNumberOfWorkUnits(NITK);
+            metric2->SetMaximumNumberOfWorkUnits(NITK);
+        }
         registration->SetMetric(        metric2        );
 
 
@@ -202,9 +209,16 @@ QuadraticTransformType::Pointer  RegisterDWIToB0(ImageType3D::Pointer fixed_img,
             registration->SetOptimizer(optimizer);
             registration->SetInitialTransform(initialTransform);
             registration->InPlaceOn();
-            registration->SetNumberOfWorkUnits(1);
-            //registration->SetNumberOfThreads(NITK);
-            metric->SetMaximumNumberOfWorkUnits(1);
+            if(disable_MI_multithreading)
+            {
+                registration->SetNumberOfWorkUnits(1);
+                metric->SetMaximumNumberOfWorkUnits(1);
+            }
+            else
+            {
+                registration->SetNumberOfWorkUnits(NITK);
+                metric->SetMaximumNumberOfWorkUnits(NITK);
+            }
             registration->SetMetric(        metric        );
 
 

@@ -123,7 +123,9 @@ IF(ISDEBUG)
     ENDIF(ITK_FOUND)
 ELSE(ISDEBUG)
     if ( NOT DEFINED ITK_DIR)
-        SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-6.0b01-release)        
+
+        #SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-5.4.5-release)
+        SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-6.0b01-release)
        #SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-6.0b01-QMIL09_release)        
     endif()
     FIND_PACKAGE(ITK)
@@ -483,6 +485,18 @@ add_executable(DisplacementFieldOperations   ../src/tools/DisplacementFieldOpera
 target_link_libraries(DisplacementFieldOperations  ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 set_target_properties(DisplacementFieldOperations PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS")
 
+add_executable(SetFieldToIsocenter   ../src/tools/DisplacementFieldOperations/SetFieldToIsocenter.cxx ${SOURCES})
+target_link_libraries(SetFieldToIsocenter  ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+set_target_properties(SetFieldToIsocenter PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS")
+
+add_executable(ZeroFieldDims   ../src/tools/DisplacementFieldOperations/ZeroFieldDims.cxx ${SOURCES})
+target_link_libraries(ZeroFieldDims  ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+set_target_properties(ZeroFieldDims PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS")
+
+
+
+
+
 add_executable(ConstrainDefFields   ../src/tools/DRTAMAS/ConstrainDefFields.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ${SOURCES})
 target_link_libraries(ConstrainDefFields  ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 set_target_properties(ConstrainDefFields PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS")
@@ -505,6 +519,12 @@ target_link_libraries(Rigid2Euler ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
 add_executable(Affine2Rigid   ../src/tools/AffineToRigid/affine_to_rigid.cxx ${SOURCES})
 target_link_libraries(Affine2Rigid ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+
+#add_executable(RigidPhaseScaleRegister  ../src/tools/RigidPhaseScaleRegister/RigidPhaseScaleRegister.cxx ../src/main/rigid_register_images.cxx  ${SOURCES})
+#target_link_libraries(RigidPhaseScaleRegister ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
+
+add_executable(ComputeROIStatistic  ../src/tools/ComputeROIStatistic/ComputeROIStatistic.cxx  ${SOURCES})
+target_link_libraries(ComputeROIStatistic ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
 
 
 add_executable(ApplyTransformationToTensor   ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/DRTAMAS/ApplyTransformationToTensorDRT.cxx    ${SOURCES} )
@@ -549,29 +569,8 @@ target_link_libraries(ResampleTensor ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
 set_target_properties(ResampleTensor PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS")
 
 
-
-#add_executable(Test ../src/tools/Test/Test.cxx ${SOURCES})
-#target_link_libraries(Test ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
-
-#add_executable(ReorientImageDEC ../src/tools/ReorientImage3D/reorient_imageDEC.cxx  ../src/tools/ReorientImage3D/reorient_image_parser.cxx  ${SOURCES})
-#target_link_libraries(ReorientImageDEC ${ITK_LIBRARIES}  ${Boost_LIBRARIES})
-
-#add_executable(AffineTransformationDeterminant  ../src/tools/AffineTransformationDeterminant/AffineTransformationDeterminant.cxx  ${SOURCES})
-#target_include_directories(AffineTransformationDeterminant   PRIVATE   )
-#target_link_libraries(AffineTransformationDeterminant ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
-
 #add_executable(BrukerBmatToTORTOISEBMTXT   ../src/tools/BrukerBmatToTORTOISEBMTXT/BrukerBmatToTORTOISEBMTXT.cxx ${SOURCES})
 #target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
-
-#add_executable(JoanahUpDownB0Transformations  ../src/tools/JoanahUpDownB0Transformations/JoanahUpDownB0Transformations.cxx ../src/tools/JoanahUpDownB0Transformations/JoanahUpDownB0Transformations_parser.cxx ${SOURCES})
-#target_link_libraries(JoanahUpDownB0Transformations ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
-
-#add_executable(RigidPhaseScaleRegister  ../src/tools/RigidPhaseScaleRegister/RigidPhaseScaleRegister.cxx ../src/main/rigid_register_images.cxx  ${SOURCES})
-#target_link_libraries(RigidPhaseScaleRegister ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
-
-
-#add_executable(JoanahRegisterAlongAxes  ../src/tools/JoanahUpDownB0Transformations/JoanahRegisterAlongAxes.cxx ../src/main/register_dwi_to_b0.cxx   ../src/tools/ResampleDWIs/resample_dwis.cxx ${SOURCES})
-#target_link_libraries(JoanahRegisterAlongAxes ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
 
 
 IF(USE_VTK)

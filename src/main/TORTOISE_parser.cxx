@@ -473,6 +473,16 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
         option->SetModule(4);
         this->AddOption( option );
     }
+    {
+        std::string description = std::string("Disable multi-threading in ITK mutual information metric to get reproducible results between runs. Default: 0")  ;
+        OptionType::Pointer option = OptionType::New();
+        option->SetLongName( "disable_MI_mt");
+        option->SetDescription( description );
+        option->SetModule(4);
+        this->AddOption( option );
+    }
+
+
 
     {
         std::string description = std::string("Signal drift correction method. Data will be checked to automatically determine if this correction can be applied. ")  ;
@@ -588,6 +598,17 @@ void TORTOISE_PARSER::InitializeCommandLineOptions()
 
 
 }
+
+bool TORTOISE_PARSER::getDoDIFFPREPNONMultiThreaded()
+{
+    OptionType::Pointer option = this->GetOption("disable_MI_mt");
+    if(option->GetNumberOfFunctions())
+    {
+        return (bool)( atoi(option->GetFunction(0)->GetName().c_str()));
+    }
+    return 0;
+}
+
 
 std::string TORTOISE_PARSER::getUpBvalName()
 {
