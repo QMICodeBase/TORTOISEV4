@@ -4,52 +4,104 @@
 
 #include "create_mask.h"
 #include "itkBinaryBallStructuringElement.h"
-#include "../../external_libraries/bet/Linux/betokan.h"
 #include "itkImageDuplicator.h"
+#include <cerrno>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <spawn.h>
+#include <stdexcept>
+#include <sys/wait.h>
+#include <vector>
 
+extern char **environ;
 
-#ifdef __APPLE__
-ImageType3D::Pointer betApple(ImageType3D::Pointer img)
+namespace {
+// A private directory prevents collisions between concurrent processing runs.
+struct MaskTemporaryDirectory
 {
-    std::string DIFFPREP_loc = executable_path("DIFFPREP");
-    fs::path DIFFPREP_folder_path= fs::path(DIFFPREP_loc).parent_path();
-    fs::path  bet_path= ((DIFFPREP_folder_path / std::string("..")) / std::string("..")) / std::string("external_libraries/bet/Darwin/bet2");
-    std::string bet_str= bet_path.string();
+    fs::path path;
+    MaskTemporaryDirectory()
+    {
+        std::string pattern = (fs::temp_directory_path() / "tortoise-mask-XXXXXX").string();
+        std::vector<char> buffer(pattern.begin(), pattern.end());
+        buffer.push_back('\0');
+        char *created = mkdtemp(buffer.data());
+        if (!created)
+            throw std::runtime_error("Cannot create skull-stripping temporary directory: " +
+                                     std::string(std::strerror(errno)));
+        path = created;
+    }
+    ~MaskTemporaryDirectory()
+    {
+        boost::system::error_code error;
+        fs::remove_all(path, error);
+    }
+};
 
+ImageType3D::Pointer skullStripAFNI(ImageType3D::Pointer img)
+{
+    MaskTemporaryDirectory temporary;
+    std::string input = (temporary.path / "input.nii").string();
+    std::string output = (temporary.path / "mask.nii").string();
+    auto writer = itk::ImageFileWriter<ImageType3D>::New();
+    writer->SetInput(img);
+    writer->SetFileName(input);
+    writer->Update();
 
-    fs::path list_path(list.GetListFileName());
-    fs::path list_folder_path = list_path.parent_path();
+    // Pass arguments directly: paths containing spaces or shell characters are safe.
+    std::vector<std::string> arguments = {
+        "3dSkullStrip", "-input", input, "-prefix", output, "-mask_vol"
+    };
+    std::vector<char *> argv;
+    for (auto &argument : arguments)
+        argv.push_back(&argument[0]);
+    argv.push_back(nullptr);
+    pid_t child;
+    int error = posix_spawnp(&child, argv[0], nullptr, nullptr, argv.data(), environ);
+    if (error)
+        throw std::runtime_error("Cannot launch 3dSkullStrip; install AFNI and put it on PATH: " +
+                                 std::string(std::strerror(error)));
+    int status = 0;
+    pid_t waited;
+    do { waited = waitpid(child, &status, 0); } while (waited == -1 && errno == EINTR);
+    if (waited == -1)
+        throw std::runtime_error("Cannot wait for 3dSkullStrip: " + std::string(std::strerror(errno)));
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0)
+        throw std::runtime_error("3dSkullStrip failed; see its output above.");
+    if (!fs::exists(output))
+        throw std::runtime_error("3dSkullStrip did not produce its mask NIfTI.");
 
-    std::string home(getenv("HOME"));
-    char fname[1000]={0};
-    char oname[1000]={0};
-    sprintf(fname,"%s/temp_%d.nii",list_folder_path.string().c_str(),vol_id);
-    sprintf(oname,"%s/temp_%d_mask.nii",list_folder_path.string().c_str(),vol_id);
-
-    typedef itk::ImageFileWriter<ImageType3D> WrType;
-    WrType::Pointer wr= WrType::New();
-    wr->SetInput(img);
-    wr->SetFileName(fname);
-    wr->Update();
-
-
-    char cmd[2000]={0};
-    sprintf(cmd,"export FSLOUTPUTTYPE=NIFTI && %s %s %s -f 0.1",bet_str.c_str(), fname,oname);
-    system(cmd);
-
-
-    typedef itk::ImageFileReader<ImageType3D> RdType;
-    RdType::Pointer rd= RdType::New();
-    rd->SetFileName(oname);
-    rd->Update();
-    b0_mask_img=rd->GetOutput();
-
-
-    fs::remove( fs::path(std::string(oname)));
-    fs::remove( fs::path(std::string(fname)));
-
+    auto reader = itk::ImageFileReader<ImageType3D>::New();
+    reader->SetFileName(output);
+    reader->Update();
+    ImageType3D::Pointer mask = reader->GetOutput();
+    mask->DisconnectPipeline();
+    if (mask->GetLargestPossibleRegion().GetSize() != img->GetLargestPossibleRegion().GetSize())
+        throw std::runtime_error("3dSkullStrip changed the image dimensions.");
+    for (unsigned int i = 0; i < 3; ++i)
+    {
+        if (std::abs(mask->GetSpacing()[i] - img->GetSpacing()[i]) > 1e-4 ||
+            std::abs(mask->GetOrigin()[i] - img->GetOrigin()[i]) > 1e-3)
+            throw std::runtime_error("3dSkullStrip changed the image geometry.");
+        for (unsigned int j = 0; j < 3; ++j)
+            if (std::abs(mask->GetDirection()[i][j] - img->GetDirection()[i][j]) > 1e-4)
+                throw std::runtime_error("3dSkullStrip changed the image orientation.");
+    }
+    // AFNI documents labels 4--6 as inside the surface (step(mask - 3.01)).
+    itk::ImageRegionIteratorWithIndex<ImageType3D> it(mask, mask->GetLargestPossibleRegion());
+    bool nonempty = false;
+    for (it.GoToBegin(); !it.IsAtEnd(); ++it)
+    {
+        const bool inside = it.Get() > 3.01f;
+        it.Set(inside ? 1.0f : 0.0f);
+        nonempty = nonempty || inside;
+    }
+    if (!nonempty)
+        throw std::runtime_error("3dSkullStrip produced an empty brain mask.");
+    return mask;
 }
-#endif
+} // namespace
 
 ImageType3D::Pointer create_mask(ImageType3D::Pointer img,ImageType3D::Pointer noise_img)
 {
@@ -57,21 +109,7 @@ ImageType3D::Pointer create_mask(ImageType3D::Pointer img,ImageType3D::Pointer n
 
     if(noise_img==nullptr)
     {
-#ifdef __linux__
-        b0_mask_img=betokan(img);
-#endif
-
-#ifdef __APPLE__
-        b0_mask_img=betApple(img);
-#endif
-        itk::ImageRegionIteratorWithIndex<ImageType3D> it(b0_mask_img,b0_mask_img->GetLargestPossibleRegion());
-        while(!it.IsAtEnd())
-        {
-            float b0_val = it.Get();
-            if(b0_val !=0)
-                it.Set(1);
-            ++it;
-        }
+        b0_mask_img=skullStripAFNI(img);
     }
     else
     {

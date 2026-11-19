@@ -1,228 +1,130 @@
 cmake_minimum_required(VERSION 3.20)
+project(TORTOISEV4 LANGUAGES C CXX)
 
-PROJECT(TORTOISEV4  )
-
-SET(USEOPENMP 1)
-#   SET(CMAKE_BUILD_TYPE Debug)
-#   SET(ISDEBUG 1)
-
-if ( NOT DEFINED USECUDA)
-    SET(USECUDA  0)
+option(USECUDA "Build CUDA executables" OFF)
+option(USE_VTK "Build VTK tools" OFF)
+option(QSIPREP "QSIPrep configuration" OFF)
+if(APPLE AND USECUDA)
+    message(FATAL_ERROR "CUDA is not supported on macOS; use the CPU build")
 endif()
-if ( NOT DEFINED USE_VTK)
-    SET(USE_VTK 0)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
-
-if ( NOT DEFINED QSIPREP)
-    SET(QSIPREP 0)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+if(APPLE)
+    set(CMAKE_INSTALL_RPATH "@loader_path/../lib")
 else()
-    message("Doing smaller build for QSIPrep")
+    set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
 endif()
 
-if ( DEFINED CMAKE_BUILD_TYPE)
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
-        SET(ISDEBUG 0)
-    else()
-        if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-            SET(ISDEBUG 1)
-        else()
-            SET(CMAKE_BUILD_TYPE Release)
-            SET(ISDEBUG 0)
-        endif()
-    endif()
-else()
-    SET(CMAKE_BUILD_TYPE Release)
-    SET(ISDEBUG 0)
-endif()
+find_package(OpenMP REQUIRED COMPONENTS C CXX)
+add_compile_definitions(USE_OPENMP)
+add_compile_options(-Wno-deprecated-declarations -Wno-unused-result -Wno-narrowing)
+find_package(Boost 1.86 CONFIG REQUIRED COMPONENTS iostreams filesystem system algorithm lexical_cast dll endian math)
+set(Boost_LIBRARIES Boost::iostreams Boost::filesystem Boost::system Boost::algorithm Boost::lexical_cast Boost::dll Boost::endian Boost::math)
+find_package(Eigen3 3.4 REQUIRED CONFIG)
+set(ZLIB_USE_STATIC_LIBS ON)
+find_package(ZLIB REQUIRED)
+find_package(ITK REQUIRED)
+include(${ITK_USE_FILE})
+find_path(FFTW3_INCLUDE_DIR fftw3.h REQUIRED)
+find_library(FFTW3_LIBRARY NAMES fftw3 REQUIRED)
+add_library(FFTW3::fftw3 UNKNOWN IMPORTED)
+set_target_properties(FFTW3::fftw3 PROPERTIES
+    IMPORTED_LOCATION "${FFTW3_LIBRARY}"
+    INTERFACE_INCLUDE_DIRECTORIES "${FFTW3_INCLUDE_DIR}")
+# Existing targets use both plain and keyword link signatures. Directory-level
+# dependencies supply common headers and OpenMP without mixing those signatures.
+link_libraries(OpenMP::OpenMP_CXX Eigen3::Eigen)
 
-
-message( "${CMAKE_CXX_COMPILER}")
-message( "${CMAKE_C_COMPILER}")
-message( "${CMAKE_BUILD_TYPE}")
-
-
-message(${CMAKE_BINARY_DIR})
-set( CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin/)
-set( CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin/lib/ )
-set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/../bin/lib/ )
-
-
-IF(USEOPENMP)
-    SET(CMAKE_CXX_FLAGS "-fopenmp -std=c++14 -Wno-deprecated-declarations -Wno-unused-result -Wno-narrowing")
-    SET(CMAKE_C_FLAGS "-fopenmp -Wno-deprecated-declarations -Wno-unused-result -Wno-narrowing")
-    add_definitions(-DUSE_OPENMP)
-ELSE(USEOPENMP)
-    SET(CMAKE_CXX_FLAGS "-fPIC -std=c++14 -Wno-deprecated-declarations -Wno-unused-result -Wno-narrowing")
-    SET(CMAKE_C_FLAGS "-fPIC -Wno-deprecated-declarations -Wno-unused-result -Wno-narrowing")
-ENDIF(USEOPENMP)
-
-
-
-set(Boost_USE_MULTITHREADED      ON)
-set(Boost_USE_STATIC_RUNTIME    ON)
-set(Boost_USE_STATIC_LIBS   ON)
-set(Boost_NO_BOOST_CMAKE ON)
-set(BOOST_ROOT /usr/local/boost186)
-set(Boost_LIBRARY_DIRS /usr/local/boost186/lib)
-set(Boost_INCLUDE_DIRS /usr/local/boost186/include)
-find_package(Boost COMPONENTS iostreams filesystem system REQUIRED)
-
-if(Boost_FOUND)
-  include_directories(${Boost_INCLUDE_DIRS})
-  link_directories(${Boost_LIBRARY_DIRS})
-  MESSAGE("Boost Found")
-else(Boost_FOUND)
-   MESSAGE("BOOST NOT FOUND!")
-endif()
-
-
-message(${Boost_LIBRARIES})
-
-IF(USECUDA)
-    include(CheckLanguage)
-    set(CMAKE_CUDA_COMPILER /usr/local/cuda/bin/nvcc)
-
-    set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda")
-    set(CMAKE_CUDA_COMPILER "/usr/local/cuda/bin/nvcc")
-    set(CMAKE_CUDA_COMPILER_TOOLKIT_ROOT "/usr/local/cuda")
-    set(CMAKE_CUDA_COMPILER_LIBRARY_ROOT "/usr/local/cuda")
-    set(CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES "/usr/local/cuda/targets/x86_64-linux/include/")
+if(USECUDA)
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
     set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
-
-    include_directories("/usr/local/cuda/targets/x86_64-linux/include/")
-
-    find_package(CUDAToolkit)
-
-    check_language(CUDA)
-    message(${CMAKE_CUDA_COMPILER})
-    if(CMAKE_CUDA_COMPILER)
-      enable_language(CUDA)
-      add_definitions(-DUSECUDA)
-      message("CUDA Enabled..")
-    else()
-      message(STATUS "No CUDA SUPPORT..")
-    endif()
-    set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -std=c++11") # Or higher standard
-
-ELSE(USECUDA)
-    set(ZLIB_USE_STATIC_LIBS ON)
-ENDIF(USECUDA)
-
-
-
-IF(ISDEBUG)
-     if ( NOT DEFINED ITK_DIR)         
-         SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-6.0b01-debug)      
-    endif()
-    FIND_PACKAGE(ITK)
-    IF(ITK_FOUND)
-        INCLUDE(${ITK_USE_FILE})
-        MESSAGE("ITK ${ITK_VERSION_MAJOR}${ITK_VERSION_MINOR}${ITK_VERSION_PATCH} Debug version used!")
-    ELSE(ITK_FOUND)
-        MESSAGE(FATAL_ERROR "ITK not found. Please set ITK_DIR.")
-    ENDIF(ITK_FOUND)
-ELSE(ISDEBUG)
-    if ( NOT DEFINED ITK_DIR)
-
-        #SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-5.4.5-release)
-        SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-6.0b01-release)
-       #SET(ITK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/InsightToolkit-6.0b01-QMIL09_release)        
-    endif()
-    FIND_PACKAGE(ITK)
-    IF(ITK_FOUND)
-       INCLUDE(${ITK_USE_FILE})
-       MESSAGE("ITK ${ITK_VERSION_MAJOR}${ITK_VERSION_MINOR}${ITK_VERSION_PATCH} Release version used!")
-       MESSAGE("${ITK_DIR}")
-    ELSE(ITK_FOUND)
-        MESSAGE(FATAL_ERROR "ITK not found. Please set ITK_DIR.")
-    ENDIF(ITK_FOUND)
-ENDIF(ISDEBUG)
-
-
-
-find_package (Eigen3 3.4 REQUIRED NO_MODULE)
-if(Eigen3_FOUND)    
-    message("Eigen found.")
-    message(${EIGEN3_INCLUDE_DIR})    
-    include_directories(${EIGEN3_INCLUDE_DIR})
-ELSE(Eigen3_FOUND)
-    message("NO Eigen.")
+    set(CMAKE_CUDA_STANDARD 17)
+    add_compile_definitions(USECUDA)
 endif()
-
 
 set(SOURCES ../src/main/defines.cxx  ../src/main/TORTOISE_global.cxx ../src/main/antsCommandLineParser.cxx ../src/main/antsCommandLineOption.cxx  ../src/utilities/TORTOISE_Utilities.cxx ../src/utilities/extract_3Dvolume_from_4D.cxx  ../src/utilities/read_3Dvolume_from_4D.cxx ../src/utilities/read_bmatrix_file.cxx ../src/utilities/math_utilities.cxx ../src/external_src/cmpfit-1.3a/mpfit.c)
 include_directories(../src/main)
+
+# These translation units have no per-executable compile definitions. Compile
+# them once instead of repeating the same ITK-heavy code for every utility.
+add_library(tortoise_common OBJECT ${SOURCES})
+target_link_libraries(tortoise_common PRIVATE ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+set(SOURCES $<TARGET_OBJECTS:tortoise_common>)
+
 
 IF(USECUDA)
      include_directories(../src/cuda_src )
      add_executable(TORTOISEProcess_cuda ../src/main/main.cxx ../src/main/register_dwi_to_b0.cxx    ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx  ../src/tools/ResampleDWIs/resample_dwis.cxx ../src/tools/DRBUDDI/DRBUDDI_parserBase.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateMAPMRI/MAPMRIModel.cxx  ../src/tools/RotateBMatrix/rotate_bmatrix.cxx  ../src/main/FINALDATA.cxx ../src/main/TORTOISE.cxx ../src/main/DIFFPREP.cxx ../src/main/DRBUDDI.cxx ../src/main/DRBUDDIBase.cxx  ../src/main/EPIREG.cxx ../src/main/TORTOISE_parser.cxx ../src/cuda_src/cuda_image.cxx  ../src/cuda_src/warp_image.cu ../src/cuda_src/warp_image.cxx  ../src/main/run_drbuddi_stage.cxx  ../src/main/run_drbuddi_stage_TVVF.cxx ../src/cuda_src/resample_image.cu ../src/cuda_src/resample_image.cxx ../src/cuda_src/gaussian_smooth_image.cu ../src/cuda_src/gaussian_smooth_image.cxx  ../src/cuda_src/cuda_image_utilities.cu ../src/cuda_src/cuda_image_utilities.cxx ../src/cuda_src/compute_metric.cu ../src/cuda_src/compute_metric.cxx ../src/main/DRBUDDI_Diffeo.cxx  ../src/tools/gradnonlin/init_iso_gw.cxx ../src/tools/gradnonlin/gradcal.cxx ../src/tools/ResampleDWIs/resample_dwis.cxx ../src/main/rigid_register_images.cxx ../src/tools/EstimateTensor/estimate_tensor_wlls.cxx ../src/main/create_mask.cxx ../src/cuda_src/register_dwi_to_b0_cuda.cxx ../src/cuda_src/quadratic_transform_image.cxx ../src/cuda_src/quadratic_transform_image.cu ../src/cuda_src/compute_entropy.cxx ../src/cuda_src/compute_entropy.cu  ${SOURCES} )
      target_include_directories(TORTOISEProcess_cuda   PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-     target_link_libraries(TORTOISEProcess_cuda  Eigen3::Eigen ${ITK_LIBRARIES} ${Boost_LIBRARIES}   fftw3 ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a   -static-libgcc -static-libstdc++ )
+     target_link_libraries(TORTOISEProcess_cuda  Eigen3::Eigen ${ITK_LIBRARIES} ${Boost_LIBRARIES}   FFTW3::fftw3    )
 
      add_executable(DRBUDDI_cuda ../src/tools/DRBUDDI/DRBUDDI_main.cxx ../src/tools/DRBUDDI/DRBUDDI_parserBase.cxx ../src/tools/EstimateTensor/DTIModel.cxx   ../src/main/DRBUDDI.cxx ../src/main/DRBUDDIBase.cxx   ../src/cuda_src/cuda_image.cxx  ../src/cuda_src/warp_image.cu ../src/cuda_src/warp_image.cxx  ../src/main/run_drbuddi_stage.cxx ../src/main/run_drbuddi_stage_TVVF.cxx ../src/cuda_src/resample_image.cu ../src/cuda_src/resample_image.cxx ../src/cuda_src/gaussian_smooth_image.cu ../src/cuda_src/gaussian_smooth_image.cxx  ../src/cuda_src/cuda_image_utilities.cu ../src/cuda_src/cuda_image_utilities.cxx ../src/cuda_src/compute_metric.cu ../src/cuda_src/compute_metric.cxx ../src/main/DRBUDDI_Diffeo.cxx   ../src/tools/ResampleDWIs/resample_dwis.cxx ../src/main/rigid_register_images.cxx ../src/tools/EstimateTensor/estimate_tensor_wlls.cxx ../src/main/create_mask.cxx    ${SOURCES} )
      target_include_directories(DRBUDDI_cuda  PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-     target_link_libraries(DRBUDDI_cuda  ${ITK_LIBRARIES} ${Boost_LIBRARIES}    ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a -lz    -static-libgcc -static-libstdc++)
+     target_link_libraries(DRBUDDI_cuda  ${ITK_LIBRARIES} ${Boost_LIBRARIES}     ZLIB::ZLIB   )
      target_compile_definitions(DRBUDDI_cuda PUBLIC -DDRBUDDIALONE)
 
      add_executable(DRTAMAS_cuda  ../src/tools/ResampleDWIs/resample_dwis.cxx ../src/main/drbuddi_image_utilities.cxx ../src/tools/DRTAMAS/compute_metric_dev.cu ../src/tools/DRTAMAS/compute_metric_dev.cxx   ../src/cuda_src/compute_metric.cu ../src/cuda_src/compute_metric.cxx ../src/cuda_src/warp_image.cu ../src/cuda_src/warp_image.cxx  ../src/cuda_src/gaussian_smooth_image.cu ../src/cuda_src/gaussian_smooth_image.cxx ../src/tools/DRTAMAS/run_drtamas_stage.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities.cu   ../src/tools/DRTAMAS/DRTAMAS_Diffeo.cxx ../src/cuda_src/resample_image.cu ../src/cuda_src/resample_image.cxx ../src/cuda_src/cuda_image_utilities.cu ../src/cuda_src/cuda_image_utilities.cxx ../src/cuda_src/cuda_image.cxx ../src/main/rigid_register_images.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/DRTAMAS/DRTAMAS_main.cxx ../src/tools/DRTAMAS/DRTAMAS.cxx ../src/tools/DRTAMAS/DRTAMAS_parser.cxx   ${SOURCES} )
      target_include_directories(DRTAMAS_cuda   PRIVATE    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-     target_link_libraries(DRTAMAS_cuda  Eigen3::Eigen  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  -static-libgcc -static-libstdc++ )
+     target_link_libraries(DRTAMAS_cuda  Eigen3::Eigen  ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
      set_target_properties(DRTAMAS_cuda PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS")
 
 
      add_custom_command(
          TARGET DRTAMAS_cuda POST_BUILD
          COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                 "../src/tools/DRTAMAS/DRTAMAS_batch_register_to_target_main.bash"
+                 "${CMAKE_CURRENT_SOURCE_DIR}/../src/tools/DRTAMAS/DRTAMAS_batch_register_to_target_main.bash"
                  "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS/DRTAMAS_batch_register_to_target_main.bash"
      )
     add_custom_command(
         TARGET DRTAMAS_cuda POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-             "../src/tools/DRTAMAS/DRTAMAS_batch_register_to_target_nonsmoothlast.bash"
+             "${CMAKE_CURRENT_SOURCE_DIR}/../src/tools/DRTAMAS/DRTAMAS_batch_register_to_target_nonsmoothlast.bash"
              "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS/DRTAMAS_batch_register_to_target_nonsmoothlast.bash"
     )
     add_custom_command(
         TARGET DRTAMAS_cuda POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-             "../src/tools/DRTAMAS/DRTAMAS_create_template_main.bash"
+             "${CMAKE_CURRENT_SOURCE_DIR}/../src/tools/DRTAMAS/DRTAMAS_create_template_main.bash"
              "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS/DRTAMAS_create_template_main.bash"
     )
     add_custom_command(
         TARGET DRTAMAS_cuda POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-             "../src/tools/DRTAMAS/DRTAMAS_create_template_nonsmoothlast.bash"
+             "${CMAKE_CURRENT_SOURCE_DIR}/../src/tools/DRTAMAS/DRTAMAS_create_template_nonsmoothlast.bash"
              "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS/DRTAMAS_create_template_nonsmoothlast.bash"
     )
     add_custom_command(
         TARGET DRTAMAS_cuda POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
-             "../src/tools/DRTAMAS/DRTAMAS_external_registration_with_constraint.bash"
+             "${CMAKE_CURRENT_SOURCE_DIR}/../src/tools/DRTAMAS/DRTAMAS_external_registration_with_constraint.bash"
              "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS/DRTAMAS_external_registration_with_constraint.bash"
     )
 
 
 ELSE(USECUDA)
-    if(NOT QSIPREP)
-        SET(CMAKE_EXE_LINKER_FLAGS "-static ")
-    endif()
     add_executable(TORTOISEProcess ../src/main/main.cxx  ../src/main/register_dwi_to_b0.cxx  ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/ResampleDWIs/resample_dwis.cxx  ../src/tools/DRBUDDI/DRBUDDI_parserBase.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateMAPMRI/MAPMRIModel.cxx   ../src/tools/RotateBMatrix/rotate_bmatrix.cxx ../src/main/FINALDATA.cxx ../src/main/TORTOISE.cxx ../src/main/DIFFPREP.cxx ../src/main/DRBUDDI.cxx ../src/main/DRBUDDIBase.cxx ../src/main/EPIREG.cxx ../src/main/DRBUDDI_Diffeo.cxx ../src/main/run_drbuddi_stage.cxx ../src/main/drbuddi_image_utilities.cxx   ../src/tools/EstimateTensor/estimate_tensor_wlls.cxx ../src/main/create_mask.cxx ../src/tools/ResampleDWIs/resample_dwis.cxx ../src/main/rigid_register_images.cxx ../src/main/TORTOISE_parser.cxx  ../src/tools/gradnonlin/init_iso_gw.cxx ../src/tools/gradnonlin/gradcal.cxx ${SOURCES})
-    target_link_libraries(TORTOISEProcess PRIVATE Eigen3::Eigen ${ITK_LIBRARIES}  ${Boost_LIBRARIES} ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a -lz fftw3 -static-libgcc -static-libstdc++)
+    target_link_libraries(TORTOISEProcess PRIVATE Eigen3::Eigen ${ITK_LIBRARIES}  ${Boost_LIBRARIES}  ZLIB::ZLIB FFTW3::fftw3)
 
     add_executable(DRBUDDI ../src/tools/DRBUDDI/DRBUDDI_main.cxx ../src/tools/DRBUDDI/DRBUDDI_parserBase.cxx ../src/tools/EstimateTensor/DTIModel.cxx   ../src/main/DRBUDDI.cxx ../src/main/DRBUDDIBase.cxx   ../src/main/run_drbuddi_stage.cxx ../src/main/DRBUDDI_Diffeo.cxx   ../src/tools/ResampleDWIs/resample_dwis.cxx ../src/main/rigid_register_images.cxx ../src/tools/EstimateTensor/estimate_tensor_wlls.cxx ../src/main/create_mask.cxx  ../src/main/drbuddi_image_utilities.cxx  ${SOURCES} )
-    target_link_libraries(DRBUDDI  PRIVATE ${ITK_LIBRARIES}  ${Boost_LIBRARIES} ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a -lz fftw3 -static-libgcc -static-libstdc++)
-    target_link_libraries(DRBUDDI PRIVATE -Wl,--exclude-libs,libitkzlib-5.4.a)
+    target_link_libraries(DRBUDDI  PRIVATE ${ITK_LIBRARIES}  ${Boost_LIBRARIES}  ZLIB::ZLIB FFTW3::fftw3)
 
 
      add_executable(Vol2SlRegistration   ../src/tools/Vol2SlRegistration/vol2sl_registration_main.cxx ../src/tools/ResampleDWIs/resample_dwis.cxx ${SOURCES})
      target_include_directories(Vol2SlRegistration   PRIVATE   )
-     target_link_libraries(Vol2SlRegistration ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++)
+     target_link_libraries(Vol2SlRegistration ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
 
 ENDIF(USECUDA)
 
 add_executable(CreateMask ../src/tools/CreateMask/create_mask_main.cxx ../src/main/create_mask.cxx ../src/main/defines.cxx)
-target_link_libraries(CreateMask PRIVATE ${ITK_LIBRARIES}  ${Boost_LIBRARIES} ${CMAKE_CURRENT_BINARY_DIR}/../external_libraries/bet/Linux/libbetokan.a -lz )
+target_link_libraries(CreateMask PRIVATE ${ITK_LIBRARIES}  ${Boost_LIBRARIES}  ZLIB::ZLIB )
 
 
 add_executable(EstimateTensor   ../src/tools/EstimateTensor/estimate_tensor_wlls_main.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateTensor/estimate_tensor_wlls_parser.cxx  ${SOURCES})
@@ -258,7 +160,7 @@ target_link_libraries(SelectBestB0 ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
 
 
 add_executable(Gibbs ../src/tools/UnRing/gibbs_main.cxx ../src/tools/ResampleDWIs/resample_dwis.cxx ${SOURCES})
-target_link_libraries(Gibbs ${ITK_LIBRARIES} ${Boost_LIBRARIES} fftw3 )
+target_link_libraries(Gibbs ${ITK_LIBRARIES} ${Boost_LIBRARIES} FFTW3::fftw3 )
 
 add_executable(CombineDWIs ../src/tools/CombineDWIs/combine_dwis_main.cxx  ${SOURCES})
 target_link_libraries(CombineDWIs ${ITK_LIBRARIES} ${Boost_LIBRARIES}  )
@@ -320,7 +222,7 @@ target_link_libraries(ReorientImage ${ITK_LIBRARIES}  ${Boost_LIBRARIES})
 add_executable(ReorientImage3D ../src/tools/ReorientImage3D/reorient_image3d.cxx  ../src/tools/ReorientImage3D/reorient_image_parser.cxx  ${SOURCES})
 target_link_libraries(ReorientImage3D ${ITK_LIBRARIES}  ${Boost_LIBRARIES})
 
-add_executable(EstimateExperimentalDeviationScalar ../src/tools/EstimateExperimentalDeviationScalar/estimate_experimental_deviation_scalar.cxx ../src/tools/EstimateExperimentalDeviationScalar/estimate_experimental_deviation_scalar_parser.cxx  ../src/external_src/cmpfit-1.3a/mpfit.c ../src/tools/EstimateTensor/DTIModel.cxx ${SOURCES})
+add_executable(EstimateExperimentalDeviationScalar ../src/tools/EstimateExperimentalDeviationScalar/estimate_experimental_deviation_scalar.cxx ../src/tools/EstimateExperimentalDeviationScalar/estimate_experimental_deviation_scalar_parser.cxx   ../src/tools/EstimateTensor/DTIModel.cxx ${SOURCES})
 target_link_libraries(EstimateExperimentalDeviationScalar ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
 
 add_executable(DIFFPREPAnonymizer ../src/tools/DIFFPREPAnonymizer/diffprep_anonymizer.cxx ../src/tools/DIFFPREPAnonymizer/itkGDCMImageIOOkan.cxx ${SOURCES})
@@ -429,7 +331,7 @@ add_executable(FitNIFTIIso
     ../src/tools/FitNIFTIIso/erodeMask.cxx
     ../src/tools/FitNIFTIIso/fit_nifti_iso_parser.cxx
     ../src/tools/FitNIFTIIso/gradcal.cxx
-    ../src/external_src/cmpfit-1.3a/mpfit.c
+
     ${SOURCES})
 target_link_libraries(FitNIFTIIso ${ITK_LIBRARIES} ${Boost_LIBRARIES} Eigen3::Eigen)
 
@@ -508,10 +410,10 @@ set_target_properties(ComputeDeformationFieldJacobian PROPERTIES RUNTIME_OUTPUT_
 add_executable(ConvertRigidHDF2Text   ../src/tools/ConvertRigidHDF2Text/ConvertRigidHDF2Text.cxx  ${SOURCES})
 target_link_libraries(ConvertRigidHDF2Text  ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
-add_executable(CombineTORTOISEProcessTransformations   ../src/tools/CombineTORTOISEProcessTransformations/CombineALLTransformations.cxx ../src/utilities/read_3Dvolume_from_4D.cxx ../src/tools/CombineTORTOISEProcessTransformations/CombineALLTransformations_parser.cxx ${SOURCES})
+add_executable(CombineTORTOISEProcessTransformations   ../src/tools/CombineTORTOISEProcessTransformations/CombineALLTransformations.cxx  ../src/tools/CombineTORTOISEProcessTransformations/CombineALLTransformations_parser.cxx ${SOURCES})
 target_link_libraries(CombineTORTOISEProcessTransformations  ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
-add_executable(ComputeRotationMatrixFromTORTOISETransformations   ../src/tools/ComputeRotationMatrixFromTORTOISETransformations/ComputeRotationMatrixFromTORTOISETransformations.cxx ../src/utilities/read_3Dvolume_from_4D.cxx ../src/tools/ComputeRotationMatrixFromTORTOISETransformations/ComputeRotationMatrixFromTORTOISETransformations_parser.cxx ${SOURCES})
+add_executable(ComputeRotationMatrixFromTORTOISETransformations   ../src/tools/ComputeRotationMatrixFromTORTOISETransformations/ComputeRotationMatrixFromTORTOISETransformations.cxx  ../src/tools/ComputeRotationMatrixFromTORTOISETransformations/ComputeRotationMatrixFromTORTOISETransformations_parser.cxx ${SOURCES})
 target_link_libraries(ComputeRotationMatrixFromTORTOISETransformations  ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
 add_executable(Rigid2Euler   ../src/tools/AffineToRigid/Rigid2Euler.cxx ${SOURCES})
@@ -521,18 +423,18 @@ add_executable(Affine2Rigid   ../src/tools/AffineToRigid/affine_to_rigid.cxx ${S
 target_link_libraries(Affine2Rigid ${ITK_LIBRARIES} ${Boost_LIBRARIES})
 
 #add_executable(RigidPhaseScaleRegister  ../src/tools/RigidPhaseScaleRegister/RigidPhaseScaleRegister.cxx ../src/main/rigid_register_images.cxx  ${SOURCES})
-#target_link_libraries(RigidPhaseScaleRegister ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
+#target_link_libraries(RigidPhaseScaleRegister ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
 
 add_executable(ComputeROIStatistic  ../src/tools/ComputeROIStatistic/ComputeROIStatistic.cxx  ${SOURCES})
-target_link_libraries(ComputeROIStatistic ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
+target_link_libraries(ComputeROIStatistic ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
 
 
 add_executable(ApplyTransformationToTensor   ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/DRTAMAS/ApplyTransformationToTensorDRT.cxx    ${SOURCES} )
-target_link_libraries(ApplyTransformationToTensor   ${ITK_LIBRARIES} ${Boost_LIBRARIES}    -static-libgcc -static-libstdc++)
+target_link_libraries(ApplyTransformationToTensor   ${ITK_LIBRARIES} ${Boost_LIBRARIES}   )
 set_target_properties(ApplyTransformationToTensor PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS")
 
 add_executable(SelectMostRepresentativeSample   ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx  ../src/tools/DRTAMAS/select_most_representative_sample.cxx    ${SOURCES} )
-target_link_libraries(SelectMostRepresentativeSample   ${ITK_LIBRARIES} ${Boost_LIBRARIES}    -static-libgcc -static-libstdc++)
+target_link_libraries(SelectMostRepresentativeSample   ${ITK_LIBRARIES} ${Boost_LIBRARIES}   )
 set_target_properties(SelectMostRepresentativeSample PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS")
 
 add_executable(ApplyTransformationToScalar2 ../src/tools/ApplyTransformationToScalar2/ApplyTransformationToScalar2.cxx ${SOURCES})
@@ -570,26 +472,15 @@ set_target_properties(ResampleTensor PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAK
 
 
 #add_executable(BrukerBmatToTORTOISEBMTXT   ../src/tools/BrukerBmatToTORTOISEBMTXT/BrukerBmatToTORTOISEBMTXT.cxx ${SOURCES})
-#target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES} -static-libgcc -static-libstdc++ )
+#target_link_libraries(BrukerBmatToTORTOISEBMTXT ${ITK_LIBRARIES} ${Boost_LIBRARIES} )
 
 
 IF(USE_VTK)
     add_definitions(-DUSE_VTK)
-    if ( NOT DEFINED VTK_DIR)
-        SET(VTK_DIR /qmi_home/irfanogo/Desktop/codes/my_codes/TORTOISEV4/external_libraries/VTK-9.4.2_build)
-    endif()
-
-    FIND_PACKAGE(VTK)
-    IF(VTK_FOUND)
-        INCLUDE(${VTK_USE_FILE})
-    ELSE(VTK_FOUND)
-      MESSAGE(FATAL_ERROR "VTK not found. Please set VTK_DIR.")
-    ENDIF(VTK_FOUND)
-
-    set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+    find_package(VTK REQUIRED)
 
     add_executable(ComputeGlyphMaps ../src/tools/ComputeGlyphMaps/compute_glyph_maps.cxx  ../src/main/defines.cxx ../src/tools/ComputeGlyphMaps/vtkTensorGlyphOkan.cxx)
-    target_link_libraries(ComputeGlyphMaps ${ITK_LIBRARIES} ${VTK_LIBRARIES} -lboost_system  )
+    target_link_libraries(ComputeGlyphMaps ${ITK_LIBRARIES} ${VTK_LIBRARIES} Boost::system  )
 
     # vtk_module_autoinit is needed
     vtk_module_autoinit(
@@ -598,12 +489,44 @@ IF(USE_VTK)
     )
 
     add_executable(WarpMesh ../src/tools/WarpMesh/WarpMesh_parser.cxx ../src/utilities/read_3Dvolume_from_4D.cxx ../src/tools/DRTAMAS/DRTAMAS_utilities_cp.cxx ../src/tools/WarpMesh/WarpMesh.cxx  ../src/main/defines.cxx ../src/main/antsCommandLineParser.cxx ../src/main/antsCommandLineOption.cxx)
-    target_link_libraries(WarpMesh ${ITK_LIBRARIES} ${VTK_LIBRARIES}  -lboost_system  )
+    target_link_libraries(WarpMesh ${ITK_LIBRARIES} ${VTK_LIBRARIES}  Boost::system  )
     set_target_properties(WarpMesh PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/DRTAMAS")
     # vtk_module_autoinit is needed
     vtk_module_autoinit(
       TARGETS WarpMesh
       MODULES ${VTK_LIBRARIES}
- cd    )
+    )
 endif(USE_VTK)
 
+
+# Preserve the runtime layout expected by TORTOISE and DRTAMAS scripts.
+file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/../settings" DESTINATION "${CMAKE_BINARY_DIR}")
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../settings" DESTINATION .)
+get_property(tortoise_targets DIRECTORY PROPERTY BUILDSYSTEM_TARGETS)
+foreach(target IN LISTS tortoise_targets)
+    get_target_property(kind ${target} TYPE)
+    if(kind STREQUAL "EXECUTABLE")
+        get_target_property(output ${target} RUNTIME_OUTPUT_DIRECTORY)
+        if(output MATCHES "/DRTAMAS$")
+            install(TARGETS ${target} RUNTIME DESTINATION bin/DRTAMAS)
+        else()
+            install(TARGETS ${target} RUNTIME DESTINATION bin)
+        endif()
+    endif()
+endforeach()
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../src/tools/DRTAMAS/"
+    DESTINATION bin/DRTAMAS USE_SOURCE_PERMISSIONS FILES_MATCHING PATTERN "*.bash")
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(MaskAdapterTest ../tests/mask_adapter_test.cxx ../src/main/create_mask.cxx)
+    target_link_libraries(MaskAdapterTest PRIVATE ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+    add_test(NAME mask_adapter COMMAND MaskAdapterTest)
+    if(NOT USECUDA)
+        foreach(tool TORTOISEProcess DRBUDDI CreateMask)
+            add_test(NAME cli_${tool} COMMAND ${CMAKE_COMMAND}
+                -DPROGRAM=$<TARGET_FILE:${tool}> -DEXPECTED=Usage:
+                -P ${CMAKE_CURRENT_SOURCE_DIR}/../tests/cli_smoke.cmake)
+        endforeach()
+    endif()
+endif()
