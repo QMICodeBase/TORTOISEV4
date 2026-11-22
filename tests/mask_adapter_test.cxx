@@ -1,6 +1,7 @@
 #include "create_mask.h"
 #include <boost/filesystem.hpp>
 #include <cstdlib>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -57,6 +58,18 @@ int main()
         require(mask->GetPixel(index) == 0, "AFNI boundary label must be excluded");
         index[0] = 1;
         require(mask->GetPixel(index) == 1, "AFNI interior label must become one");
+        // An oblique acquisition must survive the cardinal AFNI boundary
+        // without changing voxel labels or the caller's image geometry.
+        auto direction = image->GetDirection();
+        direction[0][0] = std::cos(0.03);
+        direction[0][1] = -std::sin(0.03);
+        direction[1][0] = std::sin(0.03);
+        direction[1][1] = std::cos(0.03);
+        image->SetDirection(direction);
+        mask = create_mask(image);
+        require(mask->GetDirection() == direction, "Original obliquity was not restored");
+        require(image->GetDirection() == direction, "Input geometry was modified");
+        require(mask->GetPixel(index) == 1, "Oblique mask labels changed");
         // Only the executable should remain: per-call temporary files were removed.
         require(std::distance(fs::directory_iterator(directory), fs::directory_iterator()) == 1,
                 "Temporary masking files were not cleaned up");

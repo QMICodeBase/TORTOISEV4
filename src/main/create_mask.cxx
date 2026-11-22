@@ -5,10 +5,12 @@
 #include "create_mask.h"
 #include "itkBinaryBallStructuringElement.h"
 #include "itkImageDuplicator.h"
+#include "itkSpatialOrientationAdapter.h"
 #include <cerrno>
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 #include <spawn.h>
 #include <stdexcept>
 #include <sys/wait.h>
@@ -44,8 +46,19 @@ ImageType3D::Pointer skullStripAFNI(ImageType3D::Pointer img)
     MaskTemporaryDirectory temporary;
     std::string input = (temporary.path / "input.nii").string();
     std::string output = (temporary.path / "mask.nii").string();
+    // SkullStrip operates on the voxel lattice and drops obliquity in its
+    // output header. Give it an explicitly cardinal copy, preserving axis
+    // order and handedness, then restore the original geometry below. This
+    // changes only the temporary header; no voxel resampling is performed.
+    auto duplicate = itk::ImageDuplicator<ImageType3D>::New();
+    duplicate->SetInputImage(img);
+    duplicate->Update();
+    auto afniInput = duplicate->GetOutput();
+    itk::SpatialOrientationAdapter orientation;
+    afniInput->SetDirection(orientation.ToDirectionCosines(
+        orientation.FromDirectionCosines(img->GetDirection())));
     auto writer = itk::ImageFileWriter<ImageType3D>::New();
-    writer->SetInput(img);
+    writer->SetInput(afniInput);
     writer->SetFileName(input);
     writer->Update();
 
@@ -53,6 +66,20 @@ ImageType3D::Pointer skullStripAFNI(ImageType3D::Pointer img)
     std::vector<std::string> arguments = {
         "3dSkullStrip", "-input", input, "-prefix", output, "-mask_vol"
     };
+    // Quote each argument for an unambiguous, copyable command in the log.
+    // Execution below still passes argv directly, without invoking a shell.
+    std::cout << "Running:";
+    for (const auto &argument : arguments)
+    {
+        std::cout << " '";
+        for (char character : argument)
+            if (character == '\'')
+                std::cout << "'\\''";
+            else
+                std::cout << character;
+        std::cout << "'";
+    }
+    std::cout << std::endl;
     std::vector<char *> argv;
     for (auto &argument : arguments)
         argv.push_back(&argument[0]);
@@ -85,7 +112,7 @@ ImageType3D::Pointer skullStripAFNI(ImageType3D::Pointer img)
             std::abs(mask->GetOrigin()[i] - img->GetOrigin()[i]) > 1e-3)
             throw std::runtime_error("3dSkullStrip changed the image geometry.");
         for (unsigned int j = 0; j < 3; ++j)
-            if (std::abs(mask->GetDirection()[i][j] - img->GetDirection()[i][j]) > 1e-4)
+            if (std::abs(mask->GetDirection()[i][j] - afniInput->GetDirection()[i][j]) > 1e-4)
                 throw std::runtime_error("3dSkullStrip changed the image orientation.");
     }
     // AFNI documents labels 4--6 as inside the surface (step(mask - 3.01)).
