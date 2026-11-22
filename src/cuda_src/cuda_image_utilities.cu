@@ -24,18 +24,37 @@ extern __constant__ float d_spc[3];
 
 
 __global__ void
-FieldFindMaxLocalNorm(const float *gArr, int arraySize, const float3 spc, float *gOut)
+FieldFindMaxLocalNorm(const float *gArr, const int3 sz, const size_t pitch_f, const float3 spc, float *gOut)
 {
     int thIdx = threadIdx.x;
     int gthIdx = thIdx + blockIdx.x*bSize;
     const int gridSize = bSize*gridDim.x;
+    const int nvox = sz.x*sz.y*sz.z;
     float mx = -1;
 
-    for (int i = gthIdx; i < arraySize; i += gridSize)
+    // Index by VOXEL, honouring the row pitch. The previous version swept
+    // gArr[3*i], gArr[3*i+1], gArr[3*i+2] flat over pitch/sizeof(float)/3*sz.y*sz.z
+    // elements, which is only correct when (pitch/sizeof(float)) % 3 == 0.
+    // cudaMalloc3D returns 512-byte-granular pitches, so that holds for some field
+    // widths and not others: at sz.x=42 the pitch is 512 B, pitch/4 = 128, and
+    // 128 % 3 == 2, so each "voxel" was assembled from components of DIFFERENT
+    // voxels straddling a row boundary - with their axes mis-assigned, dividing a
+    // z component by spc.x and so on. The sweep also ran over the uninitialised
+    // row padding, which CUDAIMAGE::Allocate never clears (it memsets extent.width
+    // bytes per row, not pitch).
+    //
+    // This reduces over the sz.x*sz.y*sz.z REAL voxels only, matching the CPU/ITK
+    // implementation in src/main/drbuddi_image_utilities.cxx (ScaleUpdateField).
+    for (int i = gthIdx; i < nvox; i += gridSize)
     {
-        float sm = (gArr[3*i  ]/spc.x)*(gArr[3*i  ]/spc.x) +
-                   (gArr[3*i+1]/spc.y)*(gArr[3*i+1]/spc.y) +
-                   (gArr[3*i+2]/spc.z)*(gArr[3*i+2]/spc.z) ;
+        const int x =  i % sz.x;
+        const int y = (i / sz.x) % sz.y;
+        const int z =  i / (sz.x*sz.y);
+        const float *v = gArr + ((size_t)z*sz.y + y)*pitch_f + 3*x;
+
+        float sm = (v[0]/spc.x)*(v[0]/spc.x) +
+                   (v[1]/spc.y)*(v[1]/spc.y) +
+                   (v[2]/spc.z)*(v[2]/spc.z) ;
         sm=sqrt(sm);
         if(sm>mx)
             mx=sm;
@@ -390,7 +409,7 @@ void ScaleUpdateField_cuda(cudaPitchedPtr field, const int3 data_sz,float3 spc, 
         float* dev_out;
         cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
 
-        FieldFindMaxLocalNorm<<<gSize, bSize>>>((float *)field.ptr, field.pitch/sizeof(float)/3*data_sz.y*data_sz.z,spc,dev_out);
+        FieldFindMaxLocalNorm<<<gSize, bSize>>>((float *)field.ptr, data_sz, field.pitch/sizeof(float), spc, dev_out);
         ScalarFindMax<<<1, bSize>>>(dev_out, gSize, dev_out);
         cudaDeviceSynchronize();
 
@@ -429,7 +448,7 @@ float ComputeFieldScale_cuda(cudaPitchedPtr field, const int3 data_sz,const floa
         float* dev_out;
         cudaMalloc((void**)&dev_out, sizeof(float)*gSize);
 
-        FieldFindMaxLocalNorm<<<gSize, bSize>>>((float *)field.ptr, field.pitch/sizeof(float)/3*data_sz.y*data_sz.z,spc,dev_out);
+        FieldFindMaxLocalNorm<<<gSize, bSize>>>((float *)field.ptr, data_sz, field.pitch/sizeof(float), spc, dev_out);
         ScalarFindMax<<<1, bSize>>>(dev_out, gSize, dev_out);
         cudaDeviceSynchronize();
 
