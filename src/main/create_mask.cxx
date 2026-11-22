@@ -5,6 +5,13 @@
 #include "create_mask.h"
 #include "itkBinaryBallStructuringElement.h"
 #include "itkImageDuplicator.h"
+#if defined(__linux__)
+#include "../../external_libraries/bet/Linux/betokan.h"
+#elif !defined(__APPLE__)
+#error "Automatic brain masking supports Linux and macOS only."
+#endif
+
+#ifdef __APPLE__
 #include "itkSpatialOrientationAdapter.h"
 #include <cerrno>
 #include <cmath>
@@ -129,6 +136,7 @@ ImageType3D::Pointer skullStripAFNI(ImageType3D::Pointer img)
     return mask;
 }
 } // namespace
+#endif // __APPLE__
 
 ImageType3D::Pointer create_mask(ImageType3D::Pointer img,ImageType3D::Pointer noise_img)
 {
@@ -136,7 +144,23 @@ ImageType3D::Pointer create_mask(ImageType3D::Pointer img,ImageType3D::Pointer n
 
     if(noise_img==nullptr)
     {
+#ifdef __APPLE__
         b0_mask_img=skullStripAFNI(img);
+#elif defined(__linux__)
+        // Preserve Linux's in-process BET implementation (fractional threshold
+        // 0.3); it links libbetokan.a and does not search PATH.
+        // To use AFNI on Linux instead, enable the AFNI includes/helper above
+        // for Linux, call skullStripAFNI(img) here, and remove the betokan
+        // include and Linux archive linkage in CMakeLists.txt. posix_spawnp
+        // will find 3dSkullStrip on PATH, just as on macOS.
+        // To use BET on PATH instead, implement an external-process adapter:
+        // write a temporary input, launch `bet input output -m -f 0.3` with
+        // posix_spawnp, read output_mask.nii[.gz], and validate the binary mask
+        // and geometry. Handle FSL's output type in the child environment;
+        // do not reuse AFNI's label threshold or orientation workaround.
+        // Neither external alternative is enabled by this branch.
+        b0_mask_img=betokan(img);
+#endif
     }
     else
     {

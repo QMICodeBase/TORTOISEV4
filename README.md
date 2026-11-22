@@ -165,7 +165,7 @@ The manual dependency instructions below are an alternative to the superbuild.
 
 ### TORTOISEV4 Prerequisite Libraries
 TORTOISE requires the following libraries to be installed beforehand:
- * ITK 6.0b,  Boost 1.86, CUDA 11.3 or higher (for CUDA executables), Eigen 3.3, FFTW3,  VTK 8.0.1 (only for a single executable). It also uses the nlohmann/json C++ library (https://github.com/nlohmann/json), MPFIT library from  C. Markwardt (http://cow.physics.wisc.edu/~craigm/idl/idl.html) which are included in the distribution. Automatic brain masking requires AFNI’s `3dSkullStrip` executable on `PATH` at runtime.
+ * ITK 6.0b,  Boost 1.86, CUDA 11.3 or higher (for CUDA executables), Eigen 3.3, FFTW3,  VTK 8.0.1 (only for a single executable). It also uses the nlohmann/json C++ library (https://github.com/nlohmann/json), MPFIT library from  C. Markwardt (http://cow.physics.wisc.edu/~craigm/idl/idl.html) which are included in the distribution. On macOS, automatic brain masking requires AFNI’s `3dSkullStrip` executable on `PATH` at runtime. Linux uses the bundled `libbetokan.a` instead.
 
 The compilation has been tested with GCC-9/G++9 and  GCC-11/G++11.  Nnewer compilers should be okay but we ran into compilation issues compiling with GCC/G++-7.  You also need Cmake for compilation. The version used for testing was Cmake-3.20.
 
@@ -317,6 +317,11 @@ TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file
 
 ### Automatic brain masking
 
-`TORTOISEProcess`, `DRBUDDI`, and `CreateMask` use AFNI `3dSkullStrip` for automatic brain masking on Linux and macOS. Install AFNI separately and ensure `3dSkullStrip` is on `PATH`. The build no longer links the bundled Linux BET archive.
+`TORTOISEProcess`, `DRBUDDI`, and `CreateMask` select their automatic brain-masking backend at compile time:
 
-The adapter uses `-mask_vol` and converts AFNI interior labels (values greater than 3.01) to a binary mask. Each invocation uses a private temporary directory and checks process success, output geometry, and nonempty output. Noise-based masking for non-brain data is unchanged. This changes the brain-extraction algorithm; masks and downstream results still need comparison on representative diffusion b=0 and T2-weighted data.
+- **Linux:** the original bundled `libbetokan.a`, called in-process with fractional threshold 0.3. No BET or AFNI executable is needed on `PATH`. The archive must be compatible with the target architecture.
+- **macOS:** AFNI `3dSkullStrip`, found on `PATH`. Install AFNI separately.
+
+There is no runtime backend selector or automatic fallback. Comments in `src/main/create_mask.cxx` describe how to adapt the Linux branch to external AFNI or BET.
+
+The macOS adapter uses `-mask_vol` and converts AFNI interior labels (values greater than 3.01) to a binary mask. Each invocation uses a private temporary directory and checks process success, output geometry, and nonempty output. Noise-based masking for non-brain data is unchanged. The two backends use different brain-extraction algorithms; masks and downstream results still need comparison on representative diffusion b=0 and T2-weighted data.

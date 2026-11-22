@@ -126,6 +126,21 @@ ENDIF(USECUDA)
 add_executable(CreateMask ../src/tools/CreateMask/create_mask_main.cxx ../src/main/create_mask.cxx ../src/main/defines.cxx)
 target_link_libraries(CreateMask PRIVATE ${ITK_LIBRARIES}  ${Boost_LIBRARIES}  ZLIB::ZLIB )
 
+# Linux retains the original in-process BET backend; macOS uses 3dSkullStrip
+# from PATH and must not link this Linux archive. Keep the existing plain vs.
+# keyword target_link_libraries signatures consistent for CUDA and CPU targets.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(TORTOISE_BET_LIBRARY "${CMAKE_CURRENT_SOURCE_DIR}/../external_libraries/bet/Linux/libbetokan.a")
+    target_link_libraries(CreateMask PRIVATE "${TORTOISE_BET_LIBRARY}")
+    if(USECUDA)
+        target_link_libraries(TORTOISEProcess_cuda "${TORTOISE_BET_LIBRARY}")
+        target_link_libraries(DRBUDDI_cuda "${TORTOISE_BET_LIBRARY}")
+    else()
+        target_link_libraries(TORTOISEProcess PRIVATE "${TORTOISE_BET_LIBRARY}")
+        target_link_libraries(DRBUDDI PRIVATE "${TORTOISE_BET_LIBRARY}")
+    endif()
+endif()
+
 
 add_executable(EstimateTensor   ../src/tools/EstimateTensor/estimate_tensor_wlls_main.cxx ../src/tools/EstimateTensor/DTIModel.cxx ../src/tools/EstimateTensor/estimate_tensor_wlls_parser.cxx  ${SOURCES})
 target_link_libraries(EstimateTensor ${ITK_LIBRARIES} ${Boost_LIBRARIES} ${LIBS})
@@ -519,9 +534,12 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/../src/tools/DRTAMAS/"
 
 include(CTest)
 if(BUILD_TESTING)
-    add_executable(MaskAdapterTest ../tests/mask_adapter_test.cxx ../src/main/create_mask.cxx)
-    target_link_libraries(MaskAdapterTest PRIVATE ${ITK_LIBRARIES} ${Boost_LIBRARIES})
-    add_test(NAME mask_adapter COMMAND MaskAdapterTest)
+    # This test mocks the external AFNI command, which is macOS-only.
+    if(APPLE)
+        add_executable(MaskAdapterTest ../tests/mask_adapter_test.cxx ../src/main/create_mask.cxx)
+        target_link_libraries(MaskAdapterTest PRIVATE ${ITK_LIBRARIES} ${Boost_LIBRARIES})
+        add_test(NAME mask_adapter COMMAND MaskAdapterTest)
+    endif()
     if(NOT USECUDA)
         foreach(tool TORTOISEProcess DRBUDDI CreateMask)
             add_test(NAME cli_${tool} COMMAND ${CMAKE_COMMAND}

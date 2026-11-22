@@ -2,8 +2,9 @@
 
 The superbuild downloads checksum-pinned Boost 1.86.0, Eigen 3.4.0,
 FFTW 3.3.10, zlib 1.3.1, and ITK 6.0b02, builds them in a private prefix,
-and builds and installs TORTOISE. AFNI remains a runtime dependency:
-`3dSkullStrip` must be on `PATH` for automatic brain masks.
+and builds and installs TORTOISE. On macOS, AFNI is a runtime dependency:
+`3dSkullStrip` must be on `PATH` for automatic brain masks. Linux links the
+bundled `libbetokan.a` instead and does not require an external masking command.
 
 ## Apple Silicon with Homebrew GCC 15
 
@@ -74,9 +75,10 @@ throughout. This build uses C++17 to match the ITK 6 dependency.
 
 ## Validation
 
-The default build runs CTest before installing TORTOISE. Tests exercise the
-mask adapter with a fake AFNI command (including failure and cleanup paths)
-and check the main CPU command-line usage menus. Run them again with:
+The default build runs CTest before installing TORTOISE. On macOS, tests exercise
+the mask adapter with a fake AFNI command (including failure and cleanup paths).
+CPU builds on both platforms check the main command-line usage menus; these
+checks do not validate Linux BET mask quality. Run them again with:
 
 ```sh
 ctest --test-dir build/macos-gcc15/tortoise-build --output-on-failure
@@ -86,7 +88,7 @@ Use `TORTOISE_BUILD_TESTING=OFF` to skip building the adapter test.
 A successful compile is only the first check. Before scientific use, run the
 command-line tools and `CreateMask` on representative b=0/T2 images, inspect
 mask geometry and coverage, and compare a complete processing run with Linux.
-The switch from BET to AFNI changes brain extraction and does not promise
+The macOS switch from BET to AFNI changes brain extraction and does not promise
 numerically identical results. No representative processing dataset is
 bundled in this repository.
 
