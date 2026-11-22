@@ -6,9 +6,6 @@
 
 
 
-#ifdef __APPLE__
-ImageType3D::Pointer betApple(ImageType3D::Pointer img);
-#endif
 
 ImageType3D::Pointer create_mask(ImageType3D::Pointer img,ImageType3D::Pointer noise_img=nullptr);
 

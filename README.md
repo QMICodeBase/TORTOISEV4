@@ -104,9 +104,68 @@ docker run --gpus all --net=host -e DISPLAY -v /mydatadrive:/mydatadrive eurotom
 
 ## TORTOISEV4 Source code compilation
 
+### Native macOS CPU build (Apple Silicon)
+
+The dependency superbuild automatically downloads checksum-pinned versions of
+Boost, Eigen, FFTW, zlib, and ITK, then builds TORTOISE and runs its tests.
+These instructions were validated on Apple Silicon with GCC 15. CUDA and VTK
+are disabled by default.
+
+First install the Xcode command-line tools, if needed, and wait for their
+installation to finish:
+
+```bash
+xcode-select --install
+```
+
+With Homebrew already installed, install the build tools:
+
+```bash
+brew install cmake ninja gcc@15
+```
+
+After cloning the repository, run the following commands from its root
+(the directory containing this README):
+
+```bash
+cmake -S SuperBuild -B build/macos-gcc15 -G Ninja \
+  -DCMAKE_C_COMPILER="$(command -v gcc-15)" \
+  -DCMAKE_CXX_COMPILER="$(command -v g++-15)" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DTORTOISE_BUILD_JOBS=4
+
+cmake --build build/macos-gcc15 --parallel 2
+cmake --install build/macos-gcc15
+```
+
+The build command downloads and builds the dependencies, builds TORTOISE,
+runs the tests, and installs the executables. The final install command also
+installs the build manifest. All generated files stay under
+`build/macos-gcc15`; no `sudo` is needed for the superbuild. The first build
+requires internet access. If interrupted, rerun the build command to resume.
+
+Add the installed executables to your current shell's path:
+
+```bash
+export PATH="$PWD/build/macos-gcc15/install/bin:$PWD/build/macos-gcc15/install/bin/DRTAMAS:$PATH"
+```
+
+AFNI must be installed separately for automatic brain masking. Ensure its
+`3dSkullStrip` executable is on `PATH`:
+
+```bash
+command -v 3dSkullStrip
+```
+
+The local installation also requires GCC 15's runtime libraries, so keep that
+compiler installation available. This is a CPU build, not a standalone macOS
+application bundle. See [SuperBuild/README.md](SuperBuild/README.md) for build
+options, directory layout, validation details, and using existing dependencies.
+The manual dependency instructions below are an alternative to the superbuild.
+
 ### TORTOISEV4 Prerequisite Libraries
 TORTOISE requires the following libraries to be installed beforehand:
- * ITK 6.0b,  Boost 1.86, CUDA 11.3 or higher (for CUDA executables), Eigen 3.3, FFTW3,  VTK 8.0.1 (only for a single executable). It also uses the nlohmann/json C++ library (https://github.com/nlohmann/json), MPFIT library from  C. Markwardt (http://cow.physics.wisc.edu/~craigm/idl/idl.html) and bet brain masking library from FSL, which are included in the distribution.
+ * ITK 6.0b,  Boost 1.86, CUDA 11.3 or higher (for CUDA executables), Eigen 3.3, FFTW3,  VTK 8.0.1 (only for a single executable). It also uses the nlohmann/json C++ library (https://github.com/nlohmann/json), MPFIT library from  C. Markwardt (http://cow.physics.wisc.edu/~craigm/idl/idl.html) which are included in the distribution. On macOS, automatic brain masking requires AFNI’s `3dSkullStrip` executable on `PATH` at runtime. Linux uses the bundled `libbetokan.a` instead.
 
 The compilation has been tested with GCC-9/G++9 and  GCC-11/G++11.  Nnewer compilers should be okay but we ran into compilation issues compiling with GCC/G++-7.  You also need Cmake for compilation. The version used for testing was Cmake-3.20.
 
@@ -203,12 +262,10 @@ cmake . -D USECUDA=0 -D USE_VTK=1 -D ITK_DIR=../../libraries/InsightToolkit-6.0b
 Then,
 ```
 make -j 16
-cd ..
 export PATH=${PATH}:$(pwd)/bin
 export PATH=${PATH}:$(pwd)/bin/DRTAMAS
 
-echo "export PATH=${PATH}:$(pwd)/bin" >~/.bashrc
-echo "export PATH=${PATH}:$(pwd)/bin/DRTAMAS" >~/.bashrc
+# Add these PATH entries to your shell configuration if desired.
 ```
 
 # TORTOISEV4 Usage examples
@@ -257,3 +314,14 @@ TORTOISEProcess --up_data path_to_your_DWI_NIFTI_file
 
 ```TORTOISEProcess --up_data path_to_your_main_DWI_NIFTI_file --structural path_to_your_anatomical_NIFTI --denoising off --gibbs 0 -c off --epi off --s2v 0 --repol 0 ```
 
+
+### Automatic brain masking
+
+`TORTOISEProcess`, `DRBUDDI`, and `CreateMask` select their automatic brain-masking backend at compile time:
+
+- **Linux:** the original bundled `libbetokan.a`, called in-process with fractional threshold 0.3. No BET or AFNI executable is needed on `PATH`. The archive must be compatible with the target architecture.
+- **macOS:** AFNI `3dSkullStrip`, found on `PATH`. Install AFNI separately.
+
+There is no runtime backend selector or automatic fallback. Comments in `src/main/create_mask.cxx` describe how to adapt the Linux branch to external AFNI or BET.
+
+The macOS adapter uses `-mask_vol` and converts AFNI interior labels (values greater than 3.01) to a binary mask. Each invocation uses a private temporary directory and checks process success, output geometry, and nonempty output. Noise-based masking for non-brain data is unchanged. The two backends use different brain-extraction algorithms; masks and downstream results still need comparison on representative diffusion b=0 and T2-weighted data.
